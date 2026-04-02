@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>SerranaLog Analytics - Indicadores de Transporte</title>
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="style.css">
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-800">
+                    <i class="fas fa-truck-fast text-emerald-700 mr-2"></i> SerranaLog Analytics
+                </h1>
+                <p class="text-gray-500 mt-1">Importe a planilha diária e visualize indicadores de performance logística</p>
+            </div>
+            <div class="bg-white/60 backdrop-blur-sm rounded-full px-4 py-2 shadow-sm text-sm font-mono text-gray-600">
+                <i class="far fa-calendar-alt mr-1"></i> <span id="currentDateLabel">Hoje</span>
+            </div>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden mb-8 border border-gray-100">
+            <div class="bg-gradient-to-r from-emerald-800 to-emerald-700 px-6 py-4">
+                <h2 class="text-xl font-semibold text-white flex items-center gap-2"><i class="fas fa-upload"></i> Importar Arquivo</h2>
+            </div>
+            <div class="p-6">
+                <div id="dropZone" class="upload-zone rounded-xl p-8 text-center cursor-pointer transition-smooth">
+                    <i class="fas fa-file-excel text-5xl text-emerald-600 mb-3"></i>
+                    <p class="text-gray-600 font-medium">Arraste e solte o arquivo Excel (.xlsx, .xls) ou clique para selecionar</p>
+                    <p class="text-gray-400 text-sm mt-1">A estrutura original é mantida — geração automática de indicadores</p>
+                    <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden" />
+                    <button id="selectFileBtn" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg inline-flex items-center gap-2 text-sm font-medium shadow-sm transition"><i class="fas fa-folder-open"></i> Selecionar arquivo</button>
+                </div>
+                <div id="fileInfo" class="mt-4 hidden text-center p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                    <i class="fas fa-check-circle text-emerald-600 mr-2"></i> <span id="fileNameDisplay"></span>
+                </div>
+                <div id="errorMsg" class="mt-3 text-red-600 text-sm hidden bg-red-50 p-2 rounded-lg"></div>
+            </div>
+        </div>
+
+        <!-- Loading spinner -->
+        <div id="loadingSpinner" class="hidden flex justify-center items-center py-10">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-700"></div>
+            <span class="ml-3 text-gray-600">Processando dados...</span>
+        </div>
+
+        <!-- Dashboard cards (hidden until data loaded) -->
+        <div id="dashboardContainer" class="hidden space-y-8">
+            <!-- KPI Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5" id="kpiGrid">
+                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-emerald-500 card-hover">
+                    <div class="flex justify-between items-start">
+                        <div><p class="text-gray-500 text-sm uppercase tracking-wide">Total de Viagens</p><p id="totalViagens" class="text-3xl font-extrabold text-gray-800 mt-1">0</p></div>
+                        <i class="fas fa-chart-line text-emerald-400 text-3xl"></i>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-blue-500 card-hover">
+                    <div><p class="text-gray-500 text-sm uppercase tracking-wide">Peso Total Líquido</p><p id="totalPesoLiq" class="text-3xl font-extrabold text-gray-800 mt-1">0 t</p></div>
+                    <i class="fas fa-weight-hanging text-blue-400 text-3xl float-right -mt-8"></i>
+                </div>
+                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-amber-500 card-hover">
+                    <div><p class="text-gray-500 text-sm uppercase tracking-wide">Volume Real Médio</p><p id="mediaVolumeReal" class="text-3xl font-extrabold text-gray-800 mt-1">0 m³</p></div>
+                    <i class="fas fa-cubes text-amber-400 text-3xl float-right -mt-8"></i>
+                </div>
+                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-purple-500 card-hover">
+                    <div><p class="text-gray-500 text-sm uppercase tracking-wide">Distância Média</p><p id="mediaDistancia" class="text-3xl font-extrabold text-gray-800 mt-1">0 km</p></div>
+                    <i class="fas fa-road text-purple-400 text-3xl float-right -mt-8"></i>
+                </div>
+            </div>
+
+            <!-- Charts row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl shadow p-4">
+                    <h3 class="font-semibold text-gray-700 border-b pb-2 mb-3 flex items-center"><i class="fas fa-hourglass-half text-emerald-600 mr-2"></i> Ciclo Médio por Transportadora (horas)</h3>
+                    <canvas id="cicloChart" width="400" height="250" style="max-height: 280px;"></canvas>
+                </div>
+                <div class="bg-white rounded-xl shadow p-4">
+                    <h3 class="font-semibold text-gray-700 border-b pb-2 mb-3 flex items-center"><i class="fas fa-tachometer-alt text-blue-600 mr-2"></i> Top 5 Transportadoras (por viagens)</h3>
+                    <canvas id="transportadorasChart" width="400" height="250" style="max-height: 280px;"></canvas>
+                </div>
+            </div>
+
+            <!-- Detalhamento e Tabela resumo -->
+            <div class="bg-white rounded-xl shadow overflow-hidden">
+                <div class="bg-gray-50 px-5 py-3 border-b flex justify-between items-center flex-wrap gap-2">
+                    <h3 class="font-bold text-gray-700"><i class="fas fa-table-list mr-2"></i> Resumo dos Últimos Registros</h3>
+                    <span class="text-xs text-gray-400 bg-gray-200 px-2 py-1 rounded-full">Amostra representativa</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-100 text-gray-600">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Movimento</th>
+                                <th class="px-4 py-3 text-left">Transportadora</th>
+                                <th class="px-4 py-3 text-left">Placa Cavalo</th>
+                                <th class="px-4 py-3 text-left">Peso Líq (t)</th>
+                                <th class="px-4 py-3 text-left">Volume (m³)</th>
+                                <th class="px-4 py-3 text-left">Distância (km)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sampleTableBody" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+                <div class="text-right text-xs text-gray-400 p-3 border-t">Base processada: <span id="totalRegistrosSpan">0</span> registros válidos</div>
+            </div>
+        </div>
+
+        <footer class="mt-12 text-center text-gray-400 text-xs border-t pt-6">
+            <i class="fas fa-database mr-1"></i> Sistema dinâmico - SerranaLog • Indicadores atualizados automaticamente via importação Excel
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

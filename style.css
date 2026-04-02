@@ -1,0 +1,57 @@
+* {
+    transition: all 0.2s ease;
+}
+
+body {
+    background: #f4f7fc;
+    font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.card-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.1);
+}
+
+.transition-smooth {
+    transition: all 0.2s;
+}
+
+.upload-zone {
+    border: 2px dashed #cbd5e1;
+    background: #f8fafc;
+}
+
+.upload-zone.drag-over {
+    border-color: #2c7a4d;
+    background: #e8f5e9;
+}
+
+.indicator-card {
+    backdrop-filter: blur(2px);
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 10px;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
