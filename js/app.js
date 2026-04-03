@@ -514,6 +514,7 @@ async function loadDashboardData() {
         document.getElementById('totalViagens').innerText = '0';
         document.getElementById('totalPesoLiq').innerText = '0 t';
         document.getElementById('produtividadeGlobal').innerText = '0.0';
+        document.getElementById('ociosidadeGlobal').innerText = '0%'; // VALOR ZERADO QUANDO NÃO HÁ DADOS
         document.getElementById('bestPlacaValue').innerText = '0.0';
         document.getElementById('bestPlacaName').innerText = 'Nenhum cavalo encontrado';
         if(chartCiclo) chartCiclo.destroy();
@@ -560,6 +561,11 @@ async function loadDashboardData() {
     document.getElementById('filaFabrica').innerText = formatarHorasMinutos(mediaFilaFabrica);
     
     document.getElementById('produtividadeGlobal').innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
+
+    // TAXA DE OCIOSIDADE CALCULADA AQUI
+    const somaFilas = filteredData.reduce((s, d) => s + (d.filaCampoHoras || 0) + (d.filaFabricaHoras || 0), 0);
+    const taxaOciosidade = somaCiclosTotais > 0 ? (somaFilas / somaCiclosTotais) * 100 : 0;
+    document.getElementById('ociosidadeGlobal').innerText = taxaOciosidade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + '%';
 
     // Melhor Cavalo
     const mapaPlacas = new Map();
