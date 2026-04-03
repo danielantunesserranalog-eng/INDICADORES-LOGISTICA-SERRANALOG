@@ -1,141 +1,182 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>SerranaLog Analytics - Indicadores de Transporte</title>
+    <title>Serrana Florestal - Torre de Controle</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
-<body>
+<body class="bg-slate-900 min-h-screen text-slate-200 selection:bg-sky-500/30">
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <div>
-                <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-800">
-                    <i class="fas fa-truck-fast text-emerald-700 mr-2"></i> SerranaLog Analytics
-                </h1>
-                <p class="text-gray-500 mt-1">Importe a planilha diária e visualize indicadores de performance logística</p>
+    <div class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 border-b border-slate-800 pb-6">
+            <div class="flex items-center gap-5">
+                <div class="bg-slate-800/50 p-2 rounded-xl shadow-lg border border-slate-700/50">
+                    <img src="file:///C:/projetos/indicadores_serrana/assets/logo.png" alt="Serrana Florestal" class="h-14 object-contain" onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<i class=\'fas fa-leaf text-4xl text-sky-400 px-2\'></i>');">
+                </div>
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-white flex items-center">
+                        Serrana Florestal
+                        <span class="ml-3 px-3 py-1 bg-sky-500/10 text-sky-400 text-sm font-semibold rounded-full border border-sky-500/20 uppercase tracking-widest">
+                            Torre de Controle
+                        </span>
+                    </h1>
+                    <p class="text-slate-400 mt-1 font-medium tracking-wide">Painel Executivo de Inteligência Logística</p>
+                </div>
             </div>
-            <div class="bg-white/60 backdrop-blur-sm rounded-full px-4 py-2 shadow-sm text-sm font-mono text-gray-600">
-                <i class="far fa-calendar-alt mr-1"></i> <span id="currentDateLabel">Hoje</span>
+            <div class="bg-slate-800 border border-slate-700 rounded-full px-5 py-2.5 shadow-lg text-sm font-mono text-sky-300 flex items-center">
+                <i class="far fa-clock mr-2 text-sky-500"></i> <span id="currentDateLabel">Hoje</span>
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-xl overflow-hidden mb-8 border border-gray-100">
-            <div class="bg-gradient-to-r from-emerald-800 to-emerald-700 px-6 py-4">
-                <h2 class="text-xl font-semibold text-white flex items-center gap-2"><i class="fas fa-upload"></i> Importar Arquivo</h2>
+        <div class="glass-card rounded-2xl overflow-hidden mb-8 border border-slate-700/50 shadow-2xl">
+            <div class="bg-gradient-to-r from-sky-900 to-slate-800 px-6 py-4 border-b border-sky-800/50">
+                <h2 class="text-lg font-semibold text-sky-100 flex items-center gap-2">
+                    <i class="fas fa-cloud-upload-alt text-sky-400"></i> Processamento de Base de Dados (Excel)
+                </h2>
             </div>
             <div class="p-6">
-                <div id="dropZone" class="upload-zone rounded-xl p-8 text-center cursor-pointer transition-smooth">
-                    <i class="fas fa-file-excel text-5xl text-emerald-600 mb-3"></i>
-                    <p class="text-gray-600 font-medium">Arraste e solte o arquivo Excel (.xlsx, .xls) ou clique para selecionar</p>
-                    <p class="text-gray-400 text-sm mt-1">A estrutura original é mantida — geração automática de indicadores e tempos de ciclo</p>
+                <div id="dropZone" class="upload-zone rounded-xl p-8 text-center cursor-pointer transition-smooth group">
+                    <div class="w-20 h-20 mx-auto bg-slate-800 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg border border-slate-700">
+                        <i class="fas fa-file-excel text-4xl text-sky-500"></i>
+                    </div>
+                    <p class="text-slate-200 font-semibold text-lg">Arraste a sua base operacional ou clique para procurar</p>
+                    <p class="text-slate-500 text-sm mt-2 font-medium">O motor calculará distâncias, ciclos vitais e gargalos em tempo real.</p>
                     <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden" />
-                    <button id="selectFileBtn" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg inline-flex items-center gap-2 text-sm font-medium shadow-sm transition"><i class="fas fa-folder-open"></i> Selecionar arquivo</button>
+                    <button id="selectFileBtn" class="mt-5 bg-sky-600 hover:bg-sky-500 text-white px-8 py-2.5 rounded-lg inline-flex items-center gap-2 text-sm font-bold shadow-[0_0_15px_rgba(2,132,199,0.4)] transition-all"><i class="fas fa-folder-open"></i> Selecionar Ficheiro</button>
                 </div>
-                <div id="fileInfo" class="mt-4 hidden text-center p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                    <i class="fas fa-check-circle text-emerald-600 mr-2"></i> <span id="fileNameDisplay"></span>
+                <div id="fileInfo" class="mt-4 hidden text-center p-3 bg-emerald-900/30 rounded-lg border border-emerald-800">
+                    <i class="fas fa-check-circle text-emerald-400 mr-2"></i> <span id="fileNameDisplay" class="text-emerald-100 font-medium"></span>
                 </div>
-                <div id="errorMsg" class="mt-3 text-red-600 text-sm hidden bg-red-50 p-2 rounded-lg"></div>
+                <div id="errorMsg" class="mt-3 text-rose-200 text-sm hidden bg-rose-900/50 border border-rose-800 p-3 rounded-lg font-semibold text-center shadow-lg"></div>
             </div>
         </div>
 
-        <div id="loadingSpinner" class="hidden flex justify-center items-center py-10">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-700"></div>
-            <span class="ml-3 text-gray-600">Processando dados e cruzando horários...</span>
+        <div id="loadingSpinner" class="hidden flex justify-center items-center py-12">
+            <div class="relative w-16 h-16">
+                <div class="absolute inset-0 rounded-full border-t-2 border-sky-400 animate-spin"></div>
+                <div class="absolute inset-2 rounded-full border-r-2 border-cyan-300 animate-spin" style="animation-direction: reverse; animation-duration: 0.7s;"></div>
+            </div>
+            <span class="ml-4 text-sky-200 font-semibold tracking-wide">Sintetizando Indicadores Executivos...</span>
         </div>
 
         <div id="dashboardContainer" class="hidden space-y-6">
             
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5" id="kpiGridExecutivo">
+                <div class="glass-card rounded-2xl p-6 border-l-4 border-l-cyan-400 card-hover flex items-center justify-between relative overflow-hidden">
+                    <div class="absolute -right-6 -top-6 text-slate-700/30 text-9xl"><i class="fas fa-tachometer-alt"></i></div>
+                    <div class="relative z-10">
+                        <p class="text-cyan-400 text-xs font-bold uppercase tracking-widest mb-1">Produtividade Global</p>
+                        <div class="flex items-end gap-2">
+                            <p id="produtividadeGlobal" class="text-4xl font-black text-white">0.0</p>
+                            <span class="text-slate-400 font-bold mb-1">toneladas / hora</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass-card rounded-2xl p-6 border-l-4 border-l-rose-500 card-hover flex items-center justify-between relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 text-slate-700/30 text-9xl"><i class="fas fa-traffic-light"></i></div>
+                    <div class="relative z-10">
+                        <p class="text-rose-400 text-xs font-bold uppercase tracking-widest mb-1">Taxa de Ociosidade (Fila / Ciclo Total)</p>
+                        <div class="flex items-end gap-2">
+                            <p id="ociosidadeGlobal" class="text-4xl font-black text-white">0%</p>
+                            <span class="text-slate-400 font-bold mb-1">do tempo em espera</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5" id="kpiGridPrimary">
-                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-emerald-500 card-hover flex flex-col justify-between">
-                    <div><p class="text-gray-500 text-xs font-bold uppercase tracking-wide">Total de Viagens</p><p id="totalViagens" class="text-2xl font-extrabold text-gray-800 mt-1">0</p></div>
-                    <i class="fas fa-route text-emerald-400 text-2xl self-end -mt-6"></i>
+                <div class="glass-card rounded-2xl p-5 glow-border-blue card-hover flex flex-col justify-between">
+                    <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Viagens Totais</p><p id="totalViagens" class="text-2xl font-extrabold text-white mt-1">0</p></div>
+                    <i class="fas fa-route text-blue-500 text-2xl self-end -mt-6"></i>
                 </div>
-                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-blue-500 card-hover flex flex-col justify-between">
-                    <div><p class="text-gray-500 text-xs font-bold uppercase tracking-wide">Peso Total Liq</p><p id="totalPesoLiq" class="text-2xl font-extrabold text-gray-800 mt-1">0 t</p></div>
-                    <i class="fas fa-weight-hanging text-blue-400 text-2xl self-end -mt-6"></i>
+                <div class="glass-card rounded-2xl p-5 glow-border-cyan card-hover flex flex-col justify-between">
+                    <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Peso Total</p><p id="totalPesoLiq" class="text-2xl font-extrabold text-white mt-1">0 t</p></div>
+                    <i class="fas fa-weight-hanging text-cyan-400 text-2xl self-end -mt-6"></i>
                 </div>
-                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-cyan-500 card-hover flex flex-col justify-between">
-                    <div><p class="text-gray-500 text-xs font-bold uppercase tracking-wide">Carga Média</p><p id="cargaMediaValue" class="text-2xl font-extrabold text-gray-800 mt-1">0 t</p></div>
-                    <i class="fas fa-truck-loading text-cyan-400 text-2xl self-end -mt-6"></i>
+                <div class="glass-card rounded-2xl p-5 glow-border-indigo card-hover flex flex-col justify-between">
+                    <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Carga Média</p><p id="cargaMediaValue" class="text-2xl font-extrabold text-white mt-1">0 t</p></div>
+                    <i class="fas fa-truck-loading text-indigo-400 text-2xl self-end -mt-6"></i>
                 </div>
-                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-amber-500 card-hover flex flex-col justify-between">
-                    <div><p class="text-gray-500 text-xs font-bold uppercase tracking-wide">Vol. Real Médio</p><p id="mediaVolumeReal" class="text-2xl font-extrabold text-gray-800 mt-1">0 m³</p></div>
-                    <i class="fas fa-cubes text-amber-400 text-2xl self-end -mt-6"></i>
+                <div class="glass-card rounded-2xl p-5 glow-border-amber card-hover flex flex-col justify-between">
+                    <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Vol. Médio</p><p id="mediaVolumeReal" class="text-2xl font-extrabold text-white mt-1">0 m³</p></div>
+                    <i class="fas fa-cubes text-amber-500 text-2xl self-end -mt-6"></i>
                 </div>
-                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-purple-500 card-hover flex flex-col justify-between">
-                    <div><p class="text-gray-500 text-xs font-bold uppercase tracking-wide">Distância Média</p><p id="mediaDistancia" class="text-2xl font-extrabold text-gray-800 mt-1">0 km</p></div>
-                    <i class="fas fa-road text-purple-400 text-2xl self-end -mt-6"></i>
+                <div class="glass-card rounded-2xl p-5 glow-border-emerald card-hover flex flex-col justify-between">
+                    <div>
+                        <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Dist. Média</p>
+                        <p id="mediaDistancia" class="text-2xl font-extrabold text-white mt-1">0 km</p>
+                        <div class="flex flex-col mt-2 text-[10px] font-bold text-slate-500 border-t border-slate-700/50 pt-2">
+                            <span class="flex justify-between items-center text-slate-300"><span>Asfalto:</span> <span id="mediaAsfalto">0</span> km</span>
+                            <span class="flex justify-between items-center text-amber-400 mt-1"><span>Terra:</span> <span id="mediaTerra">0</span> km</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-4" id="kpiGridSecondary">
-                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-indigo-600 card-hover">
+                <div class="glass-card rounded-2xl p-6 glow-border-blue card-hover">
                     <div class="flex justify-between items-start">
-                        <div><p class="text-gray-500 text-sm font-bold uppercase tracking-wide">Ciclo Médio Global</p><p id="cicloMedio" class="text-3xl font-extrabold text-indigo-700 mt-1">0 h</p></div>
-                        <i class="fas fa-stopwatch text-indigo-400 text-3xl"></i>
+                        <div><p class="text-blue-400 text-xs font-bold uppercase tracking-widest">Ciclo Médio Global</p><p id="cicloMedio" class="text-3xl font-black text-white mt-2">0 h</p></div>
+                        <i class="fas fa-stopwatch text-blue-500/50 text-4xl"></i>
                     </div>
-                    <p class="text-xs text-gray-400 mt-2 font-medium">Saída Fábrica ➔ Início Descarga</p>
+                    <p class="text-[10px] text-slate-500 mt-3 font-semibold uppercase tracking-wider">Saída Fábrica ➔ Início Descarga</p>
                 </div>
-                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-orange-500 card-hover">
+                <div class="glass-card rounded-2xl p-6 glow-border-amber card-hover">
                     <div class="flex justify-between items-start">
-                        <div><p class="text-gray-500 text-sm font-bold uppercase tracking-wide">Fila Média Campo</p><p id="filaCampo" class="text-3xl font-extrabold text-orange-600 mt-1">0 h</p></div>
-                        <i class="fas fa-tractor text-orange-400 text-3xl"></i>
+                        <div><p class="text-amber-400 text-xs font-bold uppercase tracking-widest">Fila Média Campo</p><p id="filaCampo" class="text-3xl font-black text-white mt-2">0 h</p></div>
+                        <i class="fas fa-tractor text-amber-500/50 text-4xl"></i>
                     </div>
-                    <p class="text-xs text-gray-400 mt-2 font-medium">Chegada Campo ➔ Início Carreg.</p>
+                    <p class="text-[10px] text-slate-500 mt-3 font-semibold uppercase tracking-wider">Chegada Campo ➔ Início Carregamento</p>
                 </div>
-                <div class="bg-white rounded-2xl shadow-md p-5 border-l-8 border-rose-500 card-hover">
+                <div class="glass-card rounded-2xl p-6 glow-border-rose card-hover">
                     <div class="flex justify-between items-start">
-                        <div><p class="text-gray-500 text-sm font-bold uppercase tracking-wide">Fila Média Fábrica</p><p id="filaFabrica" class="text-3xl font-extrabold text-rose-600 mt-1">0 h</p></div>
-                        <i class="fas fa-industry text-rose-400 text-3xl"></i>
+                        <div><p class="text-rose-400 text-xs font-bold uppercase tracking-widest">Fila Média Fábrica</p><p id="filaFabrica" class="text-3xl font-black text-white mt-2">0 h</p></div>
+                        <i class="fas fa-industry text-rose-500/50 text-4xl"></i>
                     </div>
-                    <p class="text-xs text-gray-400 mt-2 font-medium">Entrada Fábrica ➔ Início Descarga</p>
+                    <p class="text-[10px] text-slate-500 mt-3 font-semibold uppercase tracking-wider">Entrada Fábrica ➔ Início Descarga</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white rounded-xl shadow p-4">
-                    <h3 class="font-semibold text-gray-700 border-b pb-2 mb-3 flex items-center"><i class="fas fa-hourglass-half text-indigo-600 mr-2"></i> Ciclo Médio por Transportadora (h)</h3>
+                <div class="glass-card rounded-xl p-5 border border-slate-700/50">
+                    <h3 class="font-bold text-slate-200 border-b border-slate-700 pb-3 mb-4 flex items-center uppercase tracking-wide text-sm"><i class="fas fa-chart-bar text-sky-500 mr-2"></i> Ciclo Médio por Transportadora (h)</h3>
                     <canvas id="cicloChart" width="400" height="250" style="max-height: 280px;"></canvas>
                 </div>
-                <div class="bg-white rounded-xl shadow p-4">
-                    <h3 class="font-semibold text-gray-700 border-b pb-2 mb-3 flex items-center"><i class="fas fa-chart-pie text-emerald-600 mr-2"></i> Top 5 Transportadoras (por viagens)</h3>
+                <div class="glass-card rounded-xl p-5 border border-slate-700/50">
+                    <h3 class="font-bold text-slate-200 border-b border-slate-700 pb-3 mb-4 flex items-center uppercase tracking-wide text-sm"><i class="fas fa-chart-pie text-cyan-500 mr-2"></i> Top Transportadoras (Volume de Viagens)</h3>
                     <canvas id="transportadorasChart" width="400" height="250" style="max-height: 280px;"></canvas>
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow overflow-hidden">
-                <div class="bg-gray-50 px-5 py-3 border-b flex justify-between items-center flex-wrap gap-2">
-                    <h3 class="font-bold text-gray-700"><i class="fas fa-table-list mr-2"></i> Resumo Analítico (Últimos Registros)</h3>
-                    <span class="text-xs text-gray-500 bg-gray-200 px-3 py-1 rounded-full font-medium">Amostra representativa</span>
+            <div class="glass-card rounded-xl shadow-2xl overflow-hidden border border-slate-700/50">
+                <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center flex-wrap gap-2">
+                    <h3 class="font-bold text-white tracking-wide"><i class="fas fa-table-list text-sky-500 mr-2"></i> Resumo Analítico Automático</h3>
+                    <span class="text-xs text-sky-200 bg-sky-900/50 border border-sky-700 px-3 py-1 rounded-full font-semibold tracking-wider">Amostra em tempo real</span>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead class="bg-gray-100 text-gray-600">
+                    <table class="min-w-full text-sm text-left">
+                        <thead class="bg-slate-900/50 text-slate-400 font-semibold uppercase text-[11px] tracking-wider border-b border-slate-700">
                             <tr>
-                                <th class="px-4 py-3 text-left font-semibold">Movimento</th>
-                                <th class="px-4 py-3 text-left font-semibold">Transportadora</th>
-                                <th class="px-4 py-3 text-left font-semibold">Placa</th>
-                                <th class="px-4 py-3 text-right font-semibold">Peso Líq (t)</th>
-                                <th class="px-4 py-3 text-right font-semibold">Distância (km)</th>
-                                <th class="px-4 py-3 text-right font-semibold">Ciclo (h)</th>
+                                <th class="px-6 py-4">Movimento</th>
+                                <th class="px-6 py-4">Transportadora</th>
+                                <th class="px-6 py-4">Placa</th>
+                                <th class="px-6 py-4 text-right">Peso (t)</th>
+                                <th class="px-6 py-4 text-right">Dist. (km)</th>
+                                <th class="px-6 py-4 text-right">Ciclo (h)</th>
                             </tr>
                         </thead>
-                        <tbody id="sampleTableBody" class="divide-y divide-gray-100"></tbody>
+                        <tbody id="sampleTableBody" class="divide-y divide-slate-800 text-slate-300"></tbody>
                     </table>
                 </div>
-                <div class="text-right text-xs text-gray-500 p-3 border-t bg-gray-50">Base processada: <span id="totalRegistrosSpan" class="font-bold">0</span> registros válidos</div>
+                <div class="bg-slate-900/80 text-right text-xs text-slate-500 p-4 font-semibold">Base processada: <span id="totalRegistrosSpan" class="font-bold text-sky-400">0</span> viagens completas</div>
             </div>
         </div>
-
-        <footer class="mt-12 text-center text-gray-400 text-xs border-t pt-6 mb-4">
-            <i class="fas fa-database mr-1"></i> Sistema dinâmico - SerranaLog • Indicadores atualizados automaticamente via importação Excel
-        </footer>
     </div>
 
     <script src="app.js"></script>

@@ -1,11 +1,15 @@
-// SerranaLog Analytics - Main Application Script
+// SerranaLog Analytics - Main Application Script (Dark Executive Edition)
 
-// Global variables
+// Configuração Global Chart.js para Dark Mode
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
+Chart.defaults.font.family = "'Inter', sans-serif";
+
 let currentWorkbookData = [];
 let chartCiclo = null;
 let chartTransp = null;
 
-// DOM elements
+// Elementos do DOM
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const selectFileBtn = document.getElementById('selectFileBtn');
@@ -15,185 +19,155 @@ const errorMsgDiv = document.getElementById('errorMsg');
 const loadingSpinner = document.getElementById('loadingSpinner');
 const dashboardContainer = document.getElementById('dashboardContainer');
 
-// KPI elements
+// Elementos de KPI
 const totalViagensSpan = document.getElementById('totalViagens');
 const totalPesoLiqSpan = document.getElementById('totalPesoLiq');
 const cargaMediaSpan = document.getElementById('cargaMediaValue');
 const mediaVolumeRealSpan = document.getElementById('mediaVolumeReal');
 const mediaDistanciaSpan = document.getElementById('mediaDistancia');
+const mediaAsfaltoSpan = document.getElementById('mediaAsfalto');
+const mediaTerraSpan = document.getElementById('mediaTerra');
 const cicloMedioSpan = document.getElementById('cicloMedio');
 const filaCampoSpan = document.getElementById('filaCampo');
 const filaFabricaSpan = document.getElementById('filaFabrica');
 const totalRegistrosSpan = document.getElementById('totalRegistrosSpan');
 const sampleTableBody = document.getElementById('sampleTableBody');
 
-// Set current date
-document.getElementById('currentDateLabel').innerText = new Date().toLocaleDateString('pt-BR');
+// Novos Elementos Executivos
+const produtividadeGlobalSpan = document.getElementById('produtividadeGlobal');
+const ociosidadeGlobalSpan = document.getElementById('ociosidadeGlobal');
 
-// Helper: show error message
+document.getElementById('currentDateLabel').innerText = new Date().toLocaleDateString('pt-PT');
+
 function showError(msg) {
     errorMsgDiv.innerText = msg;
     errorMsgDiv.classList.remove('hidden');
-    setTimeout(() => errorMsgDiv.classList.add('hidden'), 6000);
+    setTimeout(() => errorMsgDiv.classList.add('hidden'), 7000);
+}
+function hideError() { errorMsgDiv.classList.add('hidden'); }
+
+function parsePtBrNumber(val) {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    let str = String(val).trim();
+    if (str.includes(',')) str = str.replace(/\./g, '').replace(',', '.');
+    return parseFloat(str) || 0;
 }
 
-function hideError() {
-    errorMsgDiv.classList.add('hidden');
-}
-
-// Helper: Parse Date and Time combinations, handling Excel specific serial numbers
 function parseDateTime(dateVal, timeVal) {
     if (dateVal === undefined || dateVal === null || dateVal === "") return null;
-
     let baseDate = null;
-    
-    // Parse Date
     if (typeof dateVal === 'number') {
-        const dateCode = XLSX.SSF.parse_date_code(dateVal);
-        if (dateCode) {
-            baseDate = new Date(dateCode.y, dateCode.m - 1, dateCode.d);
-        }
+        const dateInfo = XLSX.SSF.parse_date_code(dateVal);
+        if (dateInfo) baseDate = new Date(dateInfo.y, dateInfo.m - 1, dateInfo.d);
     } else if (typeof dateVal === 'string') {
-        if (dateVal.includes('/')) {
-            const parts = dateVal.split(' ')[0].split('/');
-            if(parts.length === 3) {
-                // assume DD/MM/YYYY
-                baseDate = new Date(parts[2], parts[1] - 1, parts[0]);
-            } else {
-                baseDate = new Date(dateVal);
+        const str = dateVal.trim();
+        if (str.includes('/')) {
+            const parts = str.split(' ')[0].split('/');
+            if (parts.length >= 3) {
+                let year = parseInt(parts[2], 10);
+                if (year < 100) year += 2000;
+                baseDate = new Date(year, parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
             }
-        } else {
-            baseDate = new Date(dateVal);
-        }
+        } else { baseDate = new Date(str); }
     }
-
     if (!baseDate || isNaN(baseDate.getTime())) return null;
 
-    // Parse Time
     let hours = 0, minutes = 0, seconds = 0;
     if (typeof timeVal === 'number') {
-        // Excel stores time as a fraction of a day
-        let totalSeconds = Math.round(timeVal * 24 * 3600);
+        let fraction = timeVal % 1; 
+        if (fraction < 0) fraction += 1;
+        let totalSeconds = Math.round(fraction * 24 * 3600);
         hours = Math.floor(totalSeconds / 3600);
         totalSeconds %= 3600;
         minutes = Math.floor(totalSeconds / 60);
         seconds = totalSeconds % 60;
     } else if (typeof timeVal === 'string' && timeVal.trim() !== "") {
-        const parts = timeVal.split(':');
-        hours = parseInt(parts[0]) || 0;
-        minutes = parseInt(parts[1]) || 0;
-        seconds = parseInt(parts[2]) || 0;
+        const tParts = timeVal.trim().split(':');
+        hours = parseInt(tParts[0], 10) || 0;
+        minutes = parseInt(tParts[1], 10) || 0;
+        seconds = parseInt(tParts[2], 10) || 0;
     }
-
-    baseDate.setHours(hours, minutes, seconds);
+    baseDate.setHours(hours, minutes, seconds, 0);
     return baseDate;
 }
 
-// Helper: Calculate diff in hours between two sets of Data/Hora
 function calcHoursDiff(dtStart, hrStart, dtEnd, hrEnd) {
     const start = parseDateTime(dtStart, hrStart);
     const end = parseDateTime(dtEnd, hrEnd);
-    
     if (start && end && !isNaN(start) && !isNaN(end)) {
-        let diffMs = end - start;
-        let diffHours = diffMs / (1000 * 3600);
-        
-        // Remove discrepâncias absurdas (ex: erros de digitação maiores que 5 dias)
-        if (diffHours >= 0 && diffHours <= 120) {
-            return diffHours;
-        }
+        let diffHours = (end - start) / (1000 * 3600);
+        if (diffHours >= 0 && diffHours <= 120) return diffHours;
     }
     return null;
 }
 
-// Normalize data from sheet
+function normalizeStr(str) {
+    if (!str) return "";
+    return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
 function parseSheetToData(sheet) {
     const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-    if (!rawData || rawData.length === 0) throw new Error("Planilha sem dados ou vazia.");
+    if (!rawData || rawData.length === 0) throw new Error("A folha de cálculo não contém dados válidos.");
 
-    const firstRow = rawData[0];
-    const keys = Object.keys(firstRow);
+    const keys = Object.keys(rawData[0]);
+    const normKeys = keys.map(k => ({ orig: k, norm: normalizeStr(k) }));
 
     function findKey(possibilities) {
         for (let p of possibilities) {
-            const found = keys.find(k => k.toLowerCase().includes(p.toLowerCase()));
-            if (found) return found;
+            const normP = normalizeStr(p);
+            let found = normKeys.find(k => k.norm === normP || k.norm.includes(normP));
+            if (found) return found.orig;
         }
         return null;
     }
 
-    // Identificadores base
     const movimentoKey = findKey(['movimento', 'id_movimento']);
-    const transpKey = findKey(['transportadora', 'nome da transportadora']);
-    const placaKey = findKey(['placa do cavalo', 'placa cavalo']);
-    const pesoLiqKey = findKey(['peso líquido', 'peso_liquido']);
+    const transpKey = findKey(['transportadora', 'nome da transportadora', 'fornecedor']);
+    const placaKey = findKey(['placa do cavalo', 'placa cavalo', 'placa']);
+    
+    const pesoLiqKey = findKey(['peso líquido', 'peso liquido', 'peso_liquido']);
     const volumeKey = findKey(['volume real', 'volume_real']);
-    const distanciaKey = findKey(['distância', 'distancia']);
+    const distAsfaltoKey = findKey(['distancia por asfalto', 'distância por asfalto', 'distancia asfalto']);
+    const distTerraKey = findKey(['distancia por terra', 'distância por terra', 'distancia terra']);
 
-    // Datas e Horas para Ciclo e Filas (Corrigido para cruzar colunas separadas)
     const dtSaidaFabKey = findKey(['data saída fábrica', 'data saida fabrica']);
-    const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saida fabrica']);
-    
     const dtChegadaCampoKey = findKey(['data chegada campo']);
-    const hrChegadaCampoKey = findKey(['hora chegada campo']);
     const dtInicioCarregCpoKey = findKey(['dt início carreg cpo', 'dt inicio carreg cpo']);
-    const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo']);
-    
     const dtEntradaKey = findKey(['data de entrada', 'data entrada']);
+    const dtInicioDescarFabKey = findKey(['dt início descar fáb', 'dt inicio descar fab']);
+
+    const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saida fabrica']);
+    const hrChegadaCampoKey = findKey(['hora chegada campo']);
+    const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo']);
     const hrEntradaKey = findKey(['hora de entrada', 'hora entrada']);
-    const dtInicioDescarFabKey = findKey(['dt início descar fáb', 'dt inicio descar fab', 'data inicio descar fab']);
-    const hrInicioDescarFabKey = findKey(['hr início descar fáb', 'hr inicio descar fab', 'hora inicio descar fab']);
+    const hrInicioDescarFabKey = findKey(['hr início descar fáb', 'hr inicio descar fab']);
 
     const mappedData = rawData.map((row, idx) => {
         const getValue = (key) => (key && row[key] !== undefined && row[key] !== "") ? row[key] : null;
 
         const movimento = getValue(movimentoKey) || `MOV-${idx}`;
         let transportadora = String(getValue(transpKey) || "Não identificada").trim();
-        const placa = String(getValue(placaKey) || "-").trim();
-
-        let pesoLiq = parseFloat(getValue(pesoLiqKey));
-        if (isNaN(pesoLiq)) pesoLiq = 0;
-        let volume = parseFloat(getValue(volumeKey));
-        if (isNaN(volume)) volume = 0;
-        let distancia = parseFloat(getValue(distanciaKey));
-        if (isNaN(distancia)) distancia = 0;
-
-        // Cálculos de Tempos da Operação (com base sólida comparando data de inicio vs data de fim)
-        const cicloHoras = calcHoursDiff(
-            getValue(dtSaidaFabKey), getValue(hrSaidaFabKey),
-            getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey)
-        );
-
-        const filaCampoHoras = calcHoursDiff(
-            getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey),
-            getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey)
-        );
-
-        const filaFabricaHoras = calcHoursDiff(
-            getValue(dtEntradaKey), getValue(hrEntradaKey),
-            getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey)
-        );
-
-        // Limpeza de nome de transportadora para gráficos
         transportadora = transportadora.replace(/\s+(LTDA|Ltda|LTDA\.|S\.A\.|EIRELI)$/i, '').trim();
 
         return {
             movimento: String(movimento),
             transportadora: transportadora,
-            placa: placa,
-            pesoLiquido: pesoLiq,
-            volumeReal: volume,
-            distanciaKm: distancia,
-            cicloHoras: cicloHoras,
-            filaCampoHoras: filaCampoHoras,
-            filaFabricaHoras: filaFabricaHoras
+            placa: String(getValue(placaKey) || "-").trim(),
+            pesoLiquido: parsePtBrNumber(getValue(pesoLiqKey)),
+            volumeReal: parsePtBrNumber(getValue(volumeKey)),
+            distanciaAsfalto: parsePtBrNumber(getValue(distAsfaltoKey)),
+            distanciaTerra: parsePtBrNumber(getValue(distTerraKey)),
+            cicloHoras: calcHoursDiff(getValue(dtSaidaFabKey), getValue(hrSaidaFabKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey)),
+            filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey)),
+            filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey))
         };
     });
 
-    return mappedData.filter(item => item.pesoLiquido > 0 || item.volumeReal > 0 || item.distanciaKm > 0);
+    return mappedData.filter(item => item.pesoLiquido > 0 || item.volumeReal > 0 || item.transportadora !== "Não identificada");
 }
 
-// Process file and render dashboard
 async function processExcelFile(file) {
     hideError();
     loadingSpinner.classList.remove('hidden');
@@ -203,24 +177,29 @@ async function processExcelFile(file) {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data, { type: 'array', cellDates: false, defval: "" });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        if (!firstSheet) throw new Error("Nenhuma aba encontrada no arquivo.");
+        if (!firstSheet) throw new Error("O ficheiro não contém abas válidas.");
 
         const parsedRows = parseSheetToData(firstSheet);
-        if (parsedRows.length === 0) throw new Error("Nenhum dado válido encontrado. Verifique as colunas base da operação.");
+        if (parsedRows.length === 0) throw new Error("A folha não tem dados na estrutura correta.");
 
         currentWorkbookData = parsedRows;
 
-        // Calculate KPIs Gerais
+        // Cálculos Macro
         const totalViagens = currentWorkbookData.length;
-        const totalPesoKg = currentWorkbookData.reduce((sum, r) => sum + (r.pesoLiquido || 0), 0);
+        const totalPesoKg = currentWorkbookData.reduce((sum, r) => sum + r.pesoLiquido, 0);
         const totalPesoTon = totalPesoKg / 1000;
-        const cargaMediaTon = totalPesoTon / totalViagens;
-        const mediaVolume = currentWorkbookData.reduce((sum, r) => sum + (r.volumeReal || 0), 0) / totalViagens;
-        const mediaDist = currentWorkbookData.reduce((sum, r) => sum + (r.distanciaKm || 0), 0) / totalViagens;
+        
+        const cargaMediaTon = totalViagens > 0 ? (totalPesoTon / totalViagens) : 0;
+        const mediaVolume = totalViagens > 0 ? currentWorkbookData.reduce((sum, r) => sum + r.volumeReal, 0) / totalViagens : 0;
+        
+        const mediaAsfalto = totalViagens > 0 ? currentWorkbookData.reduce((sum, r) => sum + r.distanciaAsfalto, 0) / totalViagens : 0;
+        const mediaTerra = totalViagens > 0 ? currentWorkbookData.reduce((sum, r) => sum + r.distanciaTerra, 0) / totalViagens : 0;
+        const mediaDistTotal = mediaAsfalto + mediaTerra;
 
-        // Calculate KPIs de Tempos (médias ignorando nulos)
+        // Cálculos Médios de Tempo e Executivos
         const validCycles = currentWorkbookData.filter(d => d.cicloHoras !== null);
-        const mediaCiclo = validCycles.length > 0 ? validCycles.reduce((s, d) => s + d.cicloHoras, 0) / validCycles.length : 0;
+        const somaCiclosTotais = validCycles.reduce((s, d) => s + d.cicloHoras, 0);
+        const mediaCiclo = validCycles.length > 0 ? somaCiclosTotais / validCycles.length : 0;
 
         const validFilaCampo = currentWorkbookData.filter(d => d.filaCampoHoras !== null);
         const mediaFilaCampo = validFilaCampo.length > 0 ? validFilaCampo.reduce((s, d) => s + d.filaCampoHoras, 0) / validFilaCampo.length : 0;
@@ -228,19 +207,30 @@ async function processExcelFile(file) {
         const validFilaFabrica = currentWorkbookData.filter(d => d.filaFabricaHoras !== null);
         const mediaFilaFabrica = validFilaFabrica.length > 0 ? validFilaFabrica.reduce((s, d) => s + d.filaFabricaHoras, 0) / validFilaFabrica.length : 0;
 
-        // Atualizar painéis no DOM
+        // Indicadores Poderosos (Produtividade e Ociosidade)
+        const somaTempoFila = validCycles.reduce((s, d) => s + (d.filaCampoHoras || 0) + (d.filaFabricaHoras || 0), 0);
+        const produtividade = somaCiclosTotais > 0 ? (totalPesoTon / somaCiclosTotais) : 0;
+        const ociosidadePerc = somaCiclosTotais > 0 ? (somaTempoFila / somaCiclosTotais) * 100 : 0;
+
+        // Atualizar Visores de KPI
         totalViagensSpan.innerText = totalViagens;
-        totalPesoLiqSpan.innerText = totalPesoTon.toFixed(1) + " t";
-        cargaMediaSpan.innerText = cargaMediaTon.toFixed(1) + " t";
-        mediaVolumeRealSpan.innerText = mediaVolume.toFixed(1) + " m³";
-        mediaDistanciaSpan.innerText = mediaDist.toFixed(1) + " km";
+        totalPesoLiqSpan.innerText = totalPesoTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
+        cargaMediaSpan.innerText = cargaMediaTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
+        mediaVolumeRealSpan.innerText = mediaVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
+        
+        mediaDistanciaSpan.innerText = mediaDistTotal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " km";
+        mediaAsfaltoSpan.innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
+        mediaTerraSpan.innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
+        
         totalRegistrosSpan.innerText = totalViagens;
+        cicloMedioSpan.innerText = mediaCiclo.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " h";
+        filaCampoSpan.innerText = mediaFilaCampo.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " h";
+        filaFabricaSpan.innerText = mediaFilaFabrica.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " h";
 
-        cicloMedioSpan.innerText = mediaCiclo.toFixed(1) + " h";
-        filaCampoSpan.innerText = mediaFilaCampo.toFixed(1) + " h";
-        filaFabricaSpan.innerText = mediaFilaFabrica.toFixed(1) + " h";
+        produtividadeGlobalSpan.innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
+        ociosidadeGlobalSpan.innerText = ociosidadePerc.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + "%";
 
-        // Preparar dados para Gráficos: Top 5 Transportadoras
+        // Geração de Dados para Gráficos
         const transpCount = new Map();
         const transpCicloSum = new Map();
         const transpCicloCount = new Map();
@@ -254,10 +244,7 @@ async function processExcelFile(file) {
             }
         });
 
-        const topTransportadoras = Array.from(transpCount.entries())
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5);
-
+        const topTransportadoras = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
         const transpLabels = topTransportadoras.map(t => t[0].length > 20 ? t[0].substring(0, 18) + "..." : t[0]);
         const transpValues = topTransportadoras.map(t => t[1]);
 
@@ -269,8 +256,12 @@ async function processExcelFile(file) {
         if (chartCiclo) chartCiclo.destroy();
         if (chartTransp) chartTransp.destroy();
 
-        // Gráfico 1: Ciclo Médio
+        // Gráfico de Barras Neon Dark
         const ctxCiclo = document.getElementById('cicloChart').getContext('2d');
+        let gradientBar = ctxCiclo.createLinearGradient(0, 0, 0, 400);
+        gradientBar.addColorStop(0, '#38bdf8'); // sky-400
+        gradientBar.addColorStop(1, '#0284c7'); // sky-600
+
         chartCiclo = new Chart(ctxCiclo, {
             type: 'bar',
             data: {
@@ -278,53 +269,51 @@ async function processExcelFile(file) {
                 datasets: [{
                     label: 'Ciclo Médio (h)',
                     data: cicloMedioPorTransp,
-                    backgroundColor: '#4f46e5',
+                    backgroundColor: gradientBar,
                     borderRadius: 6,
                     barPercentage: 0.6
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { position: 'top' } },
+                responsive: true, maintainAspectRatio: true,
+                plugins: { legend: { display: false } },
                 scales: { y: { beginAtZero: true } }
             }
         });
 
-        // Gráfico 2: Distribuição de Viagens
+        // Gráfico Donut Dark
         const ctxTransp = document.getElementById('transportadorasChart').getContext('2d');
         chartTransp = new Chart(ctxTransp, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
                 labels: transpLabels,
                 datasets: [{
                     data: transpValues,
-                    backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'],
-                    borderWidth: 0
+                    backgroundColor: ['#0ea5e9', '#06b6d4', '#6366f1', '#8b5cf6', '#3b82f6'],
+                    borderWidth: 2,
+                    borderColor: '#1e293b' // slate-800
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { position: 'right', labels: { font: { size: 11 } } }
-                }
+                responsive: true, maintainAspectRatio: true, cutout: '65%',
+                plugins: { legend: { position: 'right', labels: { font: { size: 11, family: "'Inter', sans-serif" } } } }
             }
         });
 
-        // Preencher Tabela de Amostra (Agregado Coluna Ciclo)
+        // Preencher Tabela Analítica
         sampleTableBody.innerHTML = '';
         const sampleRows = currentWorkbookData.slice(0, 8);
         sampleRows.forEach(row => {
             const tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-50';
+            tr.className = 'hover:bg-slate-800/80 transition-colors';
+            const distTotalRow = row.distanciaAsfalto + row.distanciaTerra;
             tr.innerHTML = `
-                <td class="px-4 py-3 font-mono text-xs text-gray-600">${row.movimento.substring(0, 14)}</td>
-                <td class="px-4 py-3 max-w-xs truncate" title="${row.transportadora}">${row.transportadora.substring(0, 30)}</td>
-                <td class="px-4 py-3 font-mono text-xs">${row.placa}</td>
-                <td class="px-4 py-3 text-right">${(row.pesoLiquido / 1000).toFixed(1)} t</td>
-                <td class="px-4 py-3 text-right">${row.distanciaKm.toFixed(1)} km</td>
-                <td class="px-4 py-3 text-right font-bold text-indigo-600">${row.cicloHoras !== null ? row.cicloHoras.toFixed(1) + ' h' : '-'}</td>
+                <td class="px-6 py-4 font-mono text-xs text-sky-300">${row.movimento.substring(0, 14)}</td>
+                <td class="px-6 py-4 font-medium max-w-xs truncate" title="${row.transportadora}">${row.transportadora.substring(0, 30)}</td>
+                <td class="px-6 py-4 font-mono text-xs text-slate-400">${row.placa}</td>
+                <td class="px-6 py-4 text-right font-semibold">${(row.pesoLiquido / 1000).toLocaleString('pt-PT', {maximumFractionDigits: 1})}</td>
+                <td class="px-6 py-4 text-right">${distTotalRow.toLocaleString('pt-PT', {maximumFractionDigits: 1})}</td>
+                <td class="px-6 py-4 text-right font-black text-sky-400">${row.cicloHoras !== null ? row.cicloHoras.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' h' : '-'}</td>
             `;
             sampleTableBody.appendChild(tr);
         });
@@ -334,52 +323,37 @@ async function processExcelFile(file) {
 
     } catch (err) {
         console.error(err);
-        showError("Erro ao processar arquivo: " + err.message);
+        showError("Erro de leitura: " + err.message);
         dashboardContainer.classList.add('hidden');
     } finally {
         loadingSpinner.classList.add('hidden');
     }
 }
 
-// Event Listeners para Drag & Drop e Clique
-dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('drag-over');
-});
-
+// Controladores de Eventos
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
-
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        const file = files[0];
+    if (e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
         if (file.name.match(/\.(xlsx|xls)$/i)) {
-            fileInfoDiv.classList.remove('hidden');
-            fileNameSpan.innerText = `📄 ${file.name}`;
+            fileInfoDiv.classList.remove('hidden'); fileNameSpan.innerText = `📄 ${file.name}`;
             processExcelFile(file);
-        } else {
-            showError("Formato inválido. Envie arquivo .xlsx ou .xls");
-        }
+        } else { showError("Formato inválido. Apenas Excel (.xlsx ou .xls)"); }
     }
 });
 
 selectFileBtn.addEventListener('click', () => fileInput.click());
-
 fileInput.addEventListener('change', (e) => {
     if (e.target.files.length) {
         const file = e.target.files[0];
-        fileInfoDiv.classList.remove('hidden');
-        fileNameSpan.innerText = `📄 ${file.name}`;
+        fileInfoDiv.classList.remove('hidden'); fileNameSpan.innerText = `📄 ${file.name}`;
         processExcelFile(file);
     }
 });
 
 dropZone.addEventListener('click', (e) => {
-    if (e.target === dropZone || (e.target.closest('.upload-zone') && !e.target.closest('#selectFileBtn'))) {
-        fileInput.click();
-    }
+    if (e.target === dropZone || (e.target.closest('.upload-zone') && !e.target.closest('#selectFileBtn'))) fileInput.click();
 });
-
-console.log("SerranaLog Analytics carregado. Aguardando upload.");
