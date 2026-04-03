@@ -4,12 +4,6 @@ Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
 Chart.defaults.font.family = "'Inter', sans-serif";
 
-// DB Setup
-localforage.config({
-    name: 'SerranaFlorestalDB',
-    storeName: 'historico_viagens'
-});
-
 // UI Elements
 const viewDashboard = document.getElementById('viewDashboard');
 const viewLancamento = document.getElementById('viewLancamento');
@@ -167,7 +161,6 @@ function parseSheetToData(sheet) {
 
         const movimento = getValue(movimentoKey) || `MOV-GEN-${Date.now()}-${idx}`;
         let transportadora = String(getValue(transpKey) || "Não identificada").trim().replace(/\s+(LTDA|Ltda|LTDA\.|S\.A\.|EIRELI)$/i, '').trim();
-        // Fallback rápido caso a celula esteja vazia
         if(!transportadora) transportadora = "Outras";
 
         const rawDtSaida = getValue(dtSaidaBaseKey);
@@ -206,7 +199,6 @@ const centerTextPlugin = {
         const centerX = (chartArea.left + chartArea.right) / 2;
         const centerY = (chartArea.top + chartArea.bottom) / 2;
         
-        // Se todas as viagens forem 0 por causa de um filtro restrito
         const total = chart.config.data.datasets[0].data.reduce((a, b) => a + b, 0);
 
         ctx.restore();
@@ -232,17 +224,23 @@ const centerTextPlugin = {
 
 async function carregarHistoricoImportacoes() {
     try {
-        const historico = await localforage.getItem('historico_importacoes') || [];
+        const { data: historico, error } = await supabase
+            .from('historico_importacoes')
+            .select('*')
+            .order('id', { ascending: false });
+
+        if (error) throw error;
+
         const tbody = document.getElementById('importHistoryBody');
         const emptyMsg = document.getElementById('emptyHistoryMsg');
 
         tbody.innerHTML = '';
         
-        if (historico.length === 0) {
+        if (!historico || historico.length === 0) {
             emptyMsg.classList.remove('hidden');
         } else {
             emptyMsg.classList.add('hidden');
-            [...historico].reverse().forEach(log => {
+            historico.forEach(log => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-800/50 transition-colors';
                 tr.innerHTML = `
@@ -264,16 +262,16 @@ async function carregarHistoricoImportacoes() {
 
 async function loadDashboardData() {
     try {
-        // Puxa toda a base do IndexDB
-        const storedData = await localforage.getItem('dados_operacionais') || [];
+        const { data: storedData, error } = await supabase.from('historico_viagens').select('*');
         
-        if(storedData.length === 0) {
+        if (error) throw error;
+        
+        if(!storedData || storedData.length === 0) {
             dbStatusLabel.innerText = "Banco Vazio";
             dbStatusLabel.className = "text-amber-400";
             return;
         }
 
-        // Preenche o Select de Filtro Dinamicamente
         const allTransporters = [...new Set(storedData.map(d => d.transportadora))].filter(Boolean).sort();
         const currentSelection = filterTransportadora.value || 'ALL';
         
@@ -286,13 +284,11 @@ async function loadDashboardData() {
             filterTransportadora.appendChild(opt);
         });
 
-        // Aplica o Filtro Selecionado
         const activeFilter = filterTransportadora.value;
         const filteredData = activeFilter === 'ALL' 
             ? storedData 
             : storedData.filter(d => d.transportadora === activeFilter);
 
-        // Se após o filtro não houver dados
         if(filteredData.length === 0) {
             dbStatusLabel.innerText = "Sem dados para o filtro";
             return;
@@ -301,7 +297,6 @@ async function loadDashboardData() {
         dbStatusLabel.innerText = `${filteredData.length} Viagens Analisadas`;
         dbStatusLabel.className = "text-sky-300";
 
-        // Cálculos Macro (usando apenas dados filtrados)
         const totalViagens = filteredData.length;
         const totalPesoKg = filteredData.reduce((sum, r) => sum + r.pesoLiquido, 0);
         const totalPesoTon = totalPesoKg / 1000;
@@ -327,7 +322,6 @@ async function loadDashboardData() {
         const produtividade = somaCiclosTotais > 0 ? (totalPesoTon / somaCiclosTotais) : 0;
         const ociosidadePerc = somaCiclosTotais > 0 ? (somaTempoFila / somaCiclosTotais) * 100 : 0;
 
-        // Atualizar Visores de KPI
         document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
         document.getElementById('totalPesoLiq').innerText = totalPesoTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
         document.getElementById('cargaMediaValue').innerText = cargaMediaTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
@@ -344,7 +338,6 @@ async function loadDashboardData() {
         document.getElementById('produtividadeGlobal').innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
         document.getElementById('ociosidadeGlobal').innerText = ociosidadePerc.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + "%";
 
-        // Geração de Dados para Gráficos
         const transpCount = new Map();
         const transpCicloSum = new Map();
         const transpCicloCount = new Map();
@@ -358,7 +351,6 @@ async function loadDashboardData() {
             }
         });
 
-        // Top para o gráfico de barras (Ciclo) - Vamos mostrar até as 10 maiores
         const topParaBarras = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
         const labelsBarras = topParaBarras.map(t => t[0].length > 18 ? t[0].substring(0, 16) + "..." : t[0]);
         const cicloMedioPorTransp = topParaBarras.map(([nome]) => {
@@ -366,7 +358,6 @@ async function loadDashboardData() {
             return count > 0 ? parseFloat((transpCicloSum.get(nome) / count).toFixed(1)) : 0;
         });
 
-        // Top para o gráfico Donut (Volume) - Mostrar as 5 maiores (ou se tiver filtrado, mostra 1)
         const topParaDonut = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
         const labelsDonut = topParaDonut.map(t => t[0].length > 18 ? t[0].substring(0, 16) + "..." : t[0]);
         const valoresDonut = topParaDonut.map(t => t[1]);
@@ -374,7 +365,6 @@ async function loadDashboardData() {
         if (chartCiclo) chartCiclo.destroy();
         if (chartTransp) chartTransp.destroy();
 
-        // Construir Gráfico de Barras (Ciclos)
         const ctxCiclo = document.getElementById('cicloChart').getContext('2d');
         let gradientBar = ctxCiclo.createLinearGradient(0, 0, 0, 400);
         gradientBar.addColorStop(0, '#38bdf8'); 
@@ -405,7 +395,6 @@ async function loadDashboardData() {
             }
         });
 
-        // Construir Gráfico Donut (Distribuição)
         const ctxTransp = document.getElementById('transportadorasChart').getContext('2d');
         chartTransp = new Chart(ctxTransp, {
             type: 'doughnut',
@@ -428,7 +417,6 @@ async function loadDashboardData() {
             }
         });
 
-        // Preencher Tabela Analítica (Últimas 15 filtradas)
         const tbody = document.getElementById('sampleTableBody');
         tbody.innerHTML = '';
         const ultimosRegistros = [...filteredData].reverse().slice(0, 15);
@@ -472,33 +460,29 @@ async function processAndSaveFile(file) {
             dataDaBase = datasEncontradas[0];
         }
 
-        const oldData = await localforage.getItem('dados_operacionais') || [];
+        const { data: existingIds, error: selectError } = await supabase.from('historico_viagens').select('movimento');
+        if (selectError) throw selectError;
         
-        const combinedMap = new Map();
-        oldData.forEach(item => combinedMap.set(item.movimento, item));
+        const existingSet = new Set(existingIds ? existingIds.map(e => e.movimento) : []);
         
         let viagensNovas = 0;
         newRows.forEach(item => {
-            if(!combinedMap.has(item.movimento)) viagensNovas++;
-            combinedMap.set(item.movimento, item); 
+            if(!existingSet.has(item.movimento)) viagensNovas++;
         });
 
-        const finalData = Array.from(combinedMap.values());
-        
-        await localforage.setItem('dados_operacionais', finalData);
+        const { error: upsertError } = await supabase.from('historico_viagens').upsert(newRows);
+        if (upsertError) throw upsertError;
 
-        const historicoImport = await localforage.getItem('historico_importacoes') || [];
-        historicoImport.push({
-            dataBase: dataDaBase,
-            qtdViagens: viagensNovas,
-            dataLancamento: new Date().toLocaleString('pt-PT')
-        });
-        await localforage.setItem('historico_importacoes', historicoImport);
+        const { error: histError } = await supabase.from('historico_importacoes').insert([{
+            "dataBase": dataDaBase,
+            "qtdViagens": viagensNovas,
+            "dataLancamento": new Date().toLocaleString('pt-PT')
+        }]);
+        if (histError) throw histError;
 
-        // Resetar filtro antes de ir para o dashboard para visualizar tudo o que acabou de subir
         filterTransportadora.value = 'ALL';
 
-        alert(`Sucesso! Foram adicionadas ${viagensNovas} viagens novas ao banco de dados.`);
+        alert(`Sucesso! Foram processadas ${newRows.length} viagens. (${viagensNovas} novas viagens salvas na nuvem).`);
         switchView('dashboard');
         
     } catch (err) {
@@ -528,12 +512,14 @@ fileInput.addEventListener('change', (e) => {
     if (e.target.files.length) processAndSaveFile(e.target.files[0]);
 });
 
-// Limpar Banco
+// Limpar Banco no Supabase
 btnLimparBanco.addEventListener('click', async () => {
-    if(confirm("ATENÇÃO: Deseja apagar todo o histórico de viagens e importações? Esta ação não pode ser desfeita.")) {
-        await localforage.removeItem('dados_operacionais');
-        await localforage.removeItem('historico_importacoes');
-        alert("Histórico apagado com sucesso.");
+    if(confirm("ATENÇÃO: Deseja apagar todo o histórico de viagens e importações? Esta ação apagará de vez na NUVEM e não pode ser desfeita.")) {
+        
+        await supabase.from('historico_viagens').delete().neq('movimento', 'null');
+        await supabase.from('historico_importacoes').delete().gt('id', 0);
+        
+        alert("Histórico da nuvem apagado com sucesso.");
         carregarHistoricoImportacoes();
         loadDashboardData();
     }
