@@ -1,5 +1,8 @@
 // SerranaLog Analytics - Main Application Script (Dark Executive Edition)
 
+// Registar o Plugin Datalabels globalmente
+Chart.register(ChartDataLabels);
+
 // Configuração Global Chart.js para Dark Mode
 Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
@@ -168,6 +171,43 @@ function parseSheetToData(sheet) {
     return mappedData.filter(item => item.pesoLiquido > 0 || item.volumeReal > 0 || item.transportadora !== "Não identificada");
 }
 
+// Plugin Customizado para texto no meio do Donut Chart
+const centerTextPlugin = {
+    id: 'centerText',
+    beforeDraw: function(chart) {
+        if (chart.config.type !== 'doughnut') return;
+        
+        const ctx = chart.ctx;
+        const chartArea = chart.chartArea;
+        
+        // Centro da área desenhável do gráfico (ignorando a legenda)
+        const centerX = (chartArea.left + chartArea.right) / 2;
+        const centerY = (chartArea.top + chartArea.bottom) / 2;
+
+        // Calcula o total exibido no gráfico
+        const total = chart.config.data.datasets[0].data.reduce((a, b) => a + b, 0);
+
+        ctx.restore();
+        
+        // Valor numérico no centro
+        ctx.font = "bold 28px 'Inter', sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#38bdf8"; // Cor sky-400
+        const text = total.toString();
+        const textX = centerX - (ctx.measureText(text).width / 2);
+        ctx.fillText(text, textX, centerY - 8);
+        
+        // Texto "Viagens" menor em baixo
+        ctx.font = "bold 11px 'Inter', sans-serif";
+        ctx.fillStyle = "#94a3b8"; // Cor slate-400
+        const subText = "VIAGENS";
+        const subTextX = centerX - (ctx.measureText(subText).width / 2);
+        ctx.fillText(subText, subTextX, centerY + 16);
+        
+        ctx.save();
+    }
+};
+
 async function processExcelFile(file) {
     hideError();
     loadingSpinner.classList.remove('hidden');
@@ -207,7 +247,6 @@ async function processExcelFile(file) {
         const validFilaFabrica = currentWorkbookData.filter(d => d.filaFabricaHoras !== null);
         const mediaFilaFabrica = validFilaFabrica.length > 0 ? validFilaFabrica.reduce((s, d) => s + d.filaFabricaHoras, 0) / validFilaFabrica.length : 0;
 
-        // Indicadores Poderosos (Produtividade e Ociosidade)
         const somaTempoFila = validCycles.reduce((s, d) => s + (d.filaCampoHoras || 0) + (d.filaFabricaHoras || 0), 0);
         const produtividade = somaCiclosTotais > 0 ? (totalPesoTon / somaCiclosTotais) : 0;
         const ociosidadePerc = somaCiclosTotais > 0 ? (somaTempoFila / somaCiclosTotais) * 100 : 0;
@@ -256,11 +295,11 @@ async function processExcelFile(file) {
         if (chartCiclo) chartCiclo.destroy();
         if (chartTransp) chartTransp.destroy();
 
-        // Gráfico de Barras Neon Dark
+        // Gráfico de Barras - Com Labels no Topo
         const ctxCiclo = document.getElementById('cicloChart').getContext('2d');
         let gradientBar = ctxCiclo.createLinearGradient(0, 0, 0, 400);
-        gradientBar.addColorStop(0, '#38bdf8'); // sky-400
-        gradientBar.addColorStop(1, '#0284c7'); // sky-600
+        gradientBar.addColorStop(0, '#38bdf8'); 
+        gradientBar.addColorStop(1, '#0284c7'); 
 
         chartCiclo = new Chart(ctxCiclo, {
             type: 'bar',
@@ -275,13 +314,28 @@ async function processExcelFile(file) {
                 }]
             },
             options: {
-                responsive: true, maintainAspectRatio: true,
-                plugins: { legend: { display: false } },
+                responsive: true, 
+                maintainAspectRatio: true,
+                layout: {
+                    padding: { top: 30 } // Espaço para a label não cortar
+                },
+                plugins: { 
+                    legend: { display: false },
+                    datalabels: {
+                        color: '#bae6fd', // Azul clarinho para contraste
+                        anchor: 'end',    // Posiciona no fim da barra
+                        align: 'top',     // Alinha acima da barra
+                        font: { weight: 'bold', size: 12 },
+                        formatter: function(value) {
+                            return value + ' h';
+                        }
+                    }
+                },
                 scales: { y: { beginAtZero: true } }
             }
         });
 
-        // Gráfico Donut Dark
+        // Gráfico Donut - Com Labels Fora e Total no Centro
         const ctxTransp = document.getElementById('transportadorasChart').getContext('2d');
         chartTransp = new Chart(ctxTransp, {
             type: 'doughnut',
@@ -291,12 +345,33 @@ async function processExcelFile(file) {
                     data: transpValues,
                     backgroundColor: ['#0ea5e9', '#06b6d4', '#6366f1', '#8b5cf6', '#3b82f6'],
                     borderWidth: 2,
-                    borderColor: '#1e293b' // slate-800
+                    borderColor: '#1e293b'
                 }]
             },
+            plugins: [centerTextPlugin], // Adiciona o plugin do texto central
             options: {
-                responsive: true, maintainAspectRatio: true, cutout: '65%',
-                plugins: { legend: { position: 'right', labels: { font: { size: 11, family: "'Inter', sans-serif" } } } }
+                responsive: true, 
+                maintainAspectRatio: true, 
+                cutout: '70%', // Espessura do anel
+                layout: {
+                    padding: 20 // Espaço para as labels de fora não cortarem
+                },
+                plugins: { 
+                    legend: { 
+                        position: 'right', 
+                        labels: { font: { size: 11, family: "'Inter', sans-serif" } } 
+                    },
+                    datalabels: {
+                        color: '#f8fafc',
+                        anchor: 'end', // Ancora na borda externa
+                        align: 'end',  // Empurra para fora do gráfico
+                        offset: 4,     // Distância do anel
+                        font: { weight: 'bold', size: 12 },
+                        formatter: function(value) {
+                            return value; // Mostra apenas o número
+                        }
+                    }
+                }
             }
         });
 
