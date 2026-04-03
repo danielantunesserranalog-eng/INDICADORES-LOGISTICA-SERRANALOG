@@ -224,7 +224,7 @@ const centerTextPlugin = {
 
 async function carregarHistoricoImportacoes() {
     try {
-        const { data: historico, error } = await supabase
+        const { data: historico, error } = await supabaseClient
             .from('historico_importacoes')
             .select('*')
             .order('id', { ascending: false });
@@ -262,7 +262,7 @@ async function carregarHistoricoImportacoes() {
 
 async function loadDashboardData() {
     try {
-        const { data: storedData, error } = await supabase.from('historico_viagens').select('*');
+        const { data: storedData, error } = await supabaseClient.from('historico_viagens').select('*');
         
         if (error) throw error;
         
@@ -460,7 +460,7 @@ async function processAndSaveFile(file) {
             dataDaBase = datasEncontradas[0];
         }
 
-        const { data: existingIds, error: selectError } = await supabase.from('historico_viagens').select('movimento');
+        const { data: existingIds, error: selectError } = await supabaseClient.from('historico_viagens').select('movimento');
         if (selectError) throw selectError;
         
         const existingSet = new Set(existingIds ? existingIds.map(e => e.movimento) : []);
@@ -470,10 +470,10 @@ async function processAndSaveFile(file) {
             if(!existingSet.has(item.movimento)) viagensNovas++;
         });
 
-        const { error: upsertError } = await supabase.from('historico_viagens').upsert(newRows);
+        const { error: upsertError } = await supabaseClient.from('historico_viagens').upsert(newRows);
         if (upsertError) throw upsertError;
 
-        const { error: histError } = await supabase.from('historico_importacoes').insert([{
+        const { error: histError } = await supabaseClient.from('historico_importacoes').insert([{
             "dataBase": dataDaBase,
             "qtdViagens": viagensNovas,
             "dataLancamento": new Date().toLocaleString('pt-PT')
@@ -516,8 +516,8 @@ fileInput.addEventListener('change', (e) => {
 btnLimparBanco.addEventListener('click', async () => {
     if(confirm("ATENÇÃO: Deseja apagar todo o histórico de viagens e importações? Esta ação apagará de vez na NUVEM e não pode ser desfeita.")) {
         
-        await supabase.from('historico_viagens').delete().neq('movimento', 'null');
-        await supabase.from('historico_importacoes').delete().gt('id', 0);
+        await supabaseClient.from('historico_viagens').delete().neq('movimento', 'null');
+        await supabaseClient.from('historico_importacoes').delete().gt('id', 0);
         
         alert("Histórico da nuvem apagado com sucesso.");
         carregarHistoricoImportacoes();
