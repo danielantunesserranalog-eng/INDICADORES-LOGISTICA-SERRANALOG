@@ -41,17 +41,17 @@ function switchView(view) {
         btnMenuDashboard.classList.add('text-slate-400');
         pageTitle.innerText = "Central de Lançamentos";
         pageSubtitle.innerText = "Importe as bases diárias para alimentar o histórico";
+        carregarHistoricoImportacoes(); // Atualiza a lista sempre que abrir a aba
     }
 }
 
 btnMenuDashboard.addEventListener('click', () => switchView('dashboard'));
 btnMenuLancamento.addEventListener('click', () => switchView('lancamento'));
 
-// Variáveis de Gráficos
 let chartCiclo = null;
 let chartTransp = null;
 
-// Funções Auxiliares de Leitura (Mesmas da versão anterior)
+// Funções Auxiliares de Leitura
 function parsePtBrNumber(val) {
     if (typeof val === 'number') return val;
     if (!val) return 0;
@@ -115,7 +115,7 @@ function normalizeStr(str) {
 
 function parseSheetToData(sheet) {
     const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-    if (!rawData || rawData.length === 0) throw new Error("Planilha vazia.");
+    if (!rawData || rawData.length === 0) throw new Error("Planilha vazia ou em formato incorreto.");
 
     const keys = Object.keys(rawData[0]);
     const normKeys = keys.map(k => ({ orig: k, norm: normalizeStr(k) }));
@@ -136,11 +136,15 @@ function parseSheetToData(sheet) {
     const volumeKey = findKey(['volume real', 'volume_real']);
     const distAsfaltoKey = findKey(['distancia por asfalto', 'distância por asfalto', 'distancia asfalto']);
     const distTerraKey = findKey(['distancia por terra', 'distância por terra', 'distancia terra']);
-    const dtSaidaFabKey = findKey(['data saída fábrica', 'data saida fabrica']);
+    
     const dtChegadaCampoKey = findKey(['data chegada campo']);
     const dtInicioCarregCpoKey = findKey(['dt início carreg cpo']);
     const dtEntradaKey = findKey(['data de entrada', 'data entrada']);
     const dtInicioDescarFabKey = findKey(['dt início descar fáb']);
+    
+    // Procura especificamente a "Data de Saída" para registrar de qual dia é a base
+    const dtSaidaBaseKey = findKey(['data de saída', 'data de saida', 'data saída', 'data saida', 'data saída fábrica', 'data saida fabrica']);
+    
     const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saida fabrica']);
     const hrChegadaCampoKey = findKey(['hora chegada campo']);
     const hrInicioCarregCpoKey = findKey(['hr início carreg cpo']);
@@ -155,16 +159,25 @@ function parseSheetToData(sheet) {
         const movimento = getValue(movimentoKey) || `MOV-GEN-${Date.now()}-${idx}`;
         let transportadora = String(getValue(transpKey) || "Não identificada").trim().replace(/\s+(LTDA|Ltda|LTDA\.|S\.A\.|EIRELI)$/i, '').trim();
 
+        // Extrai e formata a Data da Base
+        const rawDtSaida = getValue(dtSaidaBaseKey);
+        let strDataBase = 'Desconhecida';
+        if (rawDtSaida) {
+            const parsed = parseDateTime(rawDtSaida, null);
+            if (parsed) strDataBase = parsed.toLocaleDateString('pt-PT');
+        }
+
         return {
             movimento: String(movimento),
             dataLancamento: today,
+            dataDaBaseExcel: strDataBase, // Salvando de que dia é essa viagem
             transportadora: transportadora,
             placa: String(getValue(placaKey) || "-").trim(),
             pesoLiquido: parsePtBrNumber(getValue(pesoLiqKey)),
             volumeReal: parsePtBrNumber(getValue(volumeKey)),
             distanciaAsfalto: parsePtBrNumber(getValue(distAsfaltoKey)),
             distanciaTerra: parsePtBrNumber(getValue(distTerraKey)),
-            cicloHoras: calcHoursDiff(getValue(dtSaidaFabKey), getValue(hrSaidaFabKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey)),
+            cicloHoras: calcHoursDiff(getValue(dtSaidaBaseKey), getValue(hrSaidaFabKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey)),
             filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey)),
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey))
         };
@@ -204,6 +217,35 @@ const centerTextPlugin = {
 // ==========================================
 // MOTOR DE BANCO DE DADOS E DASHBOARD
 // ==========================================
+
+async function carregarHistoricoImportacoes() {
+    try {
+        const historico = await localforage.getItem('historico_importacoes') || [];
+        const tbody = document.getElementById('importHistoryBody');
+        const emptyMsg = document.getElementById('emptyHistoryMsg');
+
+        tbody.innerHTML = '';
+        
+        if (historico.length === 0) {
+            emptyMsg.classList.remove('hidden');
+        } else {
+            emptyMsg.classList.add('hidden');
+            // Mostra do mais recente para o mais antigo
+            [...historico].reverse().forEach(log => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-800/50 transition-colors';
+                tr.innerHTML = `
+                    <td class="px-6 py-3 font-semibold text-sky-300"><i class="far fa-calendar-check mr-2"></i> ${log.dataBase}</td>
+                    <td class="px-6 py-3 text-right font-bold text-emerald-400">+ ${log.qtdViagens}</td>
+                    <td class="px-6 py-3 text-right font-mono text-xs text-slate-500">${log.dataLancamento}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    } catch (e) {
+        console.error("Erro ao carregar histórico de importações", e);
+    }
+}
 
 async function loadDashboardData() {
     try {
@@ -324,7 +366,7 @@ async function loadDashboardData() {
             }
         });
 
-        // Preencher Tabela (Pegar as 15 últimas para não pesar)
+        // Preencher Tabela (Pegar as 15 últimas para não pesar a performance)
         const tbody = document.getElementById('sampleTableBody');
         tbody.innerHTML = '';
         const ultimosRegistros = [...storedData].reverse().slice(0, 15);
@@ -362,6 +404,13 @@ async function processAndSaveFile(file) {
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const newRows = parseSheetToData(firstSheet);
 
+        // Identifica de qual "dia" é esta planilha (pegando a data da base da primeira linha válida)
+        let dataDaBase = 'Desconhecida';
+        const datasEncontradas = newRows.map(r => r.dataDaBaseExcel).filter(d => d && d !== 'Desconhecida');
+        if (datasEncontradas.length > 0) {
+            dataDaBase = datasEncontradas[0]; // Assume a data principal da planilha
+        }
+
         // Buscar dados antigos
         const oldData = await localforage.getItem('dados_operacionais') || [];
         
@@ -377,15 +426,24 @@ async function processAndSaveFile(file) {
 
         const finalData = Array.from(combinedMap.values());
         
-        // Salvar no Banco
+        // 1. Salvar no Banco Operacional
         await localforage.setItem('dados_operacionais', finalData);
 
-        alert(`Sucesso! Foram adicionadas ${viagensNovas} viagens novas ao histórico.`);
+        // 2. Salvar no Histórico de Importações
+        const historicoImport = await localforage.getItem('historico_importacoes') || [];
+        historicoImport.push({
+            dataBase: dataDaBase, // Data extraída da coluna Data de Saída
+            qtdViagens: viagensNovas,
+            dataLancamento: new Date().toLocaleString('pt-PT')
+        });
+        await localforage.setItem('historico_importacoes', historicoImport);
+
+        alert(`Sucesso! Foram adicionadas ${viagensNovas} viagens novas ao banco de dados.`);
         switchView('dashboard'); // Volta pro painel principal
         
     } catch (err) {
         console.error(err);
-        errorMsgDiv.innerText = "Erro ao processar: " + err.message;
+        errorMsgDiv.innerText = "Erro ao processar arquivo: " + err.message;
         errorMsgDiv.classList.remove('hidden');
     } finally {
         loadingSpinner.classList.add('hidden');
@@ -412,9 +470,11 @@ fileInput.addEventListener('change', (e) => {
 
 // Botão de Limpar Banco
 btnLimparBanco.addEventListener('click', async () => {
-    if(confirm("ATENÇÃO: Deseja apagar todo o histórico de viagens? Esta ação não tem volta.")) {
+    if(confirm("ATENÇÃO: Deseja apagar todo o histórico de viagens e importações? Esta ação não pode ser desfeita.")) {
         await localforage.removeItem('dados_operacionais');
+        await localforage.removeItem('historico_importacoes');
         alert("Histórico apagado com sucesso.");
+        carregarHistoricoImportacoes();
         loadDashboardData();
     }
 });
