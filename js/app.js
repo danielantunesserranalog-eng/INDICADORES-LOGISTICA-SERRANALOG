@@ -7,12 +7,12 @@ Chart.defaults.font.family = "'Inter', sans-serif";
 const viewDashboard = document.getElementById('viewDashboard');
 const viewOperacional = document.getElementById('viewOperacional');
 const viewHistorico = document.getElementById('viewHistorico');
-const viewConfiguracoes = document.getElementById('viewConfiguracoes'); // NOVO
+const viewConfiguracoes = document.getElementById('viewConfiguracoes');
 
 const btnMenuDashboard = document.getElementById('btnMenuDashboard');
 const btnMenuOperacional = document.getElementById('btnMenuOperacional');
 const btnMenuHistorico = document.getElementById('btnMenuHistorico');
-const btnMenuConfiguracoes = document.getElementById('btnMenuConfiguracoes'); // NOVO
+const btnMenuConfiguracoes = document.getElementById('btnMenuConfiguracoes');
 
 const pageTitle = document.getElementById('pageTitle');
 const pageSubtitle = document.getElementById('pageSubtitle');
@@ -69,7 +69,7 @@ function switchView(view) {
         pageTitle.innerText = "Configurações da Torre";
         pageSubtitle.innerText = "Gerenciamento de Metas Globais e Base de Dados";
         carregarHistoricoImportacoes(); 
-        carregarMetasGlobais(); // Preenche os inputs da aba config
+        carregarMetasGlobais();
     }
 }
 
@@ -212,7 +212,7 @@ function parseSheetToData(sheet) {
 
         const movimento = getValue(movimentoKey) || `MOV-GEN-${Date.now()}-${idx}`;
         let transportadora = String(getValue(transpKey) || "Não identificada").trim().replace(/\s+(LTDA|Ltda|LTDA\.|S\.A\.|EIRELI)$/i, '').trim();
-        if(!transportadora) transportadora = "Outras";
+        if(!transportadora || transportadora === "-") transportadora = "Outras";
 
         const rawDtSaida = getValue(dtSaidaBaseKey);
         let strDataBase = 'Desconhecida';
@@ -281,6 +281,7 @@ async function processAndSaveFile(file) {
 
         alert(`Sucesso! processadas ${newRows.length} viagens. (${viagensNovas} novas).`);
         carregarHistoricoImportacoes();
+        fullHistoricoData = []; // Força recarregar
         loadHistoricoCompleto();
     } catch (err) {
         errorMsgDiv.innerText = "Erro: " + err.message;
@@ -322,7 +323,6 @@ async function carregarMetasGlobais() {
             document.getElementById('cfg_vol_prog').value = data.vol_prog || '';
             document.getElementById('cfg_cx_prog').value = data.cx_prog || '';
             document.getElementById('cfg_pbtc').value = data.pbtc_prog || '';
-            // Atualiza o localStorage local como backup
             localStorage.setItem('cfg_metas', JSON.stringify(data));
         }
     } catch(e) { console.log("Lendo metas locais...", e); }
@@ -348,8 +348,39 @@ document.getElementById('btnSalvarMetasGlobais').addEventListener('click', async
     setTimeout(() => btn.innerHTML = '<i class="fas fa-save"></i> Salvar Metas Base', 2000);
 });
 
-// --- DASHBOARD ANALÍTICO ---
+// ==========================================
+// --- DASHBOARD ANALÍTICO (GRÁFICOS) ---
+// ==========================================
 let chartCiclo = null, chartTransp = null;
+
+const centerTextPlugin = {
+    id: 'centerText',
+    beforeDraw: function(chart) {
+        if (chart.config.type !== 'doughnut') return;
+        const ctx = chart.ctx;
+        const chartArea = chart.chartArea;
+        const centerX = (chartArea.left + chartArea.right) / 2;
+        const centerY = (chartArea.top + chartArea.bottom) / 2;
+        
+        const total = chart.config.data.datasets[0].data.reduce((a, b) => a + b, 0);
+
+        ctx.restore();
+        ctx.font = "bold 28px 'Inter', sans-serif";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#38bdf8"; 
+        const text = total.toLocaleString('pt-PT');
+        const textX = centerX - (ctx.measureText(text).width / 2);
+        ctx.fillText(text, textX, centerY - 8);
+        
+        ctx.font = "bold 11px 'Inter', sans-serif";
+        ctx.fillStyle = "#94a3b8"; 
+        const subText = "VIAGENS";
+        const subTextX = centerX - (ctx.measureText(subText).width / 2);
+        ctx.fillText(subText, subTextX, centerY + 16);
+        ctx.save();
+    }
+};
+
 async function loadDashboardData() {
     if(fullHistoricoData.length === 0) {
         const { data } = await supabaseClient.from('historico_viagens').select('*');
@@ -388,16 +419,126 @@ async function loadDashboardData() {
         return mTransp && mData;
     });
 
-    document.getElementById('totalViagens').innerText = filteredData.length.toLocaleString('pt-PT');
+    if (filteredData.length === 0) {
+        document.getElementById('dbStatusLabel').innerText = "Sem dados para o filtro";
+        document.getElementById('totalViagens').innerText = '0';
+        document.getElementById('totalPesoLiq').innerText = '0 t';
+        document.getElementById('produtividadeGlobal').innerText = '0.0';
+        document.getElementById('bestPlacaValue').innerText = '0.0';
+        document.getElementById('bestPlacaName').innerText = 'Nenhum cavalo encontrado';
+        if(chartCiclo) chartCiclo.destroy();
+        if(chartTransp) chartTransp.destroy();
+        return;
+    }
+
     document.getElementById('dbStatusLabel').innerText = `${filteredData.length} Viagens`;
     
-    const totPeso = filteredData.reduce((s, r) => s + r.pesoLiquido, 0) / 1000;
-    document.getElementById('totalPesoLiq').innerText = totPeso.toLocaleString('pt-PT', {maximumFractionDigits:1}) + " t";
-    
-    const validC = filteredData.filter(d => d.cicloHoras !== null);
-    const somaCiclos = validC.reduce((s,d) => s + d.cicloHoras, 0);
-    const mCiclo = validC.length > 0 ? somaCiclos / validC.length : 0;
-    document.getElementById('cicloMedio').innerText = formatarHorasMinutos(mCiclo);
+    const totalViagens = filteredData.length;
+    const totalPesoKg = filteredData.reduce((sum, r) => sum + r.pesoLiquido, 0);
+    const totalPesoTon = totalPesoKg / 1000;
+    const cargaMediaTon = totalViagens > 0 ? (totalPesoTon / totalViagens) : 0;
+    const mediaVolume = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.volumeReal, 0) / totalViagens : 0;
+    const mediaAsfalto = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.distanciaAsfalto, 0) / totalViagens : 0;
+    const mediaTerra = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.distanciaTerra, 0) / totalViagens : 0;
+    const mediaDistTotal = mediaAsfalto + mediaTerra;
+
+    const validCycles = filteredData.filter(d => d.cicloHoras !== null);
+    const somaCiclosTotais = validCycles.reduce((s, d) => s + d.cicloHoras, 0);
+    const mediaCiclo = validCycles.length > 0 ? somaCiclosTotais / validCycles.length : 0;
+    const validFilaCampo = filteredData.filter(d => d.filaCampoHoras !== null);
+    const mediaFilaCampo = validFilaCampo.length > 0 ? validFilaCampo.reduce((s, d) => s + d.filaCampoHoras, 0) / validFilaCampo.length : 0;
+    const validFilaFabrica = filteredData.filter(d => d.filaFabricaHoras !== null);
+    const mediaFilaFabrica = validFilaFabrica.length > 0 ? validFilaFabrica.reduce((s, d) => s + d.filaFabricaHoras, 0) / validFilaFabrica.length : 0;
+    const somaTempoFila = validCycles.reduce((s, d) => s + (d.filaCampoHoras || 0) + (d.filaFabricaHoras || 0), 0);
+    const produtividade = somaCiclosTotais > 0 ? (totalPesoTon / somaCiclosTotais) : 0;
+    const ociosidadePerc = somaCiclosTotais > 0 ? (somaTempoFila / somaCiclosTotais) * 100 : 0;
+
+    document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
+    document.getElementById('totalPesoLiq').innerText = totalPesoTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
+    document.getElementById('cargaMediaValue').innerText = cargaMediaTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
+    document.getElementById('mediaVolumeReal').innerText = mediaVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
+    document.getElementById('mediaDistancia').innerText = mediaDistTotal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " km";
+    document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
+    document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
+    document.getElementById('cicloMedio').innerText = formatarHorasMinutos(mediaCiclo);
+    document.getElementById('filaCampo').innerText = formatarHorasMinutos(mediaFilaCampo);
+    document.getElementById('filaFabrica').innerText = formatarHorasMinutos(mediaFilaFabrica);
+    document.getElementById('produtividadeGlobal').innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
+    document.getElementById('ociosidadeGlobal').innerText = ociosidadePerc.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + "%";
+
+    // Melhor Cavalo
+    const mapaPlacas = new Map();
+    validCycles.forEach(d => {
+        const placaFormatada = (d.placa && d.placa.trim() !== '-' && d.placa.trim() !== '') ? d.placa.trim().toUpperCase() : 'DESCONHECIDA';
+        if (placaFormatada === 'DESCONHECIDA') return;
+        if (!mapaPlacas.has(placaFormatada)) mapaPlacas.set(placaFormatada, { pesoAcumulado: 0, ciclosAcumulados: 0 });
+        const p = mapaPlacas.get(placaFormatada);
+        p.pesoAcumulado += d.pesoLiquido;
+        p.ciclosAcumulados += d.cicloHoras;
+    });
+
+    let melhorPlacaNome = "---", melhorPlacaProdutividade = 0;
+    mapaPlacas.forEach((dados, placa) => {
+        if (dados.ciclosAcumulados > 0.5) {
+            const prod = (dados.pesoAcumulado / 1000) / dados.ciclosAcumulados;
+            if (prod > melhorPlacaProdutividade) { melhorPlacaProdutividade = prod; melhorPlacaNome = placa; }
+        }
+    });
+    document.getElementById('bestPlacaValue').innerText = melhorPlacaProdutividade > 0 ? melhorPlacaProdutividade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) : "0.0";
+    document.getElementById('bestPlacaName').innerText = `Placa: ${melhorPlacaNome}`;
+
+    // Gráficos (Aqui está o que tinha sumido!)
+    const transpCount = new Map();
+    const transpCicloSum = new Map();
+    const transpCicloCount = new Map();
+
+    filteredData.forEach(d => {
+        const nome = d.transportadora || "Outras";
+        transpCount.set(nome, (transpCount.get(nome) || 0) + 1);
+        if (d.cicloHoras !== null) {
+            transpCicloSum.set(nome, (transpCicloSum.get(nome) || 0) + d.cicloHoras);
+            transpCicloCount.set(nome, (transpCicloCount.get(nome) || 0) + 1);
+        }
+    });
+
+    const topParaBarras = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const labelsBarras = topParaBarras.map(t => t[0].length > 18 ? t[0].substring(0, 16) + "..." : t[0]);
+    const cicloMedioPorTransp = topParaBarras.map(([nome]) => {
+        const count = transpCicloCount.get(nome) || 0;
+        return count > 0 ? parseFloat((transpCicloSum.get(nome) / count).toFixed(1)) : 0;
+    });
+
+    const topParaDonut = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const labelsDonut = topParaDonut.map(t => t[0].length > 18 ? t[0].substring(0, 16) + "..." : t[0]);
+    const valoresDonut = topParaDonut.map(t => t[1]);
+
+    if (chartCiclo) chartCiclo.destroy();
+    if (chartTransp) chartTransp.destroy();
+
+    const ctxCiclo = document.getElementById('cicloChart').getContext('2d');
+    let gradientBar = ctxCiclo.createLinearGradient(0, 0, 0, 400);
+    gradientBar.addColorStop(0, '#38bdf8'); gradientBar.addColorStop(1, '#0284c7'); 
+
+    chartCiclo = new Chart(ctxCiclo, {
+        type: 'bar',
+        data: { labels: labelsBarras, datasets: [{ label: 'Ciclo (h)', data: cicloMedioPorTransp, backgroundColor: gradientBar, borderRadius: 6, barPercentage: 0.6 }] },
+        options: {
+            responsive: true, maintainAspectRatio: true, layout: { padding: { top: 30 } },
+            plugins: { legend: { display: false }, datalabels: { color: '#bae6fd', anchor: 'end', align: 'top', font: { weight: 'bold', size: 11 }, formatter: (v) => v > 0 ? formatarHorasMinutos(v) : '-' } },
+            scales: { y: { beginAtZero: true }, x: { ticks: { font: { size: 10 } } } }
+        }
+    });
+
+    const ctxTransp = document.getElementById('transportadorasChart').getContext('2d');
+    chartTransp = new Chart(ctxTransp, {
+        type: 'doughnut',
+        data: { labels: labelsDonut, datasets: [{ data: valoresDonut, backgroundColor: ['#0ea5e9', '#06b6d4', '#6366f1', '#8b5cf6', '#3b82f6'], borderWidth: 2, borderColor: '#1e293b' }] },
+        plugins: [centerTextPlugin],
+        options: {
+            responsive: true, maintainAspectRatio: true, cutout: '70%', layout: { padding: 20 },
+            plugins: { legend: { position: 'right', labels: { font: { size: 11, family: "'Inter', sans-serif" } } }, datalabels: { color: '#f8fafc', anchor: 'end', align: 'end', offset: 4, font: { weight: 'bold', size: 12 } } }
+        }
+    });
 
     // Carrega tabelinha de baixo
     const tbody = document.getElementById('sampleTableBody');
@@ -405,8 +546,8 @@ async function loadDashboardData() {
         tbody.innerHTML = '';
         [...filteredData].sort((a,b) => parseDateTime(b.dataDaBaseExcel, null) - parseDateTime(a.dataDaBaseExcel, null)).slice(0,10).forEach(r => {
             tbody.insertAdjacentHTML('beforeend', `<tr class="border-b border-slate-800">
-                <td class="px-6 py-4">${r.dataDaBaseExcel}</td><td class="px-6 py-4 text-sky-400">${r.movimento}</td>
-                <td class="px-6 py-4">${r.transportadora}</td><td class="px-6 py-4 text-right">${(r.pesoLiquido/1000).toFixed(1)}</td>
+                <td class="px-6 py-4 font-mono text-[11px] text-slate-400">${r.dataDaBaseExcel}</td><td class="px-6 py-4 font-mono text-[11px] text-sky-400">${r.movimento}</td>
+                <td class="px-6 py-4 text-xs truncate max-w-[150px]">${r.transportadora}</td><td class="px-6 py-4 text-right">${(r.pesoLiquido/1000).toLocaleString('pt-PT', {maximumFractionDigits:1})} t</td>
                 <td class="px-6 py-4 text-right text-sky-400 font-bold">${formatarHorasMinutos(r.cicloHoras)}</td></tr>`);
         });
     }
