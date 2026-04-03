@@ -61,6 +61,7 @@
                 </div>
                 
                 <div id="dashboardFilters" class="hidden items-center gap-4 bg-slate-900/80 p-2 rounded-xl border border-sky-800 shadow-lg shadow-sky-900/20 flex-wrap">
+                    
                     <div class="flex items-center gap-2">
                         <label for="filterData" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="far fa-calendar-alt mr-1"></i> Data:</label>
                         <select id="filterData" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-4 py-2 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner">
@@ -68,12 +69,22 @@
                         </select>
                     </div>
                     
+                    <div class="flex items-center gap-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700/50 shadow-inner" id="quickFiltersGroup">
+                        <button data-qf="D-1" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all" title="Ontem">D-1</button>
+                        <button data-qf="D-2" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all" title="Anteontem">D-2</button>
+                        <button data-qf="D-7" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all" title="Últimos 7 dias">D-7</button>
+                        <button data-qf="D-30" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all" title="Últimos 30 dias">D-30</button>
+                        <div class="w-px h-4 bg-slate-700 mx-1"></div>
+                        <button data-qf="ALL" class="btn-qf active bg-sky-900/50 text-sky-400 border border-sky-800/50 text-[10px] font-bold px-2 py-1.5 rounded transition-all shadow-[0_0_10px_rgba(14,165,233,0.2)]" title="Limpar Filtros Rápidos"><i class="fas fa-times"></i></button>
+                    </div>
+
                     <div class="flex items-center gap-2">
                         <label for="filterTransportadora" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="fas fa-truck mr-1"></i> Transp:</label>
                         <select id="filterTransportadora" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-4 py-2 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner">
                             <option value="ALL">TODAS AS TRANSPORTADORAS</option>
                         </select>
                     </div>
+
                 </div>
 
                 <div class="flex items-center gap-4">

@@ -26,6 +26,10 @@ const dashboardFilters = document.getElementById('dashboardFilters');
 const filterTransportadora = document.getElementById('filterTransportadora');
 const filterData = document.getElementById('filterData');
 
+// Variáveis e botões dos Filtros Rápidos (D-1, D-2...)
+const btnQFs = document.querySelectorAll('.btn-qf');
+let activeQuickFilter = 'ALL';
+
 // Elementos do Histórico Completo
 const searchHistorico = document.getElementById('searchHistorico');
 const historicoGeralBody = document.getElementById('historicoGeralBody');
@@ -87,9 +91,45 @@ btnMenuDashboard.addEventListener('click', () => switchView('dashboard'));
 btnMenuLancamento.addEventListener('click', () => switchView('lancamento'));
 btnMenuHistorico.addEventListener('click', () => switchView('historico'));
 
-// Ao mudar qualquer filtro, recarrega o dashboard
+// ==========================================
+// LÓGICA DOS FILTROS (Selects e Botões)
+// ==========================================
+
 filterTransportadora.addEventListener('change', () => loadDashboardData());
-filterData.addEventListener('change', () => loadDashboardData());
+
+// Se o usuário mexer no select de data específico, desativa os botões rápidos
+filterData.addEventListener('change', () => {
+    setQuickFilterUI('ALL');
+    loadDashboardData();
+});
+
+// Evento de clique nos botões rápidos (D-1, D-2...)
+btnQFs.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const qf = e.currentTarget.getAttribute('data-qf');
+        setQuickFilterUI(qf);
+        
+        // Se ativou um filtro rápido, reseta o select visual de Data
+        if (qf !== 'ALL') {
+            filterData.value = 'ALL';
+        }
+        
+        loadDashboardData();
+    });
+});
+
+function setQuickFilterUI(qf) {
+    activeQuickFilter = qf;
+    btnQFs.forEach(b => {
+        if (b.getAttribute('data-qf') === qf) {
+            b.classList.add('active', 'bg-sky-900/50', 'text-sky-400', 'border-sky-800/50', 'shadow-[0_0_10px_rgba(14,165,233,0.2)]');
+            b.classList.remove('text-slate-400', 'hover:bg-slate-700/50', 'border-transparent');
+        } else {
+            b.classList.remove('active', 'bg-sky-900/50', 'text-sky-400', 'border-sky-800/50', 'shadow-[0_0_10px_rgba(14,165,233,0.2)]');
+            b.classList.add('text-slate-400', 'hover:bg-slate-700/50', 'border-transparent');
+        }
+    });
+}
 
 // Pesquisa instantânea na tabela de histórico
 searchHistorico.addEventListener('input', () => renderHistoricoTable());
@@ -106,7 +146,7 @@ function parsePtBrNumber(val) {
     return parseFloat(str) || 0;
 }
 
-// NOVA FUNÇÃO: Formatar Horas e Minutos (ex: 2h 24m)
+// FUNÇÃO: Formatar Horas e Minutos (ex: 2h 24m)
 function formatarHorasMinutos(horasDecimais) {
     if (horasDecimais === null || horasDecimais === undefined || isNaN(horasDecimais)) return '-';
     
@@ -244,7 +284,7 @@ function parseSheetToData(sheet) {
     return mappedData.filter(item => item.pesoLiquido > 0 || item.volumeReal > 0);
 }
 
-// NOVA FUNÇÃO: Busca e mostra o horário da última importação
+// FUNÇÃO: Busca e mostra o horário da última importação
 async function atualizarIndicadorUltimaImportacao() {
     try {
         if (!lastUpdateIndicator) return;
@@ -265,7 +305,7 @@ async function atualizarIndicadorUltimaImportacao() {
             return;
         }
 
-        const dataLancamentoStr = data[0].dataLancamento; // Ex: "03/04/2026, 08:30:00"
+        const dataLancamentoStr = data[0].dataLancamento; 
         const hoje = new Date().toLocaleDateString('pt-PT');
 
         if (dataLancamentoStr.includes(hoje)) {
@@ -505,13 +545,37 @@ async function loadDashboardData() {
             filterData.appendChild(opt);
         }
 
-        // 3. APLICAR FILTROS
+        // 3. APLICAR FILTROS (Com Lógica dos Botões Rápidos)
         const activeTransp = filterTransportadora.value;
         const activeData = filterData.value;
         
         const filteredData = storedData.filter(d => {
             const matchTransp = activeTransp === 'ALL' || d.transportadora === activeTransp;
-            const matchData = activeData === 'ALL' || d.dataDaBaseExcel === activeData;
+            let matchData = true;
+
+            // Se algum Filtro Rápido (D-1, D-2...) estiver clicado, ele ignora o select de Data
+            if (activeQuickFilter !== 'ALL') {
+                const parsedData = parseDateTime(d.dataDaBaseExcel, null);
+                if (parsedData) {
+                    parsedData.setHours(0, 0, 0, 0);
+                    const hoje = new Date();
+                    hoje.setHours(0, 0, 0, 0);
+                    
+                    // Diferença em dias: Hoje - Data da Base
+                    const diffDays = Math.round((hoje - parsedData) / (1000 * 60 * 60 * 24));
+
+                    if (activeQuickFilter === 'D-1') matchData = (diffDays === 1);
+                    else if (activeQuickFilter === 'D-2') matchData = (diffDays === 2);
+                    else if (activeQuickFilter === 'D-7') matchData = (diffDays >= 0 && diffDays <= 7);
+                    else if (activeQuickFilter === 'D-30') matchData = (diffDays >= 0 && diffDays <= 30);
+                } else {
+                    matchData = false; // "Desconhecida" não entra nos filtros rápidos
+                }
+            } else {
+                // Caso contrário, usa a regra padrão do select "Data"
+                matchData = activeData === 'ALL' || d.dataDaBaseExcel === activeData;
+            }
+
             return matchTransp && matchData;
         });
 
@@ -564,7 +628,7 @@ async function loadDashboardData() {
         document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
         document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
         
-        // Utilizando formatarHorasMinutos aqui
+        // Utilizando formatarHorasMinutos
         document.getElementById('cicloMedio').innerText = formatarHorasMinutos(mediaCiclo);
         document.getElementById('filaCampo').innerText = formatarHorasMinutos(mediaFilaCampo);
         document.getElementById('filaFabrica').innerText = formatarHorasMinutos(mediaFilaFabrica);
@@ -774,8 +838,10 @@ async function processAndSaveFile(file) {
         }]);
         if (histError) throw histError;
 
+        // Resetar os filtros após importação com sucesso
         filterTransportadora.value = 'ALL';
         filterData.value = 'ALL';
+        setQuickFilterUI('ALL');
 
         alert(`Sucesso! Foram processadas ${newRows.length} viagens. (${viagensNovas} novas viagens salvas na nuvem).`);
         switchView('dashboard');
