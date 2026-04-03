@@ -1,5 +1,5 @@
 // ==============================================================
-// LÓGICA DO DASHBOARD OPERACIONAL DIÁRIO (ISOLADO DO APP.JS)
+// LÓGICA DO DASHBOARD OPERACIONAL DIÁRIO (CONECTADO AO SUPABASE)
 // ==============================================================
 
 const opDatePicker = document.getElementById('opDatePicker');
@@ -29,7 +29,6 @@ const bar_cx_perc = document.getElementById('bar_cx_perc');
 
 // Função chamada pelo app.js quando entra na aba "Operacional"
 function renderizarTabelaOperacional() {
-    // Se o seletor de data estiver vazio, coloca a data de hoje
     if (!opDatePicker.value) {
         const today = new Date();
         const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
@@ -42,49 +41,60 @@ async function updateOpDashboard() {
     const selectedDateStr = opDatePicker.value; // Ex: 2026-04-01
     if (!selectedDateStr) return;
 
-    // 1. Converter YYYY-MM-DD para DD/MM/YYYY (formato que está no historico_viagens)
+    // Converter YYYY-MM-DD para DD/MM/YYYY (formato que está no historico_viagens)
     const parts = selectedDateStr.split('-');
     const searchDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
 
-    opStatusFetch.innerText = "Consultando banco de dados...";
+    opStatusFetch.innerText = "Consultando nuvem...";
     opStatusFetch.className = "text-xs font-mono text-emerald-400 hidden md:block animate-pulse";
 
     try {
-        // 2. Buscar no Supabase diretamente e isoladamente para não mexer no Dashboard Principal
-        const { data: viagensDoDia, error } = await supabaseClient
+        // 1. Buscar REALIZADO no Supabase (historico_viagens)
+        const { data: viagensDoDia, error: errViagens } = await supabaseClient
             .from('historico_viagens')
             .select('volumeReal')
             .eq('dataDaBaseExcel', searchDate);
 
-        if (error) throw error;
+        if (errViagens) throw errViagens;
 
-        // Calcular os totais reais
         const realViagens = viagensDoDia.length;
         const realVolume = viagensDoDia.reduce((sum, d) => sum + (d.volumeReal || 0), 0);
         const realCaixa = realViagens > 0 ? (realVolume / realViagens) : 0;
 
-        // Atualiza a tela com o que a operação realmente fez neste dia
         disp_v_real.innerText = realViagens;
         disp_vol_real.innerText = realVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1});
         disp_cx_real.innerText = realCaixa.toLocaleString('pt-PT', {maximumFractionDigits: 1});
 
-        // 3. Carregar METAS PROGRAMADAS salvas localmente
-        const savedData = JSON.parse(localStorage.getItem('serranalog_metas_dash') || '{}');
-        const dayData = savedData[selectedDateStr] || { v_prog: '', vol_prog: '', cx_prog: '', pbtc_real: '' };
+        // 2. Buscar METAS PROGRAMADAS no Supabase (metas_diarias)
+        const { data: metasDoDia, error: errMetas } = await supabaseClient
+            .from('metas_diarias')
+            .select('*')
+            .eq('data_referencia', selectedDateStr)
+            .maybeSingle();
 
-        inp_v_prog.value = dayData.v_prog;
-        inp_vol_prog.value = dayData.vol_prog;
-        inp_cx_prog.value = dayData.cx_prog;
-        inp_pbtc_real.value = dayData.pbtc_real;
+        if (errMetas) throw errMetas;
 
-        // 4. Calcular Porcentagens
+        // Se encontrou meta salva no banco para aquele dia, preenche. Se não, limpa.
+        if (metasDoDia) {
+            inp_v_prog.value = metasDoDia.v_prog !== null ? metasDoDia.v_prog : '';
+            inp_vol_prog.value = metasDoDia.vol_prog !== null ? metasDoDia.vol_prog : '';
+            inp_cx_prog.value = metasDoDia.cx_prog !== null ? metasDoDia.cx_prog : '';
+            inp_pbtc_real.value = metasDoDia.pbtc_real !== null ? metasDoDia.pbtc_real : '';
+        } else {
+            inp_v_prog.value = '';
+            inp_vol_prog.value = '';
+            inp_cx_prog.value = '';
+            inp_pbtc_real.value = '';
+        }
+
+        // 3. Calcular Porcentagens com os dados preenchidos
         calculateOpPercents(realViagens, realVolume, realCaixa);
 
-        opStatusFetch.innerText = "Dados atualizados com sucesso do banco.";
+        opStatusFetch.innerText = "Dados sincronizados com a nuvem (Supabase).";
         opStatusFetch.className = "text-xs font-mono text-slate-500 hidden md:block";
 
     } catch (err) {
-        console.error("Erro ao buscar dados reais do dia:", err);
+        console.error("Erro ao buscar dados do dia:", err);
         opStatusFetch.innerText = "Falha ao conectar com banco de dados.";
         opStatusFetch.className = "text-xs font-mono text-rose-400 hidden md:block";
     }
@@ -126,27 +136,46 @@ if (opDatePicker) {
     if (inp) inp.addEventListener('input', () => calculateOpPercents());
 });
 
+// Botão de Salvar manda para o Supabase
 if (btnSalvarOp) {
-    btnSalvarOp.addEventListener('click', () => {
+    btnSalvarOp.addEventListener('click', async () => {
         const selectedDateStr = opDatePicker.value;
         if (!selectedDateStr) return;
 
-        const savedData = JSON.parse(localStorage.getItem('serranalog_metas_dash') || '{}');
-        savedData[selectedDateStr] = {
-            v_prog: inp_v_prog.value,
-            vol_prog: inp_vol_prog.value,
-            cx_prog: inp_cx_prog.value,
-            pbtc_real: inp_pbtc_real.value
-        };
-        localStorage.setItem('serranalog_metas_dash', JSON.stringify(savedData));
-
         const originalHtml = btnSalvarOp.innerHTML;
-        btnSalvarOp.innerHTML = '<i class="fas fa-check"></i> Salvo!';
-        btnSalvarOp.classList.replace('bg-emerald-600', 'bg-emerald-500');
+        btnSalvarOp.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando na nuvem...';
         
-        setTimeout(() => {
-            btnSalvarOp.innerHTML = originalHtml;
-            btnSalvarOp.classList.replace('bg-emerald-500', 'bg-emerald-600');
-        }, 2000);
+        try {
+            // Prepara o objeto com as metas digitadas
+            const dadosMeta = {
+                data_referencia: selectedDateStr,
+                v_prog: parseFloat(inp_v_prog.value) || null,
+                vol_prog: parseFloat(inp_vol_prog.value) || null,
+                cx_prog: parseFloat(inp_cx_prog.value) || null,
+                pbtc_real: parseFloat(inp_pbtc_real.value) || null
+            };
+
+            // Upsert: Se já existir essa data, ele atualiza (Update). Se não, ele insere (Insert).
+            const { error } = await supabaseClient
+                .from('metas_diarias')
+                .upsert(dadosMeta, { onConflict: 'data_referencia' });
+
+            if (error) throw error;
+
+            btnSalvarOp.innerHTML = '<i class="fas fa-check"></i> Salvo com Sucesso!';
+            btnSalvarOp.classList.replace('bg-emerald-600', 'bg-emerald-500');
+            
+        } catch (err) {
+            console.error("Erro ao salvar metas:", err);
+            btnSalvarOp.innerHTML = '<i class="fas fa-times"></i> Erro ao salvar!';
+            btnSalvarOp.classList.replace('bg-emerald-600', 'bg-rose-600');
+        } finally {
+            // Volta o botão ao normal depois de 2.5 segundos
+            setTimeout(() => {
+                btnSalvarOp.innerHTML = originalHtml;
+                btnSalvarOp.classList.remove('bg-emerald-500', 'bg-rose-600');
+                btnSalvarOp.classList.add('bg-emerald-600');
+            }, 2500);
+        }
     });
 }
