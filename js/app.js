@@ -18,6 +18,9 @@ const pageSubtitle = document.getElementById('pageSubtitle');
 const dbStatusLabel = document.getElementById('dbStatusLabel');
 const btnLimparBanco = document.getElementById('btnLimparBanco');
 
+// Novo elemento de última atualização
+const lastUpdateIndicator = document.getElementById('lastUpdateIndicator');
+
 // Filtros do Dashboard
 const dashboardFilters = document.getElementById('dashboardFilters');
 const filterTransportadora = document.getElementById('filterTransportadora');
@@ -101,6 +104,20 @@ function parsePtBrNumber(val) {
     let str = String(val).trim();
     if (str.includes(',')) str = str.replace(/\./g, '').replace(',', '.');
     return parseFloat(str) || 0;
+}
+
+// NOVA FUNÇÃO: Formatar Horas e Minutos (ex: 2h 24m)
+function formatarHorasMinutos(horasDecimais) {
+    if (horasDecimais === null || horasDecimais === undefined || isNaN(horasDecimais)) return '-';
+    
+    const horas = Math.floor(horasDecimais);
+    const minutos = Math.round((horasDecimais - horas) * 60);
+
+    if (horas === 0 && minutos === 0) return '0m';
+    if (horas === 0) return `${minutos}m`;
+    if (minutos === 0) return `${horas}h`;
+    
+    return `${horas}h ${minutos.toString().padStart(2, '0')}m`;
 }
 
 function parseDateTime(dateVal, timeVal) {
@@ -227,6 +244,46 @@ function parseSheetToData(sheet) {
     return mappedData.filter(item => item.pesoLiquido > 0 || item.volumeReal > 0);
 }
 
+// NOVA FUNÇÃO: Busca e mostra o horário da última importação
+async function atualizarIndicadorUltimaImportacao() {
+    try {
+        if (!lastUpdateIndicator) return;
+        
+        const { data, error } = await supabaseClient
+            .from('historico_importacoes')
+            .select('dataLancamento')
+            .order('id', { ascending: false })
+            .limit(1);
+        
+        if (error) throw error;
+
+        lastUpdateIndicator.classList.remove('hidden');
+
+        if (!data || data.length === 0) {
+            lastUpdateIndicator.className = "text-[10px] font-bold uppercase tracking-widest text-slate-400 border border-slate-700/50 px-3 py-1 rounded-full bg-slate-800/50 flex items-center";
+            lastUpdateIndicator.innerHTML = '<i class="fas fa-clock mr-1"></i> SEM IMPORTAÇÕES';
+            return;
+        }
+
+        const dataLancamentoStr = data[0].dataLancamento; // Ex: "03/04/2026, 08:30:00"
+        const hoje = new Date().toLocaleDateString('pt-PT');
+
+        if (dataLancamentoStr.includes(hoje)) {
+            // Fica verdinho se a importação foi HOJE
+            const horaApenas = dataLancamentoStr.split(', ')[1] || dataLancamentoStr;
+            lastUpdateIndicator.className = "text-[10px] font-bold uppercase tracking-widest text-emerald-400 border border-emerald-800/50 px-3 py-1.5 rounded-full bg-emerald-900/30 flex items-center shadow-[0_0_12px_rgba(52,211,153,0.15)]";
+            lastUpdateIndicator.innerHTML = `<i class="fas fa-check-circle mr-1"></i> ATUALIZADO HOJE, ${horaApenas}`;
+        } else {
+            // Fica cinza se a importação for de outro dia
+            const dataApenas = dataLancamentoStr.split(', ')[0] || dataLancamentoStr;
+            lastUpdateIndicator.className = "text-[10px] font-bold uppercase tracking-widest text-slate-400 border border-slate-700/50 px-3 py-1.5 rounded-full bg-slate-800/50 flex items-center";
+            lastUpdateIndicator.innerHTML = `<i class="fas fa-clock mr-1"></i> ATUALIZADO EM: ${dataApenas}`;
+        }
+    } catch (e) {
+        console.error("Erro ao buscar última atualização:", e);
+    }
+}
+
 // Plugin de Texto Central para Donut
 const centerTextPlugin = {
     id: 'centerText',
@@ -282,6 +339,7 @@ async function loadHistoricoCompleto() {
         
         // Dispara a renderização inicial
         renderHistoricoTable();
+        atualizarIndicadorUltimaImportacao(); // Atualiza a badge no topo
 
     } catch (err) {
         console.error("Erro ao carregar histórico completo", err);
@@ -321,6 +379,7 @@ function renderHistoricoTable() {
         
         const formatNumber = (val, dec=1) => val !== null && val !== undefined ? val.toLocaleString('pt-PT', {maximumFractionDigits: dec}) : '-';
         
+        // Utilizando formatarHorasMinutos nas três últimas colunas
         tr.innerHTML = `
             <td class="px-6 py-3 font-mono text-[11px] text-slate-400">${row.dataDaBaseExcel || '-'}</td>
             <td class="px-6 py-3 font-mono text-[11px] text-sky-400 truncate max-w-[120px]" title="${row.movimento}">${row.movimento}</td>
@@ -328,9 +387,9 @@ function renderHistoricoTable() {
             <td class="px-6 py-3 font-bold text-emerald-400 tracking-wider text-[11px]">${row.placa}</td>
             <td class="px-6 py-3 text-right font-semibold text-white">${formatNumber(row.pesoLiquido / 1000)}</td>
             <td class="px-6 py-3 text-right font-semibold text-slate-400">${formatNumber(row.volumeReal)}</td>
-            <td class="px-6 py-3 text-right font-black ${row.cicloHoras > 8 ? 'text-rose-400' : 'text-sky-300'}">${formatNumber(row.cicloHoras)}</td>
-            <td class="px-6 py-3 text-right text-amber-400/80 text-[12px]">${formatNumber(row.filaCampoHoras)}</td>
-            <td class="px-6 py-3 text-right text-rose-300/80 text-[12px]">${formatNumber(row.filaFabricaHoras)}</td>
+            <td class="px-6 py-3 text-right font-black ${row.cicloHoras > 8 ? 'text-rose-400' : 'text-sky-300'}">${formatarHorasMinutos(row.cicloHoras)}</td>
+            <td class="px-6 py-3 text-right text-amber-400/80 text-[12px]">${formatarHorasMinutos(row.filaCampoHoras)}</td>
+            <td class="px-6 py-3 text-right text-rose-300/80 text-[12px]">${formatarHorasMinutos(row.filaFabricaHoras)}</td>
         `;
         historicoGeralBody.appendChild(tr);
     });
@@ -378,6 +437,8 @@ async function carregarHistoricoImportacoes() {
                 tbody.appendChild(tr);
             });
         }
+        
+        atualizarIndicadorUltimaImportacao(); // Atualiza a badge no topo
     } catch (e) {
         console.error("Erro ao carregar histórico", e);
     }
@@ -390,6 +451,8 @@ async function carregarHistoricoImportacoes() {
 
 async function loadDashboardData() {
     try {
+        atualizarIndicadorUltimaImportacao(); // Atualiza a badge de sincronização
+
         const { data: storedData, error } = await supabaseClient.from('historico_viagens').select('*');
         
         if (error) throw error;
@@ -501,9 +564,10 @@ async function loadDashboardData() {
         document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
         document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
         
-        document.getElementById('cicloMedio').innerText = mediaCiclo.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " h";
-        document.getElementById('filaCampo').innerText = mediaFilaCampo.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " h";
-        document.getElementById('filaFabrica').innerText = mediaFilaFabrica.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " h";
+        // Utilizando formatarHorasMinutos aqui
+        document.getElementById('cicloMedio').innerText = formatarHorasMinutos(mediaCiclo);
+        document.getElementById('filaCampo').innerText = formatarHorasMinutos(mediaFilaCampo);
+        document.getElementById('filaFabrica').innerText = formatarHorasMinutos(mediaFilaFabrica);
 
         document.getElementById('produtividadeGlobal').innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
         document.getElementById('ociosidadeGlobal').innerText = ociosidadePerc.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + "%";
@@ -589,7 +653,8 @@ async function loadDashboardData() {
                 responsive: true, maintainAspectRatio: true, layout: { padding: { top: 30 } },
                 plugins: { 
                     legend: { display: false },
-                    datalabels: { color: '#bae6fd', anchor: 'end', align: 'top', font: { weight: 'bold', size: 11 }, formatter: (v) => v > 0 ? v + ' h' : '-' }
+                    // Mostrando h e m no grafico de barras também
+                    datalabels: { color: '#bae6fd', anchor: 'end', align: 'top', font: { weight: 'bold', size: 11 }, formatter: (v) => v > 0 ? formatarHorasMinutos(v) : '-' }
                 },
                 scales: { 
                     y: { beginAtZero: true },
@@ -632,12 +697,13 @@ async function loadDashboardData() {
         ultimosRegistros.forEach(row => {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-slate-800/80 transition-colors';
+            // Utilizando formatarHorasMinutos na coluna de ciclo
             tr.innerHTML = `
                 <td class="px-6 py-4 font-mono text-xs text-slate-500">${row.dataDaBaseExcel}</td>
                 <td class="px-6 py-4 font-mono text-xs text-sky-300">${row.movimento}</td>
                 <td class="px-6 py-4 font-medium truncate" title="${row.transportadora}">${row.transportadora.substring(0, 25)}</td>
                 <td class="px-6 py-4 text-right font-semibold">${(row.pesoLiquido / 1000).toLocaleString('pt-PT', {maximumFractionDigits: 1})} t</td>
-                <td class="px-6 py-4 text-right font-black text-sky-400">${row.cicloHoras !== null ? row.cicloHoras.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' h' : '-'}</td>
+                <td class="px-6 py-4 text-right font-black text-sky-400">${formatarHorasMinutos(row.cicloHoras)}</td>
             `;
             tbody.appendChild(tr);
         });
