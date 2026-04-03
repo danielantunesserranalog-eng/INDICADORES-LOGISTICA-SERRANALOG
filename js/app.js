@@ -4,58 +4,92 @@ Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
 Chart.defaults.font.family = "'Inter', sans-serif";
 
-// UI Elements
+// UI Elements Principais
 const viewDashboard = document.getElementById('viewDashboard');
 const viewLancamento = document.getElementById('viewLancamento');
+const viewHistorico = document.getElementById('viewHistorico');
+
 const btnMenuDashboard = document.getElementById('btnMenuDashboard');
 const btnMenuLancamento = document.getElementById('btnMenuLancamento');
+const btnMenuHistorico = document.getElementById('btnMenuHistorico');
+
 const pageTitle = document.getElementById('pageTitle');
 const pageSubtitle = document.getElementById('pageSubtitle');
 const dbStatusLabel = document.getElementById('dbStatusLabel');
 const btnLimparBanco = document.getElementById('btnLimparBanco');
 
-// Filtros
+// Filtros do Dashboard
 const dashboardFilters = document.getElementById('dashboardFilters');
 const filterTransportadora = document.getElementById('filterTransportadora');
 const filterData = document.getElementById('filterData');
 
+// Elementos do Histórico Completo
+const searchHistorico = document.getElementById('searchHistorico');
+const historicoGeralBody = document.getElementById('historicoGeralBody');
+const historicoCount = document.getElementById('historicoCount');
+let fullHistoricoData = []; // Guarda os dados para pesquisa rápida local
+
 // Navegação do Menu
 function switchView(view) {
+    // 1. Esconder tudo e resetar botões
+    viewDashboard.classList.add('hidden');
+    viewLancamento.classList.add('hidden');
+    viewHistorico.classList.add('hidden');
+    
+    [btnMenuDashboard, btnMenuLancamento, btnMenuHistorico].forEach(btn => {
+        btn.classList.remove('active', 'text-sky-400');
+        btn.classList.add('text-slate-400');
+    });
+
+    // 2. Mostrar a tela correta
     if(view === 'dashboard') {
         viewDashboard.classList.remove('hidden');
-        viewLancamento.classList.add('hidden');
         dashboardFilters.classList.remove('hidden');
-        dashboardFilters.classList.add('flex'); // Mostra os filtros
+        dashboardFilters.classList.add('flex');
         
         btnMenuDashboard.classList.add('active', 'text-sky-400');
         btnMenuDashboard.classList.remove('text-slate-400');
-        btnMenuLancamento.classList.remove('active', 'text-sky-400');
-        btnMenuLancamento.classList.add('text-slate-400');
+        
         pageTitle.innerText = "Dashboard Analítico";
         pageSubtitle.innerText = "Análise do histórico acumulado de viagens";
         loadDashboardData();
-    } else {
+        
+    } else if (view === 'lancamento') {
         viewLancamento.classList.remove('hidden');
-        viewDashboard.classList.add('hidden');
         dashboardFilters.classList.add('hidden');
-        dashboardFilters.classList.remove('flex'); // Oculta os filtros
+        dashboardFilters.classList.remove('flex');
         
         btnMenuLancamento.classList.add('active', 'text-sky-400');
         btnMenuLancamento.classList.remove('text-slate-400');
-        btnMenuDashboard.classList.remove('active', 'text-sky-400');
-        btnMenuDashboard.classList.add('text-slate-400');
+        
         pageTitle.innerText = "Central de Lançamentos";
         pageSubtitle.innerText = "Importe as bases diárias para alimentar o histórico";
         carregarHistoricoImportacoes(); 
+
+    } else if (view === 'historico') {
+        viewHistorico.classList.remove('hidden');
+        dashboardFilters.classList.add('hidden');
+        dashboardFilters.classList.remove('flex');
+        
+        btnMenuHistorico.classList.add('active', 'text-sky-400');
+        btnMenuHistorico.classList.remove('text-slate-400');
+        
+        pageTitle.innerText = "Histórico de Viagens";
+        pageSubtitle.innerText = "Consulte, pesquise e audite todas as viagens salvas no banco de dados";
+        loadHistoricoCompleto();
     }
 }
 
 btnMenuDashboard.addEventListener('click', () => switchView('dashboard'));
 btnMenuLancamento.addEventListener('click', () => switchView('lancamento'));
+btnMenuHistorico.addEventListener('click', () => switchView('historico'));
 
 // Ao mudar qualquer filtro, recarrega o dashboard
 filterTransportadora.addEventListener('change', () => loadDashboardData());
 filterData.addEventListener('change', () => loadDashboardData());
+
+// Pesquisa instantânea na tabela de histórico
+searchHistorico.addEventListener('input', () => renderHistoricoTable());
 
 let chartCiclo = null;
 let chartTransp = null;
@@ -223,7 +257,96 @@ const centerTextPlugin = {
 };
 
 // ==========================================
-// CARREGAMENTO HISTÓRICO IMPORTAÇÕES
+// FUNÇÕES DA TELA: HISTÓRICO GERAL
+// ==========================================
+
+async function loadHistoricoCompleto() {
+    try {
+        dbStatusLabel.innerText = "Buscando histórico...";
+        historicoGeralBody.innerHTML = `<tr><td colspan="9" class="px-6 py-10 text-center text-sky-400 font-bold"><i class="fas fa-spinner fa-spin mr-2"></i> Conectando ao Banco de Dados...</td></tr>`;
+        historicoCount.innerText = "Carregando...";
+        
+        const { data, error } = await supabaseClient.from('historico_viagens').select('*');
+        if(error) throw error;
+        
+        dbStatusLabel.innerText = "Banco Sincronizado";
+        dbStatusLabel.className = "text-emerald-400";
+
+        // Armazena e ordena os dados locais pela data (mais recentes primeiro)
+        fullHistoricoData = data || [];
+        fullHistoricoData.sort((a,b) => {
+            const dA = parseDateTime(a.dataDaBaseExcel, null) || new Date(0);
+            const dB = parseDateTime(b.dataDaBaseExcel, null) || new Date(0);
+            return dB - dA;
+        });
+        
+        // Dispara a renderização inicial
+        renderHistoricoTable();
+
+    } catch (err) {
+        console.error("Erro ao carregar histórico completo", err);
+        historicoGeralBody.innerHTML = `<tr><td colspan="9" class="px-6 py-10 text-center text-rose-400 font-bold"><i class="fas fa-exclamation-triangle mr-2"></i> Erro ao carregar dados do Supabase.</td></tr>`;
+        dbStatusLabel.innerText = "Erro de Conexão";
+        dbStatusLabel.className = "text-rose-400";
+    }
+}
+
+function renderHistoricoTable() {
+    const searchTerm = searchHistorico.value.toLowerCase().trim();
+    
+    // Filtro local na memória (muito rápido)
+    const filtered = fullHistoricoData.filter(d => {
+        if(!searchTerm) return true;
+        const transp = (d.transportadora || "").toLowerCase();
+        const placa = (d.placa || "").toLowerCase();
+        const mov = (d.movimento || "").toLowerCase();
+        return transp.includes(searchTerm) || placa.includes(searchTerm) || mov.includes(searchTerm);
+    });
+
+    historicoGeralBody.innerHTML = '';
+    
+    if(filtered.length === 0) {
+        historicoGeralBody.innerHTML = `<tr><td colspan="9" class="px-6 py-10 text-center text-slate-500 font-medium">Nenhuma viagem encontrada para a busca "${searchTerm}".</td></tr>`;
+        historicoCount.innerText = "0 registros listados";
+        return;
+    }
+
+    // Renderizar um limite (ex: 500) para não travar o navegador caso existam 100.000 linhas
+    const limit = 500;
+    const toRender = filtered.slice(0, limit);
+
+    toRender.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/80 transition-colors border-b border-slate-800/50';
+        
+        const formatNumber = (val, dec=1) => val !== null && val !== undefined ? val.toLocaleString('pt-PT', {maximumFractionDigits: dec}) : '-';
+        
+        tr.innerHTML = `
+            <td class="px-6 py-3 font-mono text-[11px] text-slate-400">${row.dataDaBaseExcel || '-'}</td>
+            <td class="px-6 py-3 font-mono text-[11px] text-sky-400 truncate max-w-[120px]" title="${row.movimento}">${row.movimento}</td>
+            <td class="px-6 py-3 font-medium text-slate-200 truncate max-w-[150px]" title="${row.transportadora}">${row.transportadora}</td>
+            <td class="px-6 py-3 font-bold text-emerald-400 tracking-wider text-[11px]">${row.placa}</td>
+            <td class="px-6 py-3 text-right font-semibold text-white">${formatNumber(row.pesoLiquido / 1000)}</td>
+            <td class="px-6 py-3 text-right font-semibold text-slate-400">${formatNumber(row.volumeReal)}</td>
+            <td class="px-6 py-3 text-right font-black ${row.cicloHoras > 8 ? 'text-rose-400' : 'text-sky-300'}">${formatNumber(row.cicloHoras)}</td>
+            <td class="px-6 py-3 text-right text-amber-400/80 text-[12px]">${formatNumber(row.filaCampoHoras)}</td>
+            <td class="px-6 py-3 text-right text-rose-300/80 text-[12px]">${formatNumber(row.filaFabricaHoras)}</td>
+        `;
+        historicoGeralBody.appendChild(tr);
+    });
+
+    if(filtered.length > limit) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="9" class="px-6 py-4 text-center text-[11px] text-slate-500 font-bold bg-slate-900/50">Mostrando as primeiras ${limit} de ${filtered.length} viagens. Use a busca no topo para refinar.</td>`;
+        historicoGeralBody.appendChild(tr);
+    }
+
+    historicoCount.innerText = `${filtered.length} registros encontrados no total.`;
+}
+
+
+// ==========================================
+// FUNÇÕES DA TELA: LANÇAMENTO / IMPORTAÇÕES
 // ==========================================
 
 async function carregarHistoricoImportacoes() {
@@ -260,8 +383,9 @@ async function carregarHistoricoImportacoes() {
     }
 }
 
+
 // ==========================================
-// CÁLCULO E RENDERIZAÇÃO DO DASHBOARD
+// FUNÇÕES DA TELA: DASHBOARD
 // ==========================================
 
 async function loadDashboardData() {
@@ -309,7 +433,7 @@ async function loadDashboardData() {
             if(dt === currentDataSelection) opt.selected = true;
             filterData.appendChild(opt);
         });
-        // Incluir "Desconhecida" no final, se existir no banco
+        
         if(storedData.some(d => d.dataDaBaseExcel === 'Desconhecida')) {
             const opt = document.createElement('option');
             opt.value = 'Desconhecida';
@@ -318,7 +442,7 @@ async function loadDashboardData() {
             filterData.appendChild(opt);
         }
 
-        // 3. APLICAR FILTROS (Transportadora E Data)
+        // 3. APLICAR FILTROS
         const activeTransp = filterTransportadora.value;
         const activeData = filterData.value;
         
@@ -331,7 +455,6 @@ async function loadDashboardData() {
         if(filteredData.length === 0) {
             dbStatusLabel.innerText = "Sem dados para o filtro";
             
-            // Zerar os indicadores se o filtro não encontrar nada
             document.getElementById('totalViagens').innerText = '0';
             document.getElementById('totalPesoLiq').innerText = '0 t';
             document.getElementById('produtividadeGlobal').innerText = '0.0';
@@ -369,7 +492,6 @@ async function loadDashboardData() {
         const produtividade = somaCiclosTotais > 0 ? (totalPesoTon / somaCiclosTotais) : 0;
         const ociosidadePerc = somaCiclosTotais > 0 ? (somaTempoFila / somaCiclosTotais) * 100 : 0;
 
-        // Atualização da UI Básica
         document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
         document.getElementById('totalPesoLiq').innerText = totalPesoTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
         document.getElementById('cargaMediaValue').innerText = cargaMediaTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
@@ -406,7 +528,6 @@ async function loadDashboardData() {
         let melhorPlacaProdutividade = 0;
 
         mapaPlacas.forEach((dados, placa) => {
-            // Ignorar dados irreais que dariam produtividade infinita (ciclo menor que 30min)
             if (dados.ciclosAcumulados > 0.5) {
                 const produtividadeDaPlaca = (dados.pesoAcumulado / 1000) / dados.ciclosAcumulados;
                 if (produtividadeDaPlaca > melhorPlacaProdutividade) {
@@ -502,7 +623,6 @@ async function loadDashboardData() {
         const tbody = document.getElementById('sampleTableBody');
         tbody.innerHTML = '';
         
-        // Na tabela também ordenamos por data para as mais recentes
         const ultimosRegistros = [...filteredData].sort((a,b) => {
             const dA = parseDateTime(a.dataDaBaseExcel, null) || new Date(0);
             const dB = parseDateTime(b.dataDaBaseExcel, null) || new Date(0);
@@ -527,7 +647,11 @@ async function loadDashboardData() {
     }
 }
 
-// Processo de Upload e Salvar
+
+// ==========================================
+// PROCESSO DE UPLOAD
+// ==========================================
+
 async function processAndSaveFile(file) {
     const errorMsgDiv = document.getElementById('errorMsg');
     const loadingSpinner = document.getElementById('loadingSpinner');
@@ -542,7 +666,6 @@ async function processAndSaveFile(file) {
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const newRows = parseSheetToData(firstSheet);
 
-        // Identificação de múltiplas datas para gravar no histórico de importações
         let strHistoricoDatas = 'Desconhecida';
         const datasEncontradas = [...new Set(newRows.map(r => r.dataDaBaseExcel).filter(d => d && d !== 'Desconhecida'))];
         
@@ -557,9 +680,9 @@ async function processAndSaveFile(file) {
             });
             
             if (datasEncontradas.length === 1) {
-                strHistoricoDatas = datasEncontradas[0]; // Só um dia
+                strHistoricoDatas = datasEncontradas[0];
             } else if (datasEncontradas.length <= 3) {
-                strHistoricoDatas = datasEncontradas.join(', '); // Até 3 dias mostra os três
+                strHistoricoDatas = datasEncontradas.join(', ');
             } else {
                 strHistoricoDatas = `${datasEncontradas[0]} a ${datasEncontradas[datasEncontradas.length - 1]} (${datasEncontradas.length} dias)`; 
             }
@@ -585,7 +708,6 @@ async function processAndSaveFile(file) {
         }]);
         if (histError) throw histError;
 
-        // Limpar filtros após envio para visualizar o que acabou de subir
         filterTransportadora.value = 'ALL';
         filterData.value = 'ALL';
 
@@ -602,7 +724,6 @@ async function processAndSaveFile(file) {
     }
 }
 
-// Eventos de Upload
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const selectFileBtn = document.getElementById('selectFileBtn');
@@ -619,7 +740,6 @@ fileInput.addEventListener('change', (e) => {
     if (e.target.files.length) processAndSaveFile(e.target.files[0]);
 });
 
-// Limpar Banco no Supabase
 btnLimparBanco.addEventListener('click', async () => {
     if(confirm("ATENÇÃO: Deseja apagar todo o histórico de viagens e importações? Esta ação apagará de vez na NUVEM e não pode ser desfeita.")) {
         
@@ -629,6 +749,7 @@ btnLimparBanco.addEventListener('click', async () => {
         alert("Histórico da nuvem apagado com sucesso.");
         carregarHistoricoImportacoes();
         loadDashboardData();
+        if(!viewHistorico.classList.contains('hidden')) loadHistoricoCompleto();
     }
 });
 
