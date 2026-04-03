@@ -11,7 +11,6 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
 </head>
 <body class="bg-slate-900 min-h-screen text-slate-200 selection:bg-sky-500/30 flex overflow-hidden">
 
@@ -43,7 +42,7 @@
                 Apagar Histórico Geral
             </button>
             <div class="text-center text-[10px] text-slate-500 mt-4 font-mono">
-                SerranaLog v2.2 • Data System
+                SerranaLog v2.3 • Data System
             </div>
         </div>
     </aside>
@@ -57,11 +56,20 @@
                     <p id="pageSubtitle" class="text-sm text-slate-400 font-medium">Análise do histórico acumulado de viagens</p>
                 </div>
                 
-                <div id="dashboardFilters" class="hidden items-center gap-3 bg-slate-900/80 p-2 rounded-xl border border-sky-800 shadow-lg shadow-sky-900/20">
-                    <label for="filterTransportadora" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="fas fa-filter mr-1"></i> Filtrar:</label>
-                    <select id="filterTransportadora" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-4 py-2 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner">
-                        <option value="ALL">TODAS AS TRANSPORTADORAS</option>
-                    </select>
+                <div id="dashboardFilters" class="hidden items-center gap-4 bg-slate-900/80 p-2 rounded-xl border border-sky-800 shadow-lg shadow-sky-900/20 flex-wrap">
+                    <div class="flex items-center gap-2">
+                        <label for="filterData" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="far fa-calendar-alt mr-1"></i> Data:</label>
+                        <select id="filterData" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-4 py-2 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner">
+                            <option value="ALL">TODO O PERÍODO</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex items-center gap-2">
+                        <label for="filterTransportadora" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="fas fa-truck mr-1"></i> Transp:</label>
+                        <select id="filterTransportadora" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-4 py-2 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner">
+                            <option value="ALL">TODAS AS TRANSPORTADORAS</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="flex items-center gap-4">
@@ -110,7 +118,7 @@
                                 <table class="min-w-full text-sm text-left">
                                     <thead class="bg-slate-800 text-slate-400 font-semibold uppercase text-[11px] tracking-wider border-b border-slate-700">
                                         <tr>
-                                            <th class="px-6 py-3">Data da Base (Data de Saída)</th>
+                                            <th class="px-6 py-3">Datas Identificadas na Base</th>
                                             <th class="px-6 py-3 text-right">Viagens Extraídas</th>
                                             <th class="px-6 py-3 text-right">Importado a</th>
                                         </tr>
@@ -132,7 +140,7 @@
                     <div class="glass-card rounded-2xl p-6 border-l-4 border-l-cyan-400 card-hover flex items-center justify-between relative overflow-hidden">
                         <div class="absolute -right-6 -top-6 text-slate-700/30 text-9xl"><i class="fas fa-tachometer-alt"></i></div>
                         <div class="relative z-10">
-                            <p class="text-cyan-400 text-xs font-bold uppercase tracking-widest mb-1">Produtividade Global Histórica</p>
+                            <p class="text-cyan-400 text-xs font-bold uppercase tracking-widest mb-1">Produtividade Global</p>
                             <div class="flex items-end gap-2">
                                 <p id="produtividadeGlobal" class="text-4xl font-black text-white">0.0</p>
                                 <span class="text-slate-400 font-bold mb-1">ton/h</span>
@@ -143,7 +151,7 @@
                     <div class="glass-card rounded-2xl p-6 border-l-4 border-l-rose-500 card-hover flex items-center justify-between relative overflow-hidden">
                         <div class="absolute -right-4 -top-4 text-slate-700/30 text-9xl"><i class="fas fa-traffic-light"></i></div>
                         <div class="relative z-10">
-                            <p class="text-rose-400 text-xs font-bold uppercase tracking-widest mb-1">Taxa de Ociosidade (Fila / Ciclo)</p>
+                            <p class="text-rose-400 text-xs font-bold uppercase tracking-widest mb-1">Taxa de Ociosidade (Fila/Ciclo)</p>
                             <div class="flex items-end gap-2">
                                 <p id="ociosidadeGlobal" class="text-4xl font-black text-white">0%</p>
                                 <span class="text-slate-400 font-bold mb-1">do tempo em espera</span>
@@ -166,11 +174,11 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5" id="kpiGridPrimary">
                     <div class="glass-card rounded-2xl p-5 glow-border-blue card-hover flex flex-col justify-between">
-                        <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Viagens Acumuladas</p><p id="totalViagens" class="text-2xl font-extrabold text-white mt-1">0</p></div>
+                        <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Viagens</p><p id="totalViagens" class="text-2xl font-extrabold text-white mt-1">0</p></div>
                         <i class="fas fa-route text-blue-500 text-2xl self-end -mt-6"></i>
                     </div>
                     <div class="glass-card rounded-2xl p-5 glow-border-cyan card-hover flex flex-col justify-between">
-                        <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Peso Total Acumulado</p><p id="totalPesoLiq" class="text-2xl font-extrabold text-white mt-1">0 t</p></div>
+                        <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Peso Total</p><p id="totalPesoLiq" class="text-2xl font-extrabold text-white mt-1">0 t</p></div>
                         <i class="fas fa-weight-hanging text-cyan-400 text-2xl self-end -mt-6"></i>
                     </div>
                     <div class="glass-card rounded-2xl p-5 glow-border-indigo card-hover flex flex-col justify-between">
@@ -184,7 +192,7 @@
                     
                     <div class="glass-card rounded-2xl p-5 glow-border-emerald card-hover flex flex-col justify-between">
                         <div>
-                            <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Dist. Média Total</p>
+                            <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Dist. Média</p>
                             <p id="mediaDistancia" class="text-2xl font-extrabold text-white mt-1">0 km</p>
                             <div class="flex flex-col mt-3 text-[11px] font-bold text-slate-500 border-t border-slate-700/50 pt-3 gap-2">
                                 <span class="flex justify-between items-center text-slate-300">
@@ -203,7 +211,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-4" id="kpiGridSecondary">
                     <div class="glass-card rounded-2xl p-6 glow-border-blue card-hover">
                         <div class="flex justify-between items-start">
-                            <div><p class="text-blue-400 text-xs font-bold uppercase tracking-widest">Ciclo Médio Histórico</p><p id="cicloMedio" class="text-3xl font-black text-white mt-2">0 h</p></div>
+                            <div><p class="text-blue-400 text-xs font-bold uppercase tracking-widest">Ciclo Médio</p><p id="cicloMedio" class="text-3xl font-black text-white mt-2">0 h</p></div>
                             <i class="fas fa-stopwatch text-blue-500/50 text-4xl"></i>
                         </div>
                     </div>
@@ -240,7 +248,7 @@
                         <table class="min-w-full text-sm text-left">
                             <thead class="bg-slate-900/90 text-slate-400 font-semibold uppercase text-[11px] tracking-wider border-b border-slate-700 sticky top-0 z-10">
                                 <tr>
-                                    <th class="px-6 py-4">Data Lanç.</th>
+                                    <th class="px-6 py-4">Data Saída (Base)</th>
                                     <th class="px-6 py-4">Movimento</th>
                                     <th class="px-6 py-4">Transportadora</th>
                                     <th class="px-6 py-4 text-right">Peso (t)</th>

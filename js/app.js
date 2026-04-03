@@ -13,8 +13,11 @@ const pageTitle = document.getElementById('pageTitle');
 const pageSubtitle = document.getElementById('pageSubtitle');
 const dbStatusLabel = document.getElementById('dbStatusLabel');
 const btnLimparBanco = document.getElementById('btnLimparBanco');
+
+// Filtros
 const dashboardFilters = document.getElementById('dashboardFilters');
 const filterTransportadora = document.getElementById('filterTransportadora');
+const filterData = document.getElementById('filterData');
 
 // Navegação do Menu
 function switchView(view) {
@@ -50,8 +53,9 @@ function switchView(view) {
 btnMenuDashboard.addEventListener('click', () => switchView('dashboard'));
 btnMenuLancamento.addEventListener('click', () => switchView('lancamento'));
 
-// Ao mudar a transportadora no dropdown, recarrega o dashboard
+// Ao mudar qualquer filtro, recarrega o dashboard
 filterTransportadora.addEventListener('change', () => loadDashboardData());
+filterData.addEventListener('change', () => loadDashboardData());
 
 let chartCiclo = null;
 let chartTransp = null;
@@ -244,7 +248,7 @@ async function carregarHistoricoImportacoes() {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-800/50 transition-colors';
                 tr.innerHTML = `
-                    <td class="px-6 py-3 font-semibold text-sky-300"><i class="far fa-calendar-check mr-2"></i> ${log.dataBase}</td>
+                    <td class="px-6 py-3 font-semibold text-sky-300 max-w-[200px] truncate" title="${log.dataBase}"><i class="far fa-calendar-check mr-2"></i> ${log.dataBase}</td>
                     <td class="px-6 py-3 text-right font-bold text-emerald-400">+ ${log.qtdViagens}</td>
                     <td class="px-6 py-3 text-right font-mono text-xs text-slate-500">${log.dataLancamento}</td>
                 `;
@@ -272,31 +276,74 @@ async function loadDashboardData() {
             return;
         }
 
+        // 1. POPULAR FILTRO DE TRANSPORTADORAS
         const allTransporters = [...new Set(storedData.map(d => d.transportadora))].filter(Boolean).sort();
-        const currentSelection = filterTransportadora.value || 'ALL';
+        const currentTranspSelection = filterTransportadora.value || 'ALL';
         
         filterTransportadora.innerHTML = '<option value="ALL">TODAS AS TRANSPORTADORAS</option>';
         allTransporters.forEach(t => {
             const opt = document.createElement('option');
             opt.value = t;
             opt.innerText = t.toUpperCase();
-            if(t === currentSelection) opt.selected = true;
+            if(t === currentTranspSelection) opt.selected = true;
             filterTransportadora.appendChild(opt);
         });
 
-        const activeFilter = filterTransportadora.value;
-        const filteredData = activeFilter === 'ALL' 
-            ? storedData 
-            : storedData.filter(d => d.transportadora === activeFilter);
+        // 2. POPULAR FILTRO DE DATAS
+        const allDates = [...new Set(storedData.map(d => d.dataDaBaseExcel))].filter(d => d && d !== 'Desconhecida');
+        allDates.sort((a, b) => {
+            const partsA = a.split('/');
+            const partsB = b.split('/');
+            if(partsA.length === 3 && partsB.length === 3) {
+                return new Date(partsA[2], partsA[1]-1, partsA[0]) - new Date(partsB[2], partsB[1]-1, partsB[0]);
+            }
+            return 0;
+        });
+
+        const currentDataSelection = filterData.value || 'ALL';
+        filterData.innerHTML = '<option value="ALL">TODO O PERÍODO</option>';
+        allDates.forEach(dt => {
+            const opt = document.createElement('option');
+            opt.value = dt;
+            opt.innerText = dt;
+            if(dt === currentDataSelection) opt.selected = true;
+            filterData.appendChild(opt);
+        });
+        // Incluir "Desconhecida" no final, se existir no banco
+        if(storedData.some(d => d.dataDaBaseExcel === 'Desconhecida')) {
+            const opt = document.createElement('option');
+            opt.value = 'Desconhecida';
+            opt.innerText = 'Datas Desconhecidas';
+            if('Desconhecida' === currentDataSelection) opt.selected = true;
+            filterData.appendChild(opt);
+        }
+
+        // 3. APLICAR FILTROS (Transportadora E Data)
+        const activeTransp = filterTransportadora.value;
+        const activeData = filterData.value;
+        
+        const filteredData = storedData.filter(d => {
+            const matchTransp = activeTransp === 'ALL' || d.transportadora === activeTransp;
+            const matchData = activeData === 'ALL' || d.dataDaBaseExcel === activeData;
+            return matchTransp && matchData;
+        });
 
         if(filteredData.length === 0) {
             dbStatusLabel.innerText = "Sem dados para o filtro";
+            
+            // Zerar os indicadores se o filtro não encontrar nada
+            document.getElementById('totalViagens').innerText = '0';
+            document.getElementById('totalPesoLiq').innerText = '0 t';
+            document.getElementById('produtividadeGlobal').innerText = '0.0';
+            document.getElementById('bestPlacaValue').innerText = '0.0';
+            document.getElementById('bestPlacaName').innerText = 'Nenhum cavalo encontrado';
             return;
         }
 
         dbStatusLabel.innerText = `${filteredData.length} Viagens Analisadas`;
         dbStatusLabel.className = "text-sky-300";
 
+        // CÁLCULOS DOS INDICADORES
         const totalViagens = filteredData.length;
         const totalPesoKg = filteredData.reduce((sum, r) => sum + r.pesoLiquido, 0);
         const totalPesoTon = totalPesoKg / 1000;
@@ -339,16 +386,11 @@ async function loadDashboardData() {
         document.getElementById('produtividadeGlobal').innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
         document.getElementById('ociosidadeGlobal').innerText = ociosidadePerc.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + "%";
 
-
-        // ==========================================
-        // LÓGICA DO NOVO INDICADOR: MELHOR CAVALO
-        // ==========================================
+        // LÓGICA DO MELHOR CAVALO
         const mapaPlacas = new Map();
 
         validCycles.forEach(d => {
-            // Valida e formata a placa
             const placaFormatada = (d.placa && d.placa.trim() !== '-' && d.placa.trim() !== '') ? d.placa.trim().toUpperCase() : 'DESCONHECIDA';
-            
             if (placaFormatada === 'DESCONHECIDA') return;
 
             if (!mapaPlacas.has(placaFormatada)) {
@@ -364,9 +406,8 @@ async function loadDashboardData() {
         let melhorPlacaProdutividade = 0;
 
         mapaPlacas.forEach((dados, placa) => {
-            // Vamos considerar apenas cavalos que rodaram pelo menos 1 hora para evitar dados irreais
-            // (ex: ciclo bugado de 5 min dar uma produtividade de 900 ton/h)
-            if (dados.ciclosAcumulados > 1) {
+            // Ignorar dados irreais que dariam produtividade infinita (ciclo menor que 30min)
+            if (dados.ciclosAcumulados > 0.5) {
                 const produtividadeDaPlaca = (dados.pesoAcumulado / 1000) / dados.ciclosAcumulados;
                 if (produtividadeDaPlaca > melhorPlacaProdutividade) {
                     melhorPlacaProdutividade = produtividadeDaPlaca;
@@ -377,10 +418,8 @@ async function loadDashboardData() {
 
         document.getElementById('bestPlacaValue').innerText = melhorPlacaProdutividade > 0 ? melhorPlacaProdutividade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) : "0.0";
         document.getElementById('bestPlacaName').innerText = `Placa: ${melhorPlacaNome}`;
-        // ==========================================
 
-
-        // Continuação: Gráficos
+        // Gráficos
         const transpCount = new Map();
         const transpCicloSum = new Map();
         const transpCicloCount = new Map();
@@ -462,13 +501,19 @@ async function loadDashboardData() {
 
         const tbody = document.getElementById('sampleTableBody');
         tbody.innerHTML = '';
-        const ultimosRegistros = [...filteredData].reverse().slice(0, 15);
+        
+        // Na tabela também ordenamos por data para as mais recentes
+        const ultimosRegistros = [...filteredData].sort((a,b) => {
+            const dA = parseDateTime(a.dataDaBaseExcel, null) || new Date(0);
+            const dB = parseDateTime(b.dataDaBaseExcel, null) || new Date(0);
+            return dB - dA;
+        }).slice(0, 15);
         
         ultimosRegistros.forEach(row => {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-slate-800/80 transition-colors';
             tr.innerHTML = `
-                <td class="px-6 py-4 font-mono text-xs text-slate-500">${row.dataLancamento}</td>
+                <td class="px-6 py-4 font-mono text-xs text-slate-500">${row.dataDaBaseExcel}</td>
                 <td class="px-6 py-4 font-mono text-xs text-sky-300">${row.movimento}</td>
                 <td class="px-6 py-4 font-medium truncate" title="${row.transportadora}">${row.transportadora.substring(0, 25)}</td>
                 <td class="px-6 py-4 text-right font-semibold">${(row.pesoLiquido / 1000).toLocaleString('pt-PT', {maximumFractionDigits: 1})} t</td>
@@ -497,10 +542,27 @@ async function processAndSaveFile(file) {
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const newRows = parseSheetToData(firstSheet);
 
-        let dataDaBase = 'Desconhecida';
-        const datasEncontradas = newRows.map(r => r.dataDaBaseExcel).filter(d => d && d !== 'Desconhecida');
+        // Identificação de múltiplas datas para gravar no histórico de importações
+        let strHistoricoDatas = 'Desconhecida';
+        const datasEncontradas = [...new Set(newRows.map(r => r.dataDaBaseExcel).filter(d => d && d !== 'Desconhecida'))];
+        
         if (datasEncontradas.length > 0) {
-            dataDaBase = datasEncontradas[0];
+            datasEncontradas.sort((a, b) => {
+                const partsA = a.split('/');
+                const partsB = b.split('/');
+                if(partsA.length === 3 && partsB.length === 3) {
+                    return new Date(partsA[2], partsA[1]-1, partsA[0]) - new Date(partsB[2], partsB[1]-1, partsB[0]);
+                }
+                return 0;
+            });
+            
+            if (datasEncontradas.length === 1) {
+                strHistoricoDatas = datasEncontradas[0]; // Só um dia
+            } else if (datasEncontradas.length <= 3) {
+                strHistoricoDatas = datasEncontradas.join(', '); // Até 3 dias mostra os três
+            } else {
+                strHistoricoDatas = `${datasEncontradas[0]} a ${datasEncontradas[datasEncontradas.length - 1]} (${datasEncontradas.length} dias)`; 
+            }
         }
 
         const { data: existingIds, error: selectError } = await supabaseClient.from('historico_viagens').select('movimento');
@@ -517,13 +579,15 @@ async function processAndSaveFile(file) {
         if (upsertError) throw upsertError;
 
         const { error: histError } = await supabaseClient.from('historico_importacoes').insert([{
-            "dataBase": dataDaBase,
+            "dataBase": strHistoricoDatas,
             "qtdViagens": viagensNovas,
             "dataLancamento": new Date().toLocaleString('pt-PT')
         }]);
         if (histError) throw histError;
 
+        // Limpar filtros após envio para visualizar o que acabou de subir
         filterTransportadora.value = 'ALL';
+        filterData.value = 'ALL';
 
         alert(`Sucesso! Foram processadas ${newRows.length} viagens. (${viagensNovas} novas viagens salvas na nuvem).`);
         switchView('dashboard');
