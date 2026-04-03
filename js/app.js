@@ -322,6 +322,7 @@ async function loadDashboardData() {
         const produtividade = somaCiclosTotais > 0 ? (totalPesoTon / somaCiclosTotais) : 0;
         const ociosidadePerc = somaCiclosTotais > 0 ? (somaTempoFila / somaCiclosTotais) * 100 : 0;
 
+        // Atualização da UI Básica
         document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
         document.getElementById('totalPesoLiq').innerText = totalPesoTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
         document.getElementById('cargaMediaValue').innerText = cargaMediaTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
@@ -338,6 +339,48 @@ async function loadDashboardData() {
         document.getElementById('produtividadeGlobal').innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
         document.getElementById('ociosidadeGlobal').innerText = ociosidadePerc.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + "%";
 
+
+        // ==========================================
+        // LÓGICA DO NOVO INDICADOR: MELHOR CAVALO
+        // ==========================================
+        const mapaPlacas = new Map();
+
+        validCycles.forEach(d => {
+            // Valida e formata a placa
+            const placaFormatada = (d.placa && d.placa.trim() !== '-' && d.placa.trim() !== '') ? d.placa.trim().toUpperCase() : 'DESCONHECIDA';
+            
+            if (placaFormatada === 'DESCONHECIDA') return;
+
+            if (!mapaPlacas.has(placaFormatada)) {
+                mapaPlacas.set(placaFormatada, { pesoAcumulado: 0, ciclosAcumulados: 0 });
+            }
+            
+            const p = mapaPlacas.get(placaFormatada);
+            p.pesoAcumulado += d.pesoLiquido;
+            p.ciclosAcumulados += d.cicloHoras;
+        });
+
+        let melhorPlacaNome = "---";
+        let melhorPlacaProdutividade = 0;
+
+        mapaPlacas.forEach((dados, placa) => {
+            // Vamos considerar apenas cavalos que rodaram pelo menos 1 hora para evitar dados irreais
+            // (ex: ciclo bugado de 5 min dar uma produtividade de 900 ton/h)
+            if (dados.ciclosAcumulados > 1) {
+                const produtividadeDaPlaca = (dados.pesoAcumulado / 1000) / dados.ciclosAcumulados;
+                if (produtividadeDaPlaca > melhorPlacaProdutividade) {
+                    melhorPlacaProdutividade = produtividadeDaPlaca;
+                    melhorPlacaNome = placa;
+                }
+            }
+        });
+
+        document.getElementById('bestPlacaValue').innerText = melhorPlacaProdutividade > 0 ? melhorPlacaProdutividade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) : "0.0";
+        document.getElementById('bestPlacaName').innerText = `Placa: ${melhorPlacaNome}`;
+        // ==========================================
+
+
+        // Continuação: Gráficos
         const transpCount = new Map();
         const transpCicloSum = new Map();
         const transpCicloCount = new Map();
