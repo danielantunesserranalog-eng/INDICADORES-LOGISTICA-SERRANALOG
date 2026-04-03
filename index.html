@@ -43,7 +43,7 @@
                 Apagar Histórico Geral
             </button>
             <div class="text-center text-[10px] text-slate-500 mt-4 font-mono">
-                SerranaLog v2.0 • Data System
+                SerranaLog v2.1 • Data System
             </div>
         </div>
     </aside>
@@ -51,11 +51,19 @@
     <main class="flex-1 h-screen overflow-y-auto relative">
         <div class="max-w-[96rem] mx-auto px-6 py-8">
 
-            <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
+            <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm flex-wrap gap-4">
                 <div>
                     <h1 id="pageTitle" class="text-2xl font-extrabold text-white">Dashboard Analítico</h1>
                     <p id="pageSubtitle" class="text-sm text-slate-400 font-medium">Análise do histórico acumulado de viagens</p>
                 </div>
+                
+                <div id="dashboardFilters" class="hidden items-center gap-3 bg-slate-900/80 p-2 rounded-xl border border-sky-800 shadow-lg shadow-sky-900/20">
+                    <label for="filterTransportadora" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="fas fa-filter mr-1"></i> Filtrar:</label>
+                    <select id="filterTransportadora" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-4 py-2 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner">
+                        <option value="ALL">TODAS AS TRANSPORTADORAS</option>
+                    </select>
+                </div>
+
                 <div class="flex items-center gap-4">
                     <div class="bg-slate-900 border border-slate-700 rounded-full px-5 py-2 shadow-inner text-sm font-mono text-sky-300 flex items-center">
                         <i class="fas fa-database mr-2 text-sky-500"></i> <span id="dbStatusLabel">Carregando dados...</span>
@@ -161,13 +169,20 @@
                         <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Vol. Médio</p><p id="mediaVolumeReal" class="text-2xl font-extrabold text-white mt-1">0 m³</p></div>
                         <i class="fas fa-cubes text-amber-500 text-2xl self-end -mt-6"></i>
                     </div>
+                    
                     <div class="glass-card rounded-2xl p-5 glow-border-emerald card-hover flex flex-col justify-between">
                         <div>
                             <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Dist. Média Total</p>
                             <p id="mediaDistancia" class="text-2xl font-extrabold text-white mt-1">0 km</p>
-                            <div class="flex flex-col mt-2 text-[10px] font-bold text-slate-500 border-t border-slate-700/50 pt-2">
-                                <span class="flex justify-between items-center text-slate-300"><span>Asfalto:</span> <span id="mediaAsfalto">0</span> km</span>
-                                <span class="flex justify-between items-center text-amber-400 mt-1"><span>Terra:</span> <span id="mediaTerra">0</span> km</span>
+                            <div class="flex flex-col mt-3 text-[11px] font-bold text-slate-500 border-t border-slate-700/50 pt-3 gap-2">
+                                <span class="flex justify-between items-center text-slate-300">
+                                    <span class="uppercase tracking-wider font-semibold">Asfalto:</span> 
+                                    <span class="text-sm font-black text-sky-300 bg-sky-900/30 px-2 py-0.5 rounded border border-sky-800/50 shadow-inner"><span id="mediaAsfalto">0</span> km</span>
+                                </span>
+                                <span class="flex justify-between items-center text-amber-400">
+                                    <span class="uppercase tracking-wider font-semibold">Terra:</span> 
+                                    <span class="text-sm font-black text-amber-400 bg-amber-900/30 px-2 py-0.5 rounded border border-amber-800/50 shadow-inner"><span id="mediaTerra">0</span> km</span>
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -200,14 +215,14 @@
                         <canvas id="cicloChart" width="400" height="250" style="max-height: 280px;"></canvas>
                     </div>
                     <div class="glass-card rounded-xl p-5 border border-slate-700/50">
-                        <h3 class="font-bold text-slate-200 border-b border-slate-700 pb-3 mb-4 flex items-center uppercase tracking-wide text-sm"><i class="fas fa-chart-pie text-cyan-500 mr-2"></i> Top Transportadoras (Volume Histórico)</h3>
+                        <h3 class="font-bold text-slate-200 border-b border-slate-700 pb-3 mb-4 flex items-center uppercase tracking-wide text-sm"><i class="fas fa-chart-pie text-cyan-500 mr-2"></i> Distribuição de Viagens</h3>
                         <canvas id="transportadorasChart" width="400" height="250" style="max-height: 280px;"></canvas>
                     </div>
                 </div>
 
                 <div class="glass-card rounded-xl shadow-2xl overflow-hidden border border-slate-700/50 pb-4">
                     <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
-                        <h3 class="font-bold text-white tracking-wide"><i class="fas fa-history text-sky-500 mr-2"></i> Últimas 15 Viagens Lançadas no Banco</h3>
+                        <h3 class="font-bold text-white tracking-wide"><i class="fas fa-history text-sky-500 mr-2"></i> Últimas Viagens Lançadas no Banco</h3>
                     </div>
                     <div class="overflow-x-auto max-h-96 overflow-y-auto">
                         <table class="min-w-full text-sm text-left">

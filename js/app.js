@@ -19,12 +19,17 @@ const pageTitle = document.getElementById('pageTitle');
 const pageSubtitle = document.getElementById('pageSubtitle');
 const dbStatusLabel = document.getElementById('dbStatusLabel');
 const btnLimparBanco = document.getElementById('btnLimparBanco');
+const dashboardFilters = document.getElementById('dashboardFilters');
+const filterTransportadora = document.getElementById('filterTransportadora');
 
 // Navegação do Menu
 function switchView(view) {
     if(view === 'dashboard') {
         viewDashboard.classList.remove('hidden');
         viewLancamento.classList.add('hidden');
+        dashboardFilters.classList.remove('hidden');
+        dashboardFilters.classList.add('flex'); // Mostra os filtros
+        
         btnMenuDashboard.classList.add('active', 'text-sky-400');
         btnMenuDashboard.classList.remove('text-slate-400');
         btnMenuLancamento.classList.remove('active', 'text-sky-400');
@@ -35,23 +40,29 @@ function switchView(view) {
     } else {
         viewLancamento.classList.remove('hidden');
         viewDashboard.classList.add('hidden');
+        dashboardFilters.classList.add('hidden');
+        dashboardFilters.classList.remove('flex'); // Oculta os filtros
+        
         btnMenuLancamento.classList.add('active', 'text-sky-400');
         btnMenuLancamento.classList.remove('text-slate-400');
         btnMenuDashboard.classList.remove('active', 'text-sky-400');
         btnMenuDashboard.classList.add('text-slate-400');
         pageTitle.innerText = "Central de Lançamentos";
         pageSubtitle.innerText = "Importe as bases diárias para alimentar o histórico";
-        carregarHistoricoImportacoes(); // Atualiza a lista sempre que abrir a aba
+        carregarHistoricoImportacoes(); 
     }
 }
 
 btnMenuDashboard.addEventListener('click', () => switchView('dashboard'));
 btnMenuLancamento.addEventListener('click', () => switchView('lancamento'));
 
+// Ao mudar a transportadora no dropdown, recarrega o dashboard
+filterTransportadora.addEventListener('change', () => loadDashboardData());
+
 let chartCiclo = null;
 let chartTransp = null;
 
-// Funções Auxiliares de Leitura
+// Funções Auxiliares
 function parsePtBrNumber(val) {
     if (typeof val === 'number') return val;
     if (!val) return 0;
@@ -142,9 +153,7 @@ function parseSheetToData(sheet) {
     const dtEntradaKey = findKey(['data de entrada', 'data entrada']);
     const dtInicioDescarFabKey = findKey(['dt início descar fáb']);
     
-    // Procura especificamente a "Data de Saída" para registrar de qual dia é a base
     const dtSaidaBaseKey = findKey(['data de saída', 'data de saida', 'data saída', 'data saida', 'data saída fábrica', 'data saida fabrica']);
-    
     const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saida fabrica']);
     const hrChegadaCampoKey = findKey(['hora chegada campo']);
     const hrInicioCarregCpoKey = findKey(['hr início carreg cpo']);
@@ -158,8 +167,9 @@ function parseSheetToData(sheet) {
 
         const movimento = getValue(movimentoKey) || `MOV-GEN-${Date.now()}-${idx}`;
         let transportadora = String(getValue(transpKey) || "Não identificada").trim().replace(/\s+(LTDA|Ltda|LTDA\.|S\.A\.|EIRELI)$/i, '').trim();
+        // Fallback rápido caso a celula esteja vazia
+        if(!transportadora) transportadora = "Outras";
 
-        // Extrai e formata a Data da Base
         const rawDtSaida = getValue(dtSaidaBaseKey);
         let strDataBase = 'Desconhecida';
         if (rawDtSaida) {
@@ -170,7 +180,7 @@ function parseSheetToData(sheet) {
         return {
             movimento: String(movimento),
             dataLancamento: today,
-            dataDaBaseExcel: strDataBase, // Salvando de que dia é essa viagem
+            dataDaBaseExcel: strDataBase,
             transportadora: transportadora,
             placa: String(getValue(placaKey) || "-").trim(),
             pesoLiquido: parsePtBrNumber(getValue(pesoLiqKey)),
@@ -195,6 +205,8 @@ const centerTextPlugin = {
         const chartArea = chart.chartArea;
         const centerX = (chartArea.left + chartArea.right) / 2;
         const centerY = (chartArea.top + chartArea.bottom) / 2;
+        
+        // Se todas as viagens forem 0 por causa de um filtro restrito
         const total = chart.config.data.datasets[0].data.reduce((a, b) => a + b, 0);
 
         ctx.restore();
@@ -215,7 +227,7 @@ const centerTextPlugin = {
 };
 
 // ==========================================
-// MOTOR DE BANCO DE DADOS E DASHBOARD
+// CARREGAMENTO HISTÓRICO IMPORTAÇÕES
 // ==========================================
 
 async function carregarHistoricoImportacoes() {
@@ -230,7 +242,6 @@ async function carregarHistoricoImportacoes() {
             emptyMsg.classList.remove('hidden');
         } else {
             emptyMsg.classList.add('hidden');
-            // Mostra do mais recente para o mais antigo
             [...historico].reverse().forEach(log => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-800/50 transition-colors';
@@ -243,49 +254,80 @@ async function carregarHistoricoImportacoes() {
             });
         }
     } catch (e) {
-        console.error("Erro ao carregar histórico de importações", e);
+        console.error("Erro ao carregar histórico", e);
     }
 }
 
+// ==========================================
+// CÁLCULO E RENDERIZAÇÃO DO DASHBOARD
+// ==========================================
+
 async function loadDashboardData() {
     try {
+        // Puxa toda a base do IndexDB
         const storedData = await localforage.getItem('dados_operacionais') || [];
         
         if(storedData.length === 0) {
-            dbStatusLabel.innerText = "Banco Vazio (Faça o Lançamento)";
+            dbStatusLabel.innerText = "Banco Vazio";
             dbStatusLabel.className = "text-amber-400";
             return;
         }
 
-        dbStatusLabel.innerText = `${storedData.length} Viagens no Histórico`;
+        // Preenche o Select de Filtro Dinamicamente
+        const allTransporters = [...new Set(storedData.map(d => d.transportadora))].filter(Boolean).sort();
+        const currentSelection = filterTransportadora.value || 'ALL';
+        
+        filterTransportadora.innerHTML = '<option value="ALL">TODAS AS TRANSPORTADORAS</option>';
+        allTransporters.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.innerText = t.toUpperCase();
+            if(t === currentSelection) opt.selected = true;
+            filterTransportadora.appendChild(opt);
+        });
+
+        // Aplica o Filtro Selecionado
+        const activeFilter = filterTransportadora.value;
+        const filteredData = activeFilter === 'ALL' 
+            ? storedData 
+            : storedData.filter(d => d.transportadora === activeFilter);
+
+        // Se após o filtro não houver dados
+        if(filteredData.length === 0) {
+            dbStatusLabel.innerText = "Sem dados para o filtro";
+            return;
+        }
+
+        dbStatusLabel.innerText = `${filteredData.length} Viagens Analisadas`;
         dbStatusLabel.className = "text-sky-300";
 
-        const totalViagens = storedData.length;
-        const totalPesoKg = storedData.reduce((sum, r) => sum + r.pesoLiquido, 0);
+        // Cálculos Macro (usando apenas dados filtrados)
+        const totalViagens = filteredData.length;
+        const totalPesoKg = filteredData.reduce((sum, r) => sum + r.pesoLiquido, 0);
         const totalPesoTon = totalPesoKg / 1000;
         
         const cargaMediaTon = totalViagens > 0 ? (totalPesoTon / totalViagens) : 0;
-        const mediaVolume = totalViagens > 0 ? storedData.reduce((sum, r) => sum + r.volumeReal, 0) / totalViagens : 0;
+        const mediaVolume = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.volumeReal, 0) / totalViagens : 0;
         
-        const mediaAsfalto = totalViagens > 0 ? storedData.reduce((sum, r) => sum + r.distanciaAsfalto, 0) / totalViagens : 0;
-        const mediaTerra = totalViagens > 0 ? storedData.reduce((sum, r) => sum + r.distanciaTerra, 0) / totalViagens : 0;
+        const mediaAsfalto = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.distanciaAsfalto, 0) / totalViagens : 0;
+        const mediaTerra = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.distanciaTerra, 0) / totalViagens : 0;
         const mediaDistTotal = mediaAsfalto + mediaTerra;
 
-        const validCycles = storedData.filter(d => d.cicloHoras !== null);
+        const validCycles = filteredData.filter(d => d.cicloHoras !== null);
         const somaCiclosTotais = validCycles.reduce((s, d) => s + d.cicloHoras, 0);
         const mediaCiclo = validCycles.length > 0 ? somaCiclosTotais / validCycles.length : 0;
 
-        const validFilaCampo = storedData.filter(d => d.filaCampoHoras !== null);
+        const validFilaCampo = filteredData.filter(d => d.filaCampoHoras !== null);
         const mediaFilaCampo = validFilaCampo.length > 0 ? validFilaCampo.reduce((s, d) => s + d.filaCampoHoras, 0) / validFilaCampo.length : 0;
 
-        const validFilaFabrica = storedData.filter(d => d.filaFabricaHoras !== null);
+        const validFilaFabrica = filteredData.filter(d => d.filaFabricaHoras !== null);
         const mediaFilaFabrica = validFilaFabrica.length > 0 ? validFilaFabrica.reduce((s, d) => s + d.filaFabricaHoras, 0) / validFilaFabrica.length : 0;
 
         const somaTempoFila = validCycles.reduce((s, d) => s + (d.filaCampoHoras || 0) + (d.filaFabricaHoras || 0), 0);
         const produtividade = somaCiclosTotais > 0 ? (totalPesoTon / somaCiclosTotais) : 0;
         const ociosidadePerc = somaCiclosTotais > 0 ? (somaTempoFila / somaCiclosTotais) * 100 : 0;
 
-        // UI Updates
+        // Atualizar Visores de KPI
         document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
         document.getElementById('totalPesoLiq').innerText = totalPesoTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
         document.getElementById('cargaMediaValue').innerText = cargaMediaTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
@@ -302,12 +344,12 @@ async function loadDashboardData() {
         document.getElementById('produtividadeGlobal').innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
         document.getElementById('ociosidadeGlobal').innerText = ociosidadePerc.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + "%";
 
-        // Gráficos
+        // Geração de Dados para Gráficos
         const transpCount = new Map();
         const transpCicloSum = new Map();
         const transpCicloCount = new Map();
 
-        storedData.forEach(d => {
+        filteredData.forEach(d => {
             const nome = d.transportadora;
             transpCount.set(nome, (transpCount.get(nome) || 0) + 1);
             if (d.cicloHoras !== null) {
@@ -316,18 +358,23 @@ async function loadDashboardData() {
             }
         });
 
-        const topTransportadoras = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
-        const transpLabels = topTransportadoras.map(t => t[0].length > 20 ? t[0].substring(0, 18) + "..." : t[0]);
-        const transpValues = topTransportadoras.map(t => t[1]);
-
-        const cicloMedioPorTransp = topTransportadoras.map(([nome]) => {
+        // Top para o gráfico de barras (Ciclo) - Vamos mostrar até as 10 maiores
+        const topParaBarras = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        const labelsBarras = topParaBarras.map(t => t[0].length > 18 ? t[0].substring(0, 16) + "..." : t[0]);
+        const cicloMedioPorTransp = topParaBarras.map(([nome]) => {
             const count = transpCicloCount.get(nome) || 0;
             return count > 0 ? parseFloat((transpCicloSum.get(nome) / count).toFixed(1)) : 0;
         });
 
+        // Top para o gráfico Donut (Volume) - Mostrar as 5 maiores (ou se tiver filtrado, mostra 1)
+        const topParaDonut = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        const labelsDonut = topParaDonut.map(t => t[0].length > 18 ? t[0].substring(0, 16) + "..." : t[0]);
+        const valoresDonut = topParaDonut.map(t => t[1]);
+
         if (chartCiclo) chartCiclo.destroy();
         if (chartTransp) chartTransp.destroy();
 
+        // Construir Gráfico de Barras (Ciclos)
         const ctxCiclo = document.getElementById('cicloChart').getContext('2d');
         let gradientBar = ctxCiclo.createLinearGradient(0, 0, 0, 400);
         gradientBar.addColorStop(0, '#38bdf8'); 
@@ -336,25 +383,40 @@ async function loadDashboardData() {
         chartCiclo = new Chart(ctxCiclo, {
             type: 'bar',
             data: {
-                labels: transpLabels,
-                datasets: [{ data: cicloMedioPorTransp, backgroundColor: gradientBar, borderRadius: 6, barPercentage: 0.6 }]
+                labels: labelsBarras,
+                datasets: [{ 
+                    label: 'Ciclo (h)', 
+                    data: cicloMedioPorTransp, 
+                    backgroundColor: gradientBar, 
+                    borderRadius: 6, 
+                    barPercentage: 0.6 
+                }]
             },
             options: {
                 responsive: true, maintainAspectRatio: true, layout: { padding: { top: 30 } },
                 plugins: { 
                     legend: { display: false },
-                    datalabels: { color: '#bae6fd', anchor: 'end', align: 'top', font: { weight: 'bold', size: 12 }, formatter: (v) => v + ' h' }
+                    datalabels: { color: '#bae6fd', anchor: 'end', align: 'top', font: { weight: 'bold', size: 11 }, formatter: (v) => v > 0 ? v + ' h' : '-' }
                 },
-                scales: { y: { beginAtZero: true } }
+                scales: { 
+                    y: { beginAtZero: true },
+                    x: { ticks: { font: { size: 10 } } }
+                }
             }
         });
 
+        // Construir Gráfico Donut (Distribuição)
         const ctxTransp = document.getElementById('transportadorasChart').getContext('2d');
         chartTransp = new Chart(ctxTransp, {
             type: 'doughnut',
             data: {
-                labels: transpLabels,
-                datasets: [{ data: transpValues, backgroundColor: ['#0ea5e9', '#06b6d4', '#6366f1', '#8b5cf6', '#3b82f6'], borderWidth: 2, borderColor: '#1e293b' }]
+                labels: labelsDonut,
+                datasets: [{ 
+                    data: valoresDonut, 
+                    backgroundColor: ['#0ea5e9', '#06b6d4', '#6366f1', '#8b5cf6', '#3b82f6'], 
+                    borderWidth: 2, 
+                    borderColor: '#1e293b' 
+                }]
             },
             plugins: [centerTextPlugin],
             options: {
@@ -366,10 +428,10 @@ async function loadDashboardData() {
             }
         });
 
-        // Preencher Tabela (Pegar as 15 últimas para não pesar a performance)
+        // Preencher Tabela Analítica (Últimas 15 filtradas)
         const tbody = document.getElementById('sampleTableBody');
         tbody.innerHTML = '';
-        const ultimosRegistros = [...storedData].reverse().slice(0, 15);
+        const ultimosRegistros = [...filteredData].reverse().slice(0, 15);
         
         ultimosRegistros.forEach(row => {
             const tr = document.createElement('tr');
@@ -385,7 +447,7 @@ async function loadDashboardData() {
         });
 
     } catch (err) {
-        console.error("Erro ao carregar banco:", err);
+        console.error("Erro ao processar Dashboard:", err);
     }
 }
 
@@ -404,42 +466,40 @@ async function processAndSaveFile(file) {
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const newRows = parseSheetToData(firstSheet);
 
-        // Identifica de qual "dia" é esta planilha (pegando a data da base da primeira linha válida)
         let dataDaBase = 'Desconhecida';
         const datasEncontradas = newRows.map(r => r.dataDaBaseExcel).filter(d => d && d !== 'Desconhecida');
         if (datasEncontradas.length > 0) {
-            dataDaBase = datasEncontradas[0]; // Assume a data principal da planilha
+            dataDaBase = datasEncontradas[0];
         }
 
-        // Buscar dados antigos
         const oldData = await localforage.getItem('dados_operacionais') || [];
         
-        // Mesclar garantindo que o "movimento" não duplica (Atualiza se já existir)
         const combinedMap = new Map();
         oldData.forEach(item => combinedMap.set(item.movimento, item));
         
         let viagensNovas = 0;
         newRows.forEach(item => {
             if(!combinedMap.has(item.movimento)) viagensNovas++;
-            combinedMap.set(item.movimento, item); // Sobrescreve/Adiciona
+            combinedMap.set(item.movimento, item); 
         });
 
         const finalData = Array.from(combinedMap.values());
         
-        // 1. Salvar no Banco Operacional
         await localforage.setItem('dados_operacionais', finalData);
 
-        // 2. Salvar no Histórico de Importações
         const historicoImport = await localforage.getItem('historico_importacoes') || [];
         historicoImport.push({
-            dataBase: dataDaBase, // Data extraída da coluna Data de Saída
+            dataBase: dataDaBase,
             qtdViagens: viagensNovas,
             dataLancamento: new Date().toLocaleString('pt-PT')
         });
         await localforage.setItem('historico_importacoes', historicoImport);
 
+        // Resetar filtro antes de ir para o dashboard para visualizar tudo o que acabou de subir
+        filterTransportadora.value = 'ALL';
+
         alert(`Sucesso! Foram adicionadas ${viagensNovas} viagens novas ao banco de dados.`);
-        switchView('dashboard'); // Volta pro painel principal
+        switchView('dashboard');
         
     } catch (err) {
         console.error(err);
@@ -451,7 +511,7 @@ async function processAndSaveFile(file) {
     }
 }
 
-// Eventos de Drag & Drop
+// Eventos de Upload
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 const selectFileBtn = document.getElementById('selectFileBtn');
@@ -468,7 +528,7 @@ fileInput.addEventListener('change', (e) => {
     if (e.target.files.length) processAndSaveFile(e.target.files[0]);
 });
 
-// Botão de Limpar Banco
+// Limpar Banco
 btnLimparBanco.addEventListener('click', async () => {
     if(confirm("ATENÇÃO: Deseja apagar todo o histórico de viagens e importações? Esta ação não pode ser desfeita.")) {
         await localforage.removeItem('dados_operacionais');
@@ -479,5 +539,5 @@ btnLimparBanco.addEventListener('click', async () => {
     }
 });
 
-// Init
+// Inicialização
 switchView('dashboard');
