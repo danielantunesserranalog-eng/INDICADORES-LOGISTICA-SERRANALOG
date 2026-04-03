@@ -111,8 +111,9 @@ function parsePtBrNumber(val) {
     if (str.includes(',')) str = str.replace(/\./g, '').replace(',', '.');
     return parseFloat(str) || 0;
 }
+
 function formatarHorasMinutos(horasDecimais) {
-    if (horasDecimais === null || horasDecimais === undefined || isNaN(horasDecimais)) return '-';
+    if (horasDecimais === null || horasDecimais === undefined || isNaN(horasDecimais) || horasDecimais <= 0) return '-';
     const horas = Math.floor(horasDecimais);
     const minutos = Math.round((horasDecimais - horas) * 60);
     if (horas === 0 && minutos === 0) return '0m';
@@ -120,6 +121,7 @@ function formatarHorasMinutos(horasDecimais) {
     if (minutos === 0) return `${horas}h`;
     return `${horas}h ${minutos.toString().padStart(2, '0')}m`;
 }
+
 function parseDateTime(dateVal, timeVal) {
     if (!dateVal) return null;
     let baseDate = null;
@@ -134,6 +136,15 @@ function parseDateTime(dateVal, timeVal) {
                 let year = parseInt(parts[2], 10);
                 if (year < 100) year += 2000;
                 baseDate = new Date(year, parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+            }
+        } else if (str.includes('-')) {
+            const parts = str.split(' ')[0].split('-');
+            if (parts.length >= 3) {
+                let year = parseInt(parts[0], 10) > 1000 ? parseInt(parts[0], 10) : parseInt(parts[2], 10);
+                let month = parseInt(parts[1], 10) - 1;
+                let day = parseInt(parts[0], 10) > 1000 ? parseInt(parts[2], 10) : parseInt(parts[0], 10);
+                if (year < 100) year += 2000;
+                baseDate = new Date(year, month, day);
             }
         } else { baseDate = new Date(str); }
     }
@@ -155,15 +166,31 @@ function parseDateTime(dateVal, timeVal) {
     baseDate.setHours(hours, minutes, seconds, 0);
     return baseDate;
 }
-function calcHoursDiff(dtStart, hrStart, dtEnd, hrEnd) {
-    const start = parseDateTime(dtStart, hrStart);
-    const end = parseDateTime(dtEnd, hrEnd);
+
+// ATENÇÃO AQUI: isCiclo diferencia Fila de Ciclo!
+function calcHoursDiff(dtStart, hrStart, dtEnd, hrEnd, isCiclo = false) {
+    let start = parseDateTime(dtStart, hrStart);
+    let end = parseDateTime(dtEnd || dtStart, hrEnd); // Fallback caso a data final não exista
+    
     if (start && end && !isNaN(start) && !isNaN(end)) {
+        if (end < start) {
+            end.setDate(end.getDate() + 1);
+        }
         let diffHours = (end - start) / (1000 * 3600);
-        if (diffHours >= 0 && diffHours <= 120) return diffHours;
+        
+        // REGRA DE NEGÓCIO FLORESTAL: 
+        // Se a diferença for menor que 2 horas E for um ciclo, e a planilha não informou data de fim,
+        // é porque na verdade cruzou a meia-noite (Ex: saiu 23h, chegou 00:40).
+        if (isCiclo && diffHours > 0 && diffHours < 2 && (!dtEnd || dtEnd === dtStart)) {
+            end.setDate(end.getDate() + 1);
+            diffHours = (end - start) / (1000 * 3600);
+        }
+
+        if (diffHours >= 0 && diffHours <= 240) return diffHours;
     }
     return null;
 }
+
 function normalizeStr(str) {
     if (!str) return "";
     return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -190,20 +217,26 @@ function parseSheetToData(sheet) {
     const placaKey = findKey(['placa do cavalo', 'placa cavalo', 'placa']);
     const pesoLiqKey = findKey(['peso líquido', 'peso liquido']);
     const volumeKey = findKey(['volume real', 'volume_real']);
-    const distAsfaltoKey = findKey(['distancia por asfalto']);
-    const distTerraKey = findKey(['distancia por terra']);
     
+    // RESTAURAÇÃO DAS CHAVES DE DISTÂNCIA
+    const distAsfaltoKey = findKey(['distancia por asfalto', 'distância por asfalto', 'distancia asfalto']);
+    const distTerraKey = findKey(['distancia por terra', 'distância por terra', 'distancia terra']);
+    
+    // RESTAURAÇÃO DAS CHAVES DE FILA CAMPO / FÁBRICA
     const dtChegadaCampoKey = findKey(['data chegada campo']);
-    const dtInicioCarregCpoKey = findKey(['dt início carreg cpo']);
-    const dtEntradaKey = findKey(['data de entrada', 'data entrada']);
-    const dtInicioDescarFabKey = findKey(['dt início descar fáb']);
+    const dtInicioCarregCpoKey = findKey(['dt início carreg cpo', 'dt inicio carreg cpo']);
+    const hrChegadaCampoKey = findKey(['hora chegada campo', 'hr chegada campo']);
+    const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo']);
+
+    const dtEntradaKey = findKey(['data de entrada', 'data entrada', 'data chegada']);
+    const hrEntradaKey = findKey(['hora de entrada', 'hora entrada', 'hr entrada']);
+    const dtInicioDescarFabKey = findKey(['dt início descar fáb', 'dt inicio descar fab', 'data fim']);
+    const hrInicioDescarFabKey = findKey(['hr início descar fáb', 'hr inicio descar fab', 'hora fim']);
     
     const dtSaidaBaseKey = findKey(['data de saída', 'data saída', 'data saída fábrica']);
-    const hrSaidaFabKey = findKey(['hora saída fábrica']);
-    const hrChegadaCampoKey = findKey(['hora chegada campo']);
-    const hrInicioCarregCpoKey = findKey(['hr início carreg cpo']);
-    const hrEntradaKey = findKey(['hora de entrada']);
-    const hrInicioDescarFabKey = findKey(['hr início descar fáb']);
+    const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saída', 'hora saida']);
+    
+    const cicloProntoKey = findKey(['ciclo', 'tempo de ciclo', 'ciclo horas', 'horas ciclo', 'tempo ciclo']);
 
     const today = new Date().toLocaleDateString('pt-PT');
 
@@ -215,10 +248,34 @@ function parseSheetToData(sheet) {
         if(!transportadora || transportadora === "-") transportadora = "Outras";
 
         const rawDtSaida = getValue(dtSaidaBaseKey);
+        const rawHrSaida = getValue(hrSaidaFabKey);
+        
         let strDataBase = 'Desconhecida';
+        let timestampSaida = 0;
+
         if (rawDtSaida) {
-            const parsed = parseDateTime(rawDtSaida, null);
-            if (parsed) strDataBase = parsed.toLocaleDateString('pt-PT');
+            const parsed = parseDateTime(rawDtSaida, rawHrSaida);
+            if (parsed) {
+                strDataBase = parsed.toLocaleDateString('pt-PT');
+                timestampSaida = parsed.getTime();
+            }
+        }
+
+        // Tenta usar um ciclo que já veio na planilha pronto
+        let ciclo = null;
+        if (cicloProntoKey && row[cicloProntoKey] !== undefined && row[cicloProntoKey] !== "") {
+            let rawCiclo = row[cicloProntoKey];
+            if (typeof rawCiclo === 'number') { ciclo = rawCiclo * 24; } 
+            else if (typeof rawCiclo === 'string') {
+                let parts = rawCiclo.trim().split(':');
+                if(parts.length >= 2) ciclo = parseInt(parts[0], 10) + (parseInt(parts[1], 10) / 60);
+                else ciclo = parseFloat(rawCiclo.replace(',', '.'));
+            }
+        }
+        
+        // Se não veio ciclo pronto, calcula do zero (passando isCiclo = true para a regra de 2h)
+        if ((ciclo === null || isNaN(ciclo) || ciclo <= 0) && getValue(hrInicioDescarFabKey)) {
+             ciclo = calcHoursDiff(rawDtSaida, rawHrSaida, getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), true);
         }
 
         return {
@@ -231,11 +288,44 @@ function parseSheetToData(sheet) {
             volumeReal: parsePtBrNumber(getValue(volumeKey)),
             distanciaAsfalto: parsePtBrNumber(getValue(distAsfaltoKey)),
             distanciaTerra: parsePtBrNumber(getValue(distTerraKey)),
-            cicloHoras: calcHoursDiff(getValue(dtSaidaBaseKey), getValue(hrSaidaFabKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey)),
-            filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey)),
-            filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey))
+            cicloHoras: ciclo,
+            // AQUI RESTAURAMOS AS FILAS NO RETORNO (passando isCiclo = false)
+            filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), false),
+            filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
+            _timestamp: timestampSaida
         };
     });
+
+    // ========================================================
+    // TRELAMENTO DE PLACAS: Backup caso a mesma linha não gere ciclo
+    // ========================================================
+    const viagensPorPlaca = {};
+    mappedData.forEach(item => {
+        if(item.placa && item.placa !== '-' && item._timestamp > 0) {
+            if(!viagensPorPlaca[item.placa]) viagensPorPlaca[item.placa] = [];
+            viagensPorPlaca[item.placa].push(item);
+        }
+    });
+
+    Object.keys(viagensPorPlaca).forEach(placa => {
+        const viagens = viagensPorPlaca[placa];
+        viagens.sort((a, b) => a._timestamp - b._timestamp);
+        
+        for(let i = 0; i < viagens.length - 1; i++) {
+            const atual = viagens[i];
+            const proxima = viagens[i+1];
+            
+            if (atual.cicloHoras === null || isNaN(atual.cicloHoras) || atual.cicloHoras <= 0) {
+                const diffHours = (proxima._timestamp - atual._timestamp) / (1000 * 3600);
+                if (diffHours >= 2 && diffHours <= 120) { // Garante mínimo de 2 horas pro trelamento
+                    atual.cicloHoras = diffHours;
+                }
+            }
+        }
+    });
+
+    // Limpa lixo temporário
+    mappedData.forEach(d => delete d._timestamp);
 
     return mappedData.filter(item => item.pesoLiquido > 0 || item.volumeReal > 0);
 }
@@ -314,7 +404,7 @@ document.getElementById('btnLimparBanco').addEventListener('click', async () => 
     }
 });
 
-// FUNÇÕES DA TELA CONFIGURAÇÕES (Metas Globais)
+// FUNÇÕES DA TELA CONFIGURAÇÕES
 async function carregarMetasGlobais() {
     try {
         const { data, error } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
@@ -349,7 +439,7 @@ document.getElementById('btnSalvarMetasGlobais').addEventListener('click', async
 });
 
 // ==========================================
-// --- DASHBOARD ANALÍTICO (GRÁFICOS) ---
+// --- DASHBOARD ANALÍTICO (GRÁFICOS E CARDS) ---
 // ==========================================
 let chartCiclo = null, chartTransp = null;
 
@@ -438,20 +528,24 @@ async function loadDashboardData() {
     const totalPesoTon = totalPesoKg / 1000;
     const cargaMediaTon = totalViagens > 0 ? (totalPesoTon / totalViagens) : 0;
     const mediaVolume = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.volumeReal, 0) / totalViagens : 0;
-    const mediaAsfalto = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.distanciaAsfalto, 0) / totalViagens : 0;
-    const mediaTerra = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.distanciaTerra, 0) / totalViagens : 0;
+    
+    // DISTÂNCIAS RESTAURADAS AQUI!
+    const mediaAsfalto = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + (r.distanciaAsfalto||0), 0) / totalViagens : 0;
+    const mediaTerra = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + (r.distanciaTerra||0), 0) / totalViagens : 0;
     const mediaDistTotal = mediaAsfalto + mediaTerra;
 
-    const validCycles = filteredData.filter(d => d.cicloHoras !== null);
+    // FILAS RESTAURADAS AQUI!
+    const validCycles = filteredData.filter(d => d.cicloHoras !== null && d.cicloHoras > 0);
     const somaCiclosTotais = validCycles.reduce((s, d) => s + d.cicloHoras, 0);
     const mediaCiclo = validCycles.length > 0 ? somaCiclosTotais / validCycles.length : 0;
-    const validFilaCampo = filteredData.filter(d => d.filaCampoHoras !== null);
+    
+    const validFilaCampo = filteredData.filter(d => d.filaCampoHoras !== null && d.filaCampoHoras > 0);
     const mediaFilaCampo = validFilaCampo.length > 0 ? validFilaCampo.reduce((s, d) => s + d.filaCampoHoras, 0) / validFilaCampo.length : 0;
-    const validFilaFabrica = filteredData.filter(d => d.filaFabricaHoras !== null);
+    
+    const validFilaFabrica = filteredData.filter(d => d.filaFabricaHoras !== null && d.filaFabricaHoras > 0);
     const mediaFilaFabrica = validFilaFabrica.length > 0 ? validFilaFabrica.reduce((s, d) => s + d.filaFabricaHoras, 0) / validFilaFabrica.length : 0;
-    const somaTempoFila = validCycles.reduce((s, d) => s + (d.filaCampoHoras || 0) + (d.filaFabricaHoras || 0), 0);
+
     const produtividade = somaCiclosTotais > 0 ? (totalPesoTon / somaCiclosTotais) : 0;
-    const ociosidadePerc = somaCiclosTotais > 0 ? (somaTempoFila / somaCiclosTotais) * 100 : 0;
 
     document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
     document.getElementById('totalPesoLiq').innerText = totalPesoTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
@@ -460,11 +554,12 @@ async function loadDashboardData() {
     document.getElementById('mediaDistancia').innerText = mediaDistTotal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " km";
     document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
     document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
+    
     document.getElementById('cicloMedio').innerText = formatarHorasMinutos(mediaCiclo);
     document.getElementById('filaCampo').innerText = formatarHorasMinutos(mediaFilaCampo);
     document.getElementById('filaFabrica').innerText = formatarHorasMinutos(mediaFilaFabrica);
+    
     document.getElementById('produtividadeGlobal').innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
-    document.getElementById('ociosidadeGlobal').innerText = ociosidadePerc.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + "%";
 
     // Melhor Cavalo
     const mapaPlacas = new Map();
@@ -487,7 +582,7 @@ async function loadDashboardData() {
     document.getElementById('bestPlacaValue').innerText = melhorPlacaProdutividade > 0 ? melhorPlacaProdutividade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) : "0.0";
     document.getElementById('bestPlacaName').innerText = `Placa: ${melhorPlacaNome}`;
 
-    // Gráficos (Aqui está o que tinha sumido!)
+    // Gráficos 
     const transpCount = new Map();
     const transpCicloSum = new Map();
     const transpCicloCount = new Map();
@@ -495,7 +590,7 @@ async function loadDashboardData() {
     filteredData.forEach(d => {
         const nome = d.transportadora || "Outras";
         transpCount.set(nome, (transpCount.get(nome) || 0) + 1);
-        if (d.cicloHoras !== null) {
+        if (d.cicloHoras !== null && d.cicloHoras > 0) {
             transpCicloSum.set(nome, (transpCicloSum.get(nome) || 0) + d.cicloHoras);
             transpCicloCount.set(nome, (transpCicloCount.get(nome) || 0) + 1);
         }
@@ -540,7 +635,6 @@ async function loadDashboardData() {
         }
     });
 
-    // Carrega tabelinha de baixo
     const tbody = document.getElementById('sampleTableBody');
     if(tbody){
         tbody.innerHTML = '';
@@ -566,6 +660,7 @@ async function loadHistoricoCompleto() {
     const { data } = await supabaseClient.from('historico_viagens').select('*');
     if(data) { fullHistoricoData = data; renderHistoricoTable(); }
 }
+
 function renderHistoricoTable() {
     const t = document.getElementById('historicoGeralBody');
     if(t) {
@@ -574,14 +669,13 @@ function renderHistoricoTable() {
             <td class="px-6 py-2 text-xs">${r.dataDaBaseExcel}</td><td class="px-6 py-2 text-sky-400 text-xs">${r.movimento}</td>
             <td class="px-6 py-2 text-xs">${r.transportadora}</td><td class="px-6 py-2 font-bold text-emerald-400">${r.placa}</td>
             <td class="px-6 py-2 text-right">${(r.pesoLiquido/1000).toFixed(1)}</td><td class="px-6 py-2 text-right text-slate-400">${r.volumeReal}</td>
-            <td class="px-6 py-2 text-right text-sky-300">${formatarHorasMinutos(r.cicloHoras)}</td>
-            <td class="px-6 py-2 text-right text-amber-400">${formatarHorasMinutos(r.filaCampoHoras)}</td>
-            <td class="px-6 py-2 text-right text-rose-400">${formatarHorasMinutos(r.filaFabricaHoras)}</td></tr>`));
+            <td class="px-6 py-2 text-right text-sky-300 font-bold">${formatarHorasMinutos(r.cicloHoras)}</td>
+            <td class="px-6 py-2 text-right text-amber-400 font-bold">${formatarHorasMinutos(r.filaCampoHoras)}</td>
+            <td class="px-6 py-2 text-right text-rose-400 font-bold">${formatarHorasMinutos(r.filaFabricaHoras)}</td></tr>`));
     }
 }
 
 document.getElementById('searchHistorico').addEventListener('input', renderHistoricoTable);
 
-// Inicializa Dashboard no load
 switchView('dashboard');
 loadHistoricoCompleto();
