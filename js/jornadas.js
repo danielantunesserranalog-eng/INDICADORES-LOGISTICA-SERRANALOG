@@ -1,14 +1,14 @@
 // ==========================================
-// js/jornadas.js - ALERTAS, FILTROS E LÓGICA DE DATAS
+// js/jornadas.js - ALERTAS, FILTROS E LÓGICA DE DATAS E HORAS
 // ==========================================
 
 let fullJornadasData = []; 
 let jornadasGlobalData = [];
 let activeQuickFilterJor = 'ALL';
 
-// Padrões Regex para caçar data e hora em qualquer formato que a planilha enviar
-const regexDate = /(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/;
-const regexTime = /(\d{2}:\d{2}(:\d{2})?)/;
+// Padrões Regex mais flexíveis (Aceita anos com 2 ou 4 dígitos e dias com 1 ou 2 dígitos)
+const regexDate = /(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2})/;
+const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 
 document.addEventListener('DOMContentLoaded', () => {
     configurarFiltros();
@@ -36,7 +36,6 @@ function configurarFiltros() {
             activeQuickFilterJor = e.currentTarget.getAttribute('data-qf');
             atualizarBotoesFiltro();
             
-            // Se usou atalho rápido, zera o filtro de data específica
             if (activeQuickFilterJor !== 'ALL') {
                 document.getElementById('filterDataSelect').value = 'ALL';
             }
@@ -49,11 +48,13 @@ function configurarFiltros() {
 // EXTRAIR DATA COM SEGURANÇA PARA CÁLCULO DE DIFERENÇA DE DIAS
 function extrairDataParaFiltro(dataStr) {
     if (!dataStr) return null;
-    const match = dataStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    const match = dataStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
     if (match) {
-        return new Date(match[3], match[2] - 1, match[1]); // Ano, Mês (0-11), Dia
+        let year = parseInt(match[3], 10);
+        if (year < 100) year += 2000; // Converte ano 26 para 2026
+        return new Date(year, match[2] - 1, match[1]); // Ano, Mês (0-11), Dia
     }
-    const matchISO = dataStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+    const matchISO = dataStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
     if(matchISO) {
          return new Date(matchISO[1], matchISO[2] - 1, matchISO[3]);
     }
@@ -65,7 +66,6 @@ function popularFiltroDatas() {
     const selectData = document.getElementById('filterDataSelect');
     const datasSet = new Set();
     
-    // Coleta todas as datas únicas disponíveis no banco
     fullJornadasData.forEach(d => {
         if (d.inicio) {
             const match = d.inicio.match(regexDate);
@@ -73,30 +73,27 @@ function popularFiltroDatas() {
         }
     });
     
-    // Ordena da mais recente para a mais antiga
     const datasUnicas = Array.from(datasSet).sort((a, b) => {
         const dateA = extrairDataParaFiltro(a);
         const dateB = extrairDataParaFiltro(b);
         return dateB - dateA; 
     });
     
-    // Preenche o Select HTML
     selectData.innerHTML = '<option value="ALL">TODAS AS DATAS</option>';
     datasUnicas.forEach(dataStr => {
         selectData.insertAdjacentHTML('beforeend', `<option value="${dataStr}">${dataStr}</option>`);
     });
     
-    // Ao escolher uma data específica, aplica a renderização
     selectData.addEventListener('change', (e) => {
         if(e.target.value !== 'ALL') {
-            activeQuickFilterJor = 'ALL'; // Desativa os filtros rápidos se escolher uma data exata
+            activeQuickFilterJor = 'ALL'; 
             atualizarBotoesFiltro();
         }
         renderizarPainelJornadas();
     });
 }
 
-// CARREGAR DADOS DO SUPABASE (Apenas na inicialização)
+// CARREGAR DADOS DO SUPABASE
 async function carregarPainelJornadas() {
     try {
         const { data: dadosBrutos, error } = await supabaseClient
@@ -117,23 +114,20 @@ async function carregarPainelJornadas() {
     }
 }
 
-// RENDERIZAR O PAINEL (Com base nos filtros)
+// RENDERIZAR O PAINEL
 function renderizarPainelJornadas() {
     let dados = fullJornadasData;
     const dataEspec = document.getElementById('filterDataSelect').value;
 
-    // Aplicação dos Filtros Cruzados (Data Específica e/ou Atalhos Rápidos)
     dados = dados.filter(d => {
         let dataParsedStr = '-';
         const matchDate = d.inicio ? d.inicio.match(regexDate) : null;
         if(matchDate) dataParsedStr = matchDate[0];
 
-        // 1. Filtro Data Específica
         if (dataEspec !== 'ALL' && dataParsedStr !== dataEspec) {
             return false;
         }
 
-        // 2. Filtro Atalho Rápido (D-1, D-2 etc)
         if (activeQuickFilterJor !== 'ALL') {
             const dataParsed = extrairDataParaFiltro(d.inicio);
             if (dataParsed) {
@@ -151,20 +145,18 @@ function renderizarPainelJornadas() {
                 return false;
             }
         }
-        
         return true;
     });
 
     jornadasGlobalData = dados;
     document.getElementById('jorFilterStatus').innerText = `${dados.length} Registros`;
 
-    // Reseta Contadores Visuais
     if (dados.length === 0) { 
         document.getElementById('jorTotalMotoristas').innerText = '0';
         document.getElementById('jorQtdEstouros').innerText = '0';
         document.getElementById('jorQtdRisco').innerText = '0';
         document.getElementById('jorMediaRefeicao').innerText = '0h 00m';
-        document.getElementById('jorTabelaAnaliticaBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-slate-500">Nenhum dado encontrado para o filtro selecionado.</td></tr>';
+        document.getElementById('jorTabelaAnaliticaBody').innerHTML = '<tr><td colspan="6" class="text-center py-4 text-slate-500">Nenhum dado encontrado para o filtro selecionado.</td></tr>';
         document.getElementById('jorRiscoBody').innerHTML = '';
         document.getElementById('jorTopEstourosBody').innerHTML = '';
         return; 
@@ -180,37 +172,36 @@ function renderizarPainelJornadas() {
     dados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
         const isEstouro = horas > 12;
-        const isRisco = horas >= 10.5 && horas <= 12; // Alerta Preditivo
+        const isRisco = horas >= 10.5 && horas <= 12; 
         
         if (isEstouro) qtdEstouros++;
         if (isRisco) qtdRisco++;
         if (linha.refeicao_horas > 0) { totalMinutosRefeicao += (linha.refeicao_horas * 60); qtdRefeicao++; }
 
-        // Extração Robusta (Inteligente) de Data, Início e Fim via Regex
-        let dataFormatada = '-';
+        let dataInicioStr = '-';
         let horaInicioStr = '-';
+        let dataFimStr = '-';
         let horaFimStr = '-';
 
         if (linha.inicio) {
-            const matchDate = linha.inicio.match(regexDate);
-            const matchTime = linha.inicio.match(regexTime);
-            if (matchDate) dataFormatada = matchDate[0];
-            if (matchTime) horaInicioStr = matchTime[0];
-            
-            // Se por acaso a origem não tem hora legível, exibe a string inteira na hora pra não ficar vazio
-            if(!matchTime && !matchDate) horaInicioStr = linha.inicio;
+            const mD = linha.inicio.match(regexDate);
+            const mT = linha.inicio.match(regexTime);
+            if (mD) dataInicioStr = mD[0];
+            if (mT) horaInicioStr = mT[0];
+            if (!mD && !mT) horaInicioStr = linha.inicio;
         }
 
         if (linha.fim) {
-            const matchTimeFim = linha.fim.match(regexTime);
-            if (matchTimeFim) horaFimStr = matchTimeFim[0];
-            else {
-                // Tenta remover a data para deixar só a hora (caso o regex da hora falhe por formato estranho)
-                horaFimStr = linha.fim.replace(regexDate, '').trim() || linha.fim;
-            }
+            const mDF = linha.fim.match(regexDate);
+            const mTF = linha.fim.match(regexTime);
+            
+            if (mDF) dataFimStr = mDF[0];
+            else dataFimStr = dataInicioStr; 
+
+            if (mTF) horaFimStr = mTF[0];
+            else horaFimStr = linha.fim.replace(regexDate, '').trim() || linha.fim;
         }
 
-        // Configuração Visual do Badge de Status
         let corLinha = 'text-emerald-400';
         let badge = `<span class="border border-emerald-500 text-emerald-500 bg-emerald-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">OK</span>`;
         
@@ -224,13 +215,17 @@ function renderizarPainelJornadas() {
             tbodyRisco.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${linha.motorista}</td><td class="px-3 py-2 text-right font-black text-amber-400">${formatarHorasMinutos(horas)}</td></tr>`);
         }
 
-        // Monta a Tabela Analítica Geral (Com horas arrumadas)
         tbodyAnalitica.insertAdjacentHTML('beforeend', `
             <tr class="hover:bg-slate-800/30 transition-colors">
                 <td class="px-4 py-3 text-sky-400 font-semibold truncate max-w-[150px]">${linha.motorista}</td>
-                <td class="px-4 py-3 text-slate-300">${dataFormatada}</td>
-                <td class="px-4 py-3 text-center text-slate-400 font-mono">${horaInicioStr}</td>
-                <td class="px-4 py-3 text-center text-slate-400 font-mono">${horaFimStr}</td>
+                <td class="px-4 py-3">
+                    <span class="text-[10px] text-slate-500 mr-2"><i class="far fa-calendar-alt"></i> ${dataInicioStr}</span>
+                    <span class="font-mono text-slate-200">${horaInicioStr}</span>
+                </td>
+                <td class="px-4 py-3">
+                    <span class="text-[10px] text-slate-500 mr-2"><i class="far fa-calendar-alt"></i> ${dataFimStr}</span>
+                    <span class="font-mono text-slate-200">${horaFimStr}</span>
+                </td>
                 <td class="px-4 py-3 text-center ${corLinha}">${formatarHorasMinutos(horas)}</td>
                 <td class="px-4 py-3 text-center text-slate-400">${formatarHorasMinutos(linha.direcao_horas || 0)}</td>
                 <td class="px-4 py-3 text-center">${badge}</td>
@@ -238,7 +233,6 @@ function renderizarPainelJornadas() {
         `);
     });
 
-    // Conta apenas motoristas ÚNICOS (Remove duplicados de dias diferentes)
     const motoristasUnicos = new Set(dados.map(d => d.motorista)).size;
     
     document.getElementById('jorTotalMotoristas').textContent = motoristasUnicos;
@@ -248,32 +242,34 @@ function renderizarPainelJornadas() {
     document.getElementById('jorDataReferencia').textContent = `Filtro: ${dataEspec !== 'ALL' ? dataEspec : activeQuickFilterJor}`;
 }
 
-// EXPORTAÇÃO EXCEL (SheetJS) APRIMORADA
+// EXPORTAÇÃO EXCEL
 document.getElementById('btnExportarJornada').addEventListener('click', () => {
     if (jornadasGlobalData.length === 0) return alert("Nenhum dado para exportar.");
     
     const ws = XLSX.utils.json_to_sheet(jornadasGlobalData.map(d => {
-        // Extrai a data e hora formatada também para o Excel ficar perfeitamente limpo
-        let dataF = '-', hrI = '-', hrF = '-';
+        let dI = '-', hI = '-', dF = '-', hF = '-';
+        
         if (d.inicio) {
             const mD = d.inicio.match(regexDate);
             const mT = d.inicio.match(regexTime);
-            if (mD) dataF = mD[0];
-            if (mT) hrI = mT[0];
-            if (!mD && !mT) hrI = d.inicio;
+            if (mD) dI = mD[0];
+            if (mT) hI = mT[0];
+            if (!mD && !mT) hI = d.inicio;
         }
         if (d.fim) {
+            const mDF = d.fim.match(regexDate);
             const mTF = d.fim.match(regexTime);
-            if (mTF) hrF = mTF[0];
-            else hrF = d.fim.replace(regexDate, '').trim() || d.fim;
+            if (mDF) dF = mDF[0]; else dF = dI;
+            if (mTF) hF = mTF[0]; else hF = d.fim.replace(regexDate, '').trim() || d.fim;
         }
 
         return {
             "Motorista": d.motorista, 
             "Placa": d.placa,
-            "Data": dataF,
-            "Início": hrI, 
-            "Fim": hrF,
+            "Data Início": dI,
+            "Hora Início": hI, 
+            "Data Fim": dF,
+            "Hora Fim": hF,
             "T. Trabalho (h)": d.total_trabalho_horas, 
             "T. Direção (h)": d.direcao_horas,
             "Refeição (h)": d.refeicao_horas, 
