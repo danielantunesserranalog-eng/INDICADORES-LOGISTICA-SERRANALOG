@@ -16,9 +16,11 @@ async function loadHistoricoCompleto() {
         if (tbody) tbody.innerHTML = `<tr><td colspan="10" class="text-center py-8 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i>Carregando banco de dados de viagens...</td></tr>`;
 
         // Puxa os dados sem tentar ordenar pela coluna 'id' para evitar Erro 400
+        // CORRIGIDO O LIMITE DO SUPABASE AQUI (limit(100000))
         const { data, error } = await supabaseClient
             .from('historico_viagens')
-            .select('*');
+            .select('*')
+            .limit(100000);
 
         if (error) throw error;
         

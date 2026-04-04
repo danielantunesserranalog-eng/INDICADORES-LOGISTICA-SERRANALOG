@@ -136,7 +136,8 @@ async function loadDashboardData() {
         if(statusLabel) statusLabel.innerText = "Carregando...";
 
         if(fullHistoricoData.length === 0) {
-            const { data, error } = await supabaseClient.from('historico_viagens').select('*');
+            // CORRIGIDO O LIMITE DO SUPABASE AQUI (limit(100000))
+            const { data, error } = await supabaseClient.from('historico_viagens').select('*').limit(100000);
             if(error) throw error;
             if(data) fullHistoricoData = data;
         }

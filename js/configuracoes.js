@@ -110,6 +110,8 @@ if (btnLimparBanco) {
             mensagemConfirmacao = "ATENÇÃO: Deseja apagar APENAS o banco de Produção (Viagens Excel)? As jornadas serão mantidas.";
         } else if (tipo === 'jornadas') {
             mensagemConfirmacao = "ATENÇÃO: Deseja apagar APENAS o banco de Jornadas (CSV)? O histórico de viagens será mantido.";
+        } else if (tipo === 'eventos') {
+            mensagemConfirmacao = "ATENÇÃO: Deseja apagar APENAS o banco de Eventos?";
         }
 
         if(confirm(mensagemConfirmacao)) {
@@ -121,11 +123,15 @@ if (btnLimparBanco) {
                 btnLimparBanco.classList.add('opacity-50', 'cursor-not-allowed');
 
                 if (tipo === 'tudo' || tipo === 'viagens') {
-                    await supabaseClient.from('historico_viagens').delete().neq('movimento', 'null');
+                    await supabaseClient.from('historico_viagens').delete().gt('id', 0); // CORRIGIDO PARA .gt('id', 0)
                 }
                 
                 if (tipo === 'tudo' || tipo === 'jornadas') {
                     await supabaseClient.from('historico_jornadas').delete().gt('id', 0);
+                }
+
+                if (tipo === 'tudo' || tipo === 'eventos') {
+                    await supabaseClient.from('historico_eventos').delete().gt('id', 0);
                 }
                 
                 await supabaseClient.from('historico_importacoes').insert([{
@@ -160,7 +166,7 @@ async function processAndSaveJornadasFile(file) {
 
     try {
         const text = await file.text();
-        const workbook = XLSX.read(text, { type: 'string', raw: true }); 
+        const workbook = XLSX.read(text, { type: 'string', raw: true, FS: ';' }); // CORRIGIDO FS: ';'
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
@@ -227,7 +233,8 @@ async function processAndSaveJornadasFile(file) {
 
         if(mappedData.length === 0) throw new Error("Nenhuma jornada válida (>= 8h) foi encontrada. Verifique os horários no CSV.");
 
-        const { data: existingJornadas, error: selErr } = await supabaseClient.from('historico_jornadas').select('motorista, inicio');
+        // CORRIGIDO O LIMITE DO SUPABASE AQUI (limit(100000))
+        const { data: existingJornadas, error: selErr } = await supabaseClient.from('historico_jornadas').select('motorista, inicio').limit(100000);
         if (selErr) throw selErr;
 
         const chavesExistentes = new Set(existingJornadas ? existingJornadas.map(j => `${j.motorista}|${j.inicio}`) : []);
@@ -428,7 +435,8 @@ async function processAndSaveFile(file) {
 
         if (!newRows || newRows.length === 0) throw new Error("Planilha vazia ou sem dados válidos.");
 
-        const { data: existingIds, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento');
+        // CORRIGIDO O LIMITE DO SUPABASE AQUI (limit(100000))
+        const { data: existingIds, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento').limit(100000);
         if (selErr) throw selErr;
         
         const existingSet = new Set(existingIds ? existingIds.map(e => e.movimento) : []);
@@ -508,4 +516,84 @@ if(dropZone && fileInput){
     else dropZone.addEventListener('click', () => fileInput.click());
     
     fileInput.addEventListener('change', e => { if(e.target.files.length) processAndSaveFile(e.target.files[0]); });
+}
+
+// ==========================================
+// IMPORTAÇÃO DE EVENTOS (TELEMETRIA) - ADICIONADO AQUI
+// ==========================================
+const dropZoneEventos = document.getElementById('dropZoneEventos');
+const fileInputEventos = document.getElementById('fileInputEventos');
+const selectFileBtnEventos = document.getElementById('selectFileBtnEventos');
+
+if(dropZoneEventos && fileInputEventos){
+    dropZoneEventos.addEventListener('dragover', e => { e.preventDefault(); dropZoneEventos.classList.add('bg-rose-900/20', 'border-rose-500'); });
+    dropZoneEventos.addEventListener('dragleave', () => dropZoneEventos.classList.remove('bg-rose-900/20', 'border-rose-500'));
+    dropZoneEventos.addEventListener('drop', e => {
+        e.preventDefault(); dropZoneEventos.classList.remove('bg-rose-900/20', 'border-rose-500');
+        if (e.dataTransfer.files.length > 0) processAndSaveEventosFile(e.dataTransfer.files[0]);
+    });
+    
+    if (selectFileBtnEventos) selectFileBtnEventos.addEventListener('click', () => fileInputEventos.click());
+    else dropZoneEventos.addEventListener('click', () => fileInputEventos.click());
+    
+    fileInputEventos.addEventListener('change', e => { if(e.target.files.length) processAndSaveEventosFile(e.target.files[0]); });
+}
+
+async function processAndSaveEventosFile(file) {
+    const errorMsgDiv = document.getElementById('errorMsgEventos');
+    const loadingSpinner = document.getElementById('loadingSpinnerEventos');
+    if(errorMsgDiv) errorMsgDiv.classList.add('hidden');
+    if(loadingSpinner) { loadingSpinner.classList.remove('hidden'); loadingSpinner.classList.add('flex'); }
+
+    try {
+        const text = await file.text();
+        const workbook = XLSX.read(text, { type: 'string', raw: true, FS: ';' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+        if (!rawData || rawData.length === 0) throw new Error("Planilha vazia ou em formato incorreto.");
+
+        const mappedData = rawData.map(row => {
+            const getVal = (possibleNames) => {
+                for (let k of Object.keys(row)) {
+                    const normK = k.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                    if (possibleNames.includes(normK)) return row[k];
+                }
+                return null;
+            };
+
+            const motorista = getVal(['motorista', 'nome', 'condutor']);
+            if (!motorista || String(motorista).trim() === '-' || String(motorista).trim() === '') return null;
+
+            return {
+                data_evento: String(getVal(['data', 'data e hora', 'data do evento']) || '').trim(),
+                motorista: String(motorista).trim(),
+                placa: String(getVal(['veiculo', 'placa', 'veículo']) || '').trim(),
+                evento_nome: String(getVal(['evento', 'regra', 'nome do evento']) || '').trim(),
+                criticidade: String(getVal(['criticidade', 'severidade', 'nivel']) || 'Normal').trim(),
+                velocidade_final: parseFloat(String(getVal(['velocidade', 'vel final'])).replace(',', '.')) || 0,
+                localidade: String(getVal(['local', 'localidade', 'endereco', 'endereço']) || '').trim()
+            };
+        }).filter(item => item !== null && item.motorista !== '' && item.evento_nome !== '');
+
+        if(mappedData.length === 0) throw new Error("Nenhum evento válido encontrado.");
+
+        const { error: insErr } = await supabaseClient.from('historico_eventos').insert(mappedData);
+        if (insErr) throw insErr;
+
+        await supabaseClient.from('historico_importacoes').insert([{
+            "dataBase": `Eventos Telemetria`,
+            "qtdViagens": mappedData.length,
+            "dataLancamento": new Date().toLocaleString('pt-PT')
+        }]);
+
+        alert(`Sucesso! Foram salvos ${mappedData.length} eventos.`);
+        carregarHistoricoImportacoes();
+
+    } catch (err) {
+        if(errorMsgDiv) { errorMsgDiv.innerText = "Erro: " + err.message; errorMsgDiv.classList.remove('hidden'); }
+        else alert("Erro: " + err.message);
+    } finally {
+        if(loadingSpinner) { loadingSpinner.classList.add('hidden'); loadingSpinner.classList.remove('flex'); }
+    }
 }

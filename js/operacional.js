@@ -103,7 +103,8 @@ async function loadOperacionalData() {
         const { data: metas } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
         if(metas) metasGlobais = metas;
 
-        const { data: historico } = await supabaseClient.from('historico_viagens').select('*');
+        // CORRIGIDO O LIMITE DO SUPABASE AQUI (limit(100000))
+        const { data: historico } = await supabaseClient.from('historico_viagens').select('*').limit(100000);
         if(historico) {
             fullHistoricoDataOp = historico;
             const allDates = [...new Set(historico.map(d => d.dataDaBaseExcel))].filter(d => d && d !== 'Desconhecida');
