@@ -4,13 +4,16 @@
 
 let fullHistoricoJornadas = [];
 
-// Regex para padronizar exibição (como feito no painel principal)
+// Regex para padronizar exibição 
 const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadHistoricoJornadasCompleto();
+    
+    // Configura os ouvintes de eventos para ambos os filtros
     document.getElementById('searchHistoricoJornadas').addEventListener('input', renderHistoricoJornadasTable);
+    document.getElementById('filterMotoristaDropdown').addEventListener('change', renderHistoricoJornadasTable);
 });
 
 async function loadHistoricoJornadasCompleto() {
@@ -18,7 +21,7 @@ async function loadHistoricoJornadasCompleto() {
         const tbody = document.getElementById('historicoJornadasBody');
         if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i>Carregando banco de dados de jornadas...</td></tr>`;
 
-        // Puxa as jornadas mais recentes primeiro
+        // Puxa as jornadas do Supabase
         const { data, error } = await supabaseClient
             .from('historico_jornadas')
             .select('*')
@@ -28,6 +31,7 @@ async function loadHistoricoJornadasCompleto() {
         
         if (data) { 
             fullHistoricoJornadas = data; 
+            popularFiltroMotoristasDropdown();
             renderHistoricoJornadasTable(); 
         }
     } catch(e) {
@@ -35,32 +39,55 @@ async function loadHistoricoJornadasCompleto() {
     }
 }
 
+// NOVO: Função que popula a caixa de seleção apenas com os nomes únicos
+function popularFiltroMotoristasDropdown() {
+    const select = document.getElementById('filterMotoristaDropdown');
+    if (!select) return;
+
+    // Extrai motoristas únicos e ordena alfabeticamente
+    const motoristasUnicos = [...new Set(fullHistoricoJornadas.map(d => d.motorista))]
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+
+    select.innerHTML = '<option value="ALL">TODOS OS MOTORISTAS</option>';
+    motoristasUnicos.forEach(m => {
+        select.insertAdjacentHTML('beforeend', `<option value="${m}">${m}</option>`);
+    });
+}
+
 function renderHistoricoJornadasTable() {
     const t = document.getElementById('historicoJornadasBody');
-    const termo = document.getElementById('searchHistoricoJornadas').value.toLowerCase();
+    const termoInput = document.getElementById('searchHistoricoJornadas').value.toLowerCase();
+    const motoristaSelecionado = document.getElementById('filterMotoristaDropdown').value;
     
     if(t) {
         t.innerHTML = '';
         
-        // Filtra pelo termo de busca (Motorista ou Placa)
+        // Filtro Duplo: Avalia o Dropdown e depois a Busca por Texto Livre
         const filtrados = fullHistoricoJornadas.filter(r => {
-            const motorista = (r.motorista || "").toLowerCase();
-            const placa = (r.placa || "").toLowerCase();
-            return motorista.includes(termo) || placa.includes(termo);
+            // Verifica o Dropdown
+            const matchDropdown = (motoristaSelecionado === 'ALL') || (r.motorista === motoristaSelecionado);
+            
+            // Verifica o Texto Livre
+            const motoristaTexto = (r.motorista || "").toLowerCase();
+            const placaTexto = (r.placa || "").toLowerCase();
+            const matchTexto = motoristaTexto.includes(termoInput) || placaTexto.includes(termoInput);
+
+            return matchDropdown && matchTexto;
         });
 
         if(filtrados.length === 0) {
-            t.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-500">Nenhuma jornada encontrada.</td></tr>`;
+            t.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-500">Nenhuma jornada encontrada para este filtro.</td></tr>`;
             return;
         }
 
-        // Renderiza no máximo 200 linhas para não travar o navegador na auditoria
+        // Renderiza no máximo 200 linhas para evitar travamento
         filtrados.slice(0, 200).forEach(r => {
             const horas = r.total_trabalho_horas || 0;
             const isEstouro = horas > 12;
             const isRisco = horas >= 10.5 && horas <= 12;
 
-            // Extração de Horas (Visualização limpa)
+            // Extração de Horas
             let dtInicio = '-', hrInicio = '-', dtFim = '-', hrFim = '-';
             if (r.inicio) {
                 const mD = r.inicio.match(regexDate);

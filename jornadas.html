@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 </head>
 <body class="bg-slate-900 min-h-screen text-slate-200 selection:bg-sky-500/30 flex overflow-hidden">
 
@@ -15,8 +17,8 @@
 
     <main class="flex-1 h-screen overflow-y-auto relative">
         <div class="max-w-[96rem] mx-auto px-6 py-8">
-            <div class="flex justify-between items-center mb-6 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
-                <div><h1 class="text-2xl font-extrabold text-white">Monitoramento e Prevenção de Jornadas</h1><p class="text-sm text-slate-400 font-medium">Controle preditivo da Lei do Motorista</p></div>
+            <div class="flex justify-between items-center mb-6 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm flex-wrap gap-4">
+                <div><h1 class="text-2xl font-extrabold text-white">Monitoramento e Prevenção de Jornadas</h1><p class="text-sm text-slate-400 font-medium">Controle preditivo e estatísticas da Lei do Motorista</p></div>
                 <button id="btnExportarJornada" class="bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-colors text-sm flex items-center gap-2"><i class="fas fa-file-excel"></i> Exportar CSV</button>
             </div>
 
@@ -40,10 +42,38 @@
 
             <section class="space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                    <div class="glass-card rounded-2xl p-5 glow-border-blue flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Motoristas Monitorados (Únicos)</p><p id="jorTotalMotoristas" class="text-3xl font-extrabold text-white mt-1">0</p></div><i class="fas fa-users text-blue-500 text-3xl self-end -mt-8"></i></div>
-                    <div class="glass-card rounded-2xl p-5 border-l-4 border-l-rose-500 flex flex-col justify-between"><div><p class="text-rose-400 text-[11px] font-bold uppercase tracking-widest">Estouros Registrados (>12h)</p><p id="jorQtdEstouros" class="text-3xl font-extrabold text-rose-400 mt-1">0</p></div><i class="fas fa-siren-on text-rose-500 text-3xl self-end -mt-8"></i></div>
-                    <div class="glass-card rounded-2xl p-5 border-l-4 border-l-amber-500 flex flex-col justify-between bg-amber-900/10"><div><p class="text-amber-400 text-[11px] font-bold uppercase tracking-widest animate-pulse">Ação Preventiva (>10h30)</p><p id="jorQtdRisco" class="text-3xl font-extrabold text-amber-400 mt-1">0</p></div><i class="fas fa-exclamation-triangle text-amber-500 text-3xl self-end -mt-8"></i></div>
-                    <div class="glass-card rounded-2xl p-5 glow-border-emerald flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Média de Refeição</p><p id="jorMediaRefeicao" class="text-3xl font-extrabold text-white mt-1">0h 00m</p></div><i class="fas fa-utensils text-emerald-400 text-3xl self-end -mt-8"></i></div>
+                    <div class="glass-card rounded-2xl p-5 glow-border-blue flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-blue-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-users"></i></div>
+                        <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest relative z-10">Motoristas Monitorados</p><p id="jorTotalMotoristas" class="text-4xl font-black text-white mt-1 relative z-10">0</p></div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-5 border-l-4 border-l-rose-500 flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-rose-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-siren-on"></i></div>
+                        <div><p class="text-rose-400 text-[11px] font-bold uppercase tracking-widest relative z-10">Infrações (>12h)</p><p id="jorQtdEstouros" class="text-4xl font-black text-rose-400 mt-1 relative z-10">0</p></div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-5 border-l-4 border-l-amber-500 bg-amber-900/10 flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-amber-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div><p class="text-amber-400 text-[11px] font-bold uppercase tracking-widest animate-pulse relative z-10">Ação Preventiva</p><p id="jorQtdRisco" class="text-4xl font-black text-amber-400 mt-1 relative z-10">0</p></div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-5 glow-border-emerald flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-emerald-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-steering-wheel"></i></div>
+                        <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest relative z-10">Média de Direção</p><p id="jorMediaDirecao" class="text-4xl font-black text-white mt-1 relative z-10">0h 00m</p></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="glass-card rounded-xl p-5 border border-slate-700/50 col-span-1 flex flex-col items-center justify-center">
+                        <h3 class="font-bold text-slate-200 border-b border-slate-700 w-full pb-3 mb-4 text-sm uppercase text-left"><i class="fas fa-chart-pie text-cyan-500 mr-2"></i> Status da Frota</h3>
+                        <div class="w-full relative flex justify-center items-center h-[220px]">
+                            <canvas id="statusFrotaChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-xl p-5 border border-slate-700/50 col-span-2">
+                        <h3 class="font-bold text-slate-200 border-b border-slate-700 pb-3 mb-4 text-sm uppercase"><i class="fas fa-chart-bar text-amber-500 mr-2"></i> Distribuição de Jornadas (Carga Horária)</h3>
+                        <div class="w-full h-[220px]">
+                            <canvas id="faixaHorasChart"></canvas>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -65,8 +95,9 @@
                                 <thead class="bg-slate-900/95 text-slate-400 font-semibold uppercase text-[10px] border-b border-slate-700 sticky top-0 z-10">
                                     <tr>
                                         <th class="px-4 py-3">Motorista</th>
-                                        <th class="px-4 py-3">Início</th>
-                                        <th class="px-4 py-3">Fim</th>
+                                        <th class="px-4 py-3">Data</th>
+                                        <th class="px-4 py-3 text-center">Início</th>
+                                        <th class="px-4 py-3 text-center">Fim</th>
                                         <th class="px-4 py-3 text-center">T. Trabalho</th>
                                         <th class="px-4 py-3 text-center">Direção</th>
                                         <th class="px-4 py-3 text-center">Status</th>
