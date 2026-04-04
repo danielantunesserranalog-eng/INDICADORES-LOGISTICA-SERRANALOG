@@ -100,7 +100,7 @@ if (btnLimparBanco) {
 }
 
 // ==========================================
-// IMPORTAÇÃO DE JORNADAS (CSV) - COM JUNÇÃO DE DATA E HORA
+// IMPORTAÇÃO DE JORNADAS (CSV) - COM FILTRO ANTI-DUPLICAÇÃO
 // ==========================================
 async function processAndSaveJornadasFile(file) {
     const errorMsgDiv = document.getElementById('errorMsgJornadas');
@@ -144,7 +144,6 @@ async function processAndSaveJornadasFile(file) {
             const valTrabalho = getVal(['total de trabalho', 'total trabalho', 'tempo de trabalho']);
             const totalHoras = safeParseTime(valTrabalho);
             
-            // INTELIGÊNCIA: Procura uma coluna de data isolada e une com a de hora caso necessário
             const colDataExtra = getVal(['data', 'data da jornada', 'data inicial', 'data do movimento']);
             let strInicio = String(getVal(['início', 'inicio']) || '').trim();
             let strFim = String(getVal(['fim', 'final']) || '').trim();
@@ -173,10 +172,42 @@ async function processAndSaveJornadasFile(file) {
 
         if(mappedData.length === 0) throw new Error("Nenhuma jornada válida (>= 8h) foi encontrada. Verifique os horários no CSV.");
 
-        const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(mappedData);
+        const { data: existingJornadas, error: selErr } = await supabaseClient
+            .from('historico_jornadas')
+            .select('motorista, inicio');
+        
+        if (selErr) throw selErr;
+
+        const chavesExistentes = new Set(
+            existingJornadas ? existingJornadas.map(j => `${j.motorista}|${j.inicio}`) : []
+        );
+
+        let duplicadasIgnoradas = 0;
+        const jornadasNovas = mappedData.filter(item => {
+            const chaveUnica = `${item.motorista}|${item.inicio}`;
+            
+            if (chavesExistentes.has(chaveUnica)) {
+                duplicadasIgnoradas++;
+                return false; 
+            } else {
+                chavesExistentes.add(chaveUnica); 
+                return true;  
+            }
+        });
+
+        if (jornadasNovas.length === 0) {
+            throw new Error(`Todas as ${mappedData.length} jornadas da planilha já existem no banco de dados. Nenhuma nova linha foi adicionada.`);
+        }
+
+        const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(jornadasNovas);
         if (insErr) throw insErr;
         
-        alert(`Sucesso! Foram importadas ${mappedData.length} jornadas válidas (> 8h).`);
+        let msgSucesso = `Sucesso! Foram salvas ${jornadasNovas.length} NOVAS jornadas.`;
+        if (duplicadasIgnoradas > 0) {
+            msgSucesso += `\n(${duplicadasIgnoradas} jornadas foram ignoradas pois já existiam no sistema).`;
+        }
+        
+        alert(msgSucesso);
         
     } catch (err) {
         if(errorMsgDiv) {
@@ -205,11 +236,9 @@ if(dropZoneJornadas && fileInputJornadas){
         if (e.dataTransfer.files.length > 0) processAndSaveJornadasFile(e.dataTransfer.files[0]);
     });
     
-    // TRAVA DE SEGURANÇA AQUI:
     if (selectFileBtnJornadas) {
         selectFileBtnJornadas.addEventListener('click', () => fileInputJornadas.click());
     } else {
-        // Se não tiver botão, clicar na zona inteira abre a janela de arquivo
         dropZoneJornadas.addEventListener('click', () => fileInputJornadas.click());
     }
     
@@ -389,7 +418,7 @@ async function processAndSaveFile(file) {
             "dataBase": strHistoricoDatas, "qtdViagens": viagensNovas, "dataLancamento": new Date().toLocaleString('pt-PT')
         }]);
 
-        alert(`Sucesso! processadas ${newRows.length} viagens. (${viagensNovas} novas).`);
+        alert(`Sucesso! processadas ${newRows.length} viagens. (${viagensNovas} novas atualizadas).`);
     } catch (err) {
         if(errorMsgDiv) {
             errorMsgDiv.innerText = "Erro: " + err.message;
@@ -414,7 +443,6 @@ if(dropZone && fileInput){
         if (e.dataTransfer.files.length > 0) processAndSaveFile(e.dataTransfer.files[0]);
     });
     
-    // TRAVA DE SEGURANÇA AQUI:
     if (selectFileBtn) {
         selectFileBtn.addEventListener('click', () => fileInput.click());
     } else {
