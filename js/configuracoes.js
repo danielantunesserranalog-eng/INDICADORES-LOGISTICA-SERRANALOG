@@ -4,8 +4,12 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     carregarMetasGlobais();
+    carregarHistoricoImportacoes(); // Carrega a tabela assim que abre a página
 });
 
+// ==========================================
+// LÓGICA DE METAS GLOBAIS
+// ==========================================
 async function carregarMetasGlobais() {
     try {
         const { data } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
@@ -19,8 +23,6 @@ async function carregarMetasGlobais() {
             if (elVolProg) elVolProg.value = data.vol_prog || '';
             if (elCxProg) elCxProg.value = data.cx_prog || '';
             if (elPbtcProg) elPbtcProg.value = data.pbtc_prog || '';
-            
-            localStorage.setItem('cfg_metas', JSON.stringify(data));
         }
     } catch(e) {}
 }
@@ -38,13 +40,62 @@ if (btnSalvarMetasGlobais) {
         };
         try {
             await supabaseClient.from('metas_globais').upsert(payload);
-            localStorage.setItem('cfg_metas', JSON.stringify(payload));
             btnSalvarMetasGlobais.innerHTML = '<i class="fas fa-check"></i> Salvo!';
         } catch(e) { btnSalvarMetasGlobais.innerHTML = 'Erro!'; }
         setTimeout(() => btnSalvarMetasGlobais.innerHTML = '<i class="fas fa-save"></i> Salvar Metas Base', 2000);
     });
 }
 
+// ==========================================
+// LÓGICA DA TABELA DE HISTÓRICO DE IMPORTAÇÕES
+// ==========================================
+document.getElementById('btnAtualizarHistorico').addEventListener('click', () => {
+    carregarHistoricoImportacoes();
+});
+
+async function carregarHistoricoImportacoes() {
+    const tb = document.getElementById('importHistoryBody');
+    if (!tb) return;
+    
+    tb.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Atualizando...</td></tr>';
+    
+    try {
+        const { data, error } = await supabaseClient
+            .from('historico_importacoes')
+            .select('*')
+            .order('id', { ascending: false })
+            .limit(10); // Mostra só as últimas 10
+
+        if (error) throw error;
+
+        tb.innerHTML = '';
+        if (!data || data.length === 0) {
+            tb.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-slate-500">Nenhum histórico de importação encontrado.</td></tr>';
+            return;
+        }
+
+        data.forEach(d => {
+            // Estiliza o Módulo com base na string salva
+            let icone = '<i class="fas fa-database text-slate-500"></i>';
+            if (d.dataBase.toUpperCase().includes('JORNADA')) icone = '<i class="fas fa-user-clock text-amber-500"></i>';
+            if (d.dataBase.toUpperCase().includes('VIAGEN')) icone = '<i class="fas fa-truck text-sky-500"></i>';
+
+            tb.insertAdjacentHTML('beforeend', `
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                    <td class="px-6 py-3 font-mono text-slate-400">${d.dataLancamento}</td>
+                    <td class="px-6 py-3 font-semibold text-slate-200">${icone} <span class="ml-2">${d.dataBase}</span></td>
+                    <td class="px-6 py-3 text-center font-bold text-emerald-400">+ ${d.qtdViagens}</td>
+                </tr>
+            `);
+        });
+    } catch (e) {
+        tb.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-rose-500">Erro ao carregar histórico.</td></tr>';
+    }
+}
+
+// ==========================================
+// ZONA DE RISCO (EXCLUSÃO SELETIVA)
+// ==========================================
 const btnLimparBanco = document.getElementById('btnLimparBanco');
 if (btnLimparBanco) {
     btnLimparBanco.addEventListener('click', async () => {
@@ -72,14 +123,21 @@ if (btnLimparBanco) {
 
                 if (tipo === 'tudo' || tipo === 'viagens') {
                     await supabaseClient.from('historico_viagens').delete().neq('movimento', 'null');
-                    await supabaseClient.from('historico_importacoes').delete().gt('id', 0);
                 }
                 
                 if (tipo === 'tudo' || tipo === 'jornadas') {
                     await supabaseClient.from('historico_jornadas').delete().gt('id', 0);
                 }
+                
+                // Registra quem limpou o banco
+                await supabaseClient.from('historico_importacoes').insert([{
+                    "dataBase": `[DADOS APAGADOS] - Módulo: ${tipo.toUpperCase()}`,
+                    "qtdViagens": 0,
+                    "dataLancamento": new Date().toLocaleString('pt-PT')
+                }]);
 
                 alert("Operação concluída. Os dados selecionados foram apagados da nuvem.");
+                carregarHistoricoImportacoes(); // Atualiza a tabela
                 
             } catch (error) {
                 console.error("Erro ao limpar banco:", error);
@@ -94,7 +152,7 @@ if (btnLimparBanco) {
 }
 
 // ==========================================
-// IMPORTAÇÃO DE JORNADAS COM NOTURNAS E EXTRAS
+// IMPORTAÇÃO DE JORNADAS (CSV) - COM FILTRO ANTI-DUPLICAÇÃO E REGISTRO
 // ==========================================
 async function processAndSaveJornadasFile(file) {
     const errorMsgDiv = document.getElementById('errorMsgJornadas');
@@ -138,11 +196,10 @@ async function processAndSaveJornadasFile(file) {
             const valTrabalho = getVal(['total de trabalho', 'total trabalho', 'tempo de trabalho']);
             const totalHoras = safeParseTime(valTrabalho);
             
-            // LEITURA DOS NOVOS INDICADORES DE HORAS
             const horasNoturnas = safeParseTime(getVal(['noturnas', 'noturna', 'horas noturnas']));
             const extraNormal = safeParseTime(getVal(['extra normal', 'extranormal', 'hora extra normal']));
             const extraExcedente = safeParseTime(getVal(['extra excedente', 'extraexcedente', 'hora extra excedente']));
-            const horasExtrasTotal = extraNormal + extraExcedente; // Soma as duas colunas
+            const horasExtrasTotal = extraNormal + extraExcedente;
             
             const colDataExtra = getVal(['data', 'data da jornada', 'data inicial', 'data do movimento']);
             let strInicio = String(getVal(['início', 'inicio']) || '').trim();
@@ -168,58 +225,59 @@ async function processAndSaveJornadasFile(file) {
                 horas_noturnas: horasNoturnas,
                 horas_extras: horasExtrasTotal
             };
-        }).filter(item => {
-            return item !== null && item.motorista !== '' && item.total_trabalho_horas >= 8;
-        });
+        }).filter(item => item !== null && item.motorista !== '' && item.total_trabalho_horas >= 8);
 
         if(mappedData.length === 0) throw new Error("Nenhuma jornada válida (>= 8h) foi encontrada. Verifique os horários no CSV.");
 
-        const { data: existingJornadas, error: selErr } = await supabaseClient
-            .from('historico_jornadas')
-            .select('motorista, inicio');
-        
+        const { data: existingJornadas, error: selErr } = await supabaseClient.from('historico_jornadas').select('motorista, inicio');
         if (selErr) throw selErr;
 
-        const chavesExistentes = new Set(
-            existingJornadas ? existingJornadas.map(j => `${j.motorista}|${j.inicio}`) : []
-        );
+        const chavesExistentes = new Set(existingJornadas ? existingJornadas.map(j => `${j.motorista}|${j.inicio}`) : []);
 
         let duplicadasIgnoradas = 0;
         const jornadasNovas = mappedData.filter(item => {
             const chaveUnica = `${item.motorista}|${item.inicio}`;
-            if (chavesExistentes.has(chaveUnica)) {
-                duplicadasIgnoradas++;
-                return false; 
-            } else {
-                chavesExistentes.add(chaveUnica); 
-                return true;  
-            }
+            if (chavesExistentes.has(chaveUnica)) { duplicadasIgnoradas++; return false; } 
+            else { chavesExistentes.add(chaveUnica); return true; }
         });
 
-        if (jornadasNovas.length === 0) {
-            throw new Error(`Todas as ${mappedData.length} jornadas da planilha já existem no banco de dados.`);
-        }
+        if (jornadasNovas.length === 0) throw new Error(`Todas as ${mappedData.length} jornadas da planilha já existem no banco de dados.`);
 
         const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(jornadasNovas);
         if (insErr) throw insErr;
+
+        // Extrai as datas para salvar no Histórico de Importações
+        const regexPegaData = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
+        const datasEncontradas = [...new Set(jornadasNovas.map(r => {
+            const m = r.inicio.match(regexPegaData);
+            return m ? m[0] : null;
+        }).filter(Boolean))];
+
+        let strDatasFormatadas = 'Período Indefinido';
+        if (datasEncontradas.length > 0) {
+            strDatasFormatadas = datasEncontradas.length === 1 ? datasEncontradas[0] : 
+                                 datasEncontradas.length <= 3 ? datasEncontradas.join(', ') : 
+                                 `${datasEncontradas[0]} a ${datasEncontradas[datasEncontradas.length - 1]}`;
+        }
+
+        // Salva na tabela de histórico
+        await supabaseClient.from('historico_importacoes').insert([{
+            "dataBase": `Jornadas: ${strDatasFormatadas}`,
+            "qtdViagens": jornadasNovas.length,
+            "dataLancamento": new Date().toLocaleString('pt-PT')
+        }]);
         
         let msgSucesso = `Sucesso! Foram salvas ${jornadasNovas.length} NOVAS jornadas.`;
         if (duplicadasIgnoradas > 0) msgSucesso += `\n(${duplicadasIgnoradas} jornadas foram ignoradas pois já existiam no sistema).`;
         
         alert(msgSucesso);
+        carregarHistoricoImportacoes(); // Atualiza visualmente a tabela
         
     } catch (err) {
-        if(errorMsgDiv) {
-            errorMsgDiv.innerText = "Erro: " + err.message; 
-            errorMsgDiv.classList.remove('hidden');
-        } else {
-            alert("Erro: " + err.message);
-        }
+        if(errorMsgDiv) { errorMsgDiv.innerText = "Erro: " + err.message; errorMsgDiv.classList.remove('hidden'); } 
+        else alert("Erro: " + err.message);
     } finally {
-        if(loadingSpinner) {
-            loadingSpinner.classList.add('hidden'); 
-            loadingSpinner.classList.remove('flex');
-        }
+        if(loadingSpinner) { loadingSpinner.classList.add('hidden'); loadingSpinner.classList.remove('flex'); }
     }
 }
 
@@ -228,24 +286,21 @@ const fileInputJornadas = document.getElementById('fileInputJornadas');
 const selectFileBtnJornadas = document.getElementById('selectFileBtnJornadas');
 
 if(dropZoneJornadas && fileInputJornadas){
-    dropZoneJornadas.addEventListener('dragover', e => { e.preventDefault(); dropZoneJornadas.classList.add('bg-amber-900/20'); });
-    dropZoneJornadas.addEventListener('dragleave', () => dropZoneJornadas.classList.remove('bg-amber-900/20'));
+    dropZoneJornadas.addEventListener('dragover', e => { e.preventDefault(); dropZoneJornadas.classList.add('bg-amber-900/20', 'border-amber-500'); });
+    dropZoneJornadas.addEventListener('dragleave', () => dropZoneJornadas.classList.remove('bg-amber-900/20', 'border-amber-500'));
     dropZoneJornadas.addEventListener('drop', e => {
-        e.preventDefault(); dropZoneJornadas.classList.remove('bg-amber-900/20');
+        e.preventDefault(); dropZoneJornadas.classList.remove('bg-amber-900/20', 'border-amber-500');
         if (e.dataTransfer.files.length > 0) processAndSaveJornadasFile(e.dataTransfer.files[0]);
     });
     
-    if (selectFileBtnJornadas) {
-        selectFileBtnJornadas.addEventListener('click', () => fileInputJornadas.click());
-    } else {
-        dropZoneJornadas.addEventListener('click', () => fileInputJornadas.click());
-    }
+    if (selectFileBtnJornadas) selectFileBtnJornadas.addEventListener('click', () => fileInputJornadas.click());
+    else dropZoneJornadas.addEventListener('click', () => fileInputJornadas.click());
     
     fileInputJornadas.addEventListener('change', e => { if(e.target.files.length) processAndSaveJornadasFile(e.target.files[0]); });
 }
 
 // ==========================================
-// IMPORTAÇÃO DE VIAGENS (PRODUÇÃO EXCEL)
+// IMPORTAÇÃO DE VIAGENS (PRODUÇÃO EXCEL) COM REGISTRO DE HISTÓRICO
 // ==========================================
 function parseSheetToData(sheet) {
     const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
@@ -268,26 +323,20 @@ function parseSheetToData(sheet) {
     const placaKey = findKey(['placa do cavalo', 'placa cavalo', 'placa']);
     const pesoLiqKey = findKey(['peso líquido', 'peso liquido']);
     const volumeKey = findKey(['volume real', 'volume_real']);
-    
     const distAsfaltoKey = findKey(['distancia por asfalto', 'distância por asfalto', 'distancia asfalto']);
     const distTerraKey = findKey(['distancia por terra', 'distância por terra', 'distancia terra']);
-    
     const dtChegadaCampoKey = findKey(['data chegada campo']);
     const dtInicioCarregCpoKey = findKey(['dt início carreg cpo', 'dt inicio carreg cpo']);
     const hrChegadaCampoKey = findKey(['hora chegada campo', 'hr chegada campo']);
     const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo']);
-
     const dtFinalCarregCpoKey = findKey(['dt final carreg cpo', 'data final carreg cpo', 'data fim carreg cpo']);
     const hrFinalCarregCpoKey = findKey(['hr final carreg cpo', 'hora final carreg cpo', 'hr fim carreg cpo', 'hora fim carreg cpo']);
-
     const dtEntradaKey = findKey(['data de entrada', 'data entrada', 'data chegada']);
     const hrEntradaKey = findKey(['hora de entrada', 'hora entrada', 'hr entrada']);
     const dtInicioDescarFabKey = findKey(['dt início descar fáb', 'dt inicio descar fab', 'data fim']);
     const hrInicioDescarFabKey = findKey(['hr início descar fáb', 'hr inicio descar fab', 'hora fim']);
-    
     const dtSaidaBaseKey = findKey(['data de saída', 'data saída', 'data saída fábrica']);
     const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saída', 'hora saida']);
-    
     const cicloProntoKey = findKey(['ciclo', 'tempo de ciclo', 'ciclo horas', 'horas ciclo', 'tempo ciclo']);
 
     const today = new Date().toLocaleDateString('pt-PT');
@@ -341,9 +390,7 @@ function parseSheetToData(sheet) {
             cicloHoras: ciclo,
             
             filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), false),
-            
             tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
-            
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
             
             _timestamp: timestampSaida
@@ -361,16 +408,11 @@ function parseSheetToData(sheet) {
     Object.keys(viagensPorPlaca).forEach(placa => {
         const viagens = viagensPorPlaca[placa];
         viagens.sort((a, b) => a._timestamp - b._timestamp);
-        
         for(let i = 0; i < viagens.length - 1; i++) {
-            const atual = viagens[i];
-            const proxima = viagens[i+1];
-            
+            const atual = viagens[i]; const proxima = viagens[i+1];
             if (atual.cicloHoras === null || isNaN(atual.cicloHoras) || atual.cicloHoras <= 0) {
                 const diffHours = (proxima._timestamp - atual._timestamp) / (1000 * 3600);
-                if (diffHours >= 2 && diffHours <= 120) { 
-                    atual.cicloHoras = diffHours;
-                }
+                if (diffHours >= 2 && diffHours <= 120) atual.cicloHoras = diffHours;
             }
         }
     });
@@ -413,18 +455,19 @@ async function processAndSaveFile(file) {
         const { error: upErr } = await supabaseClient.from('historico_viagens').upsert(newRows);
         if (upErr) throw upErr;
 
+        // Salva na tabela de histórico
         await supabaseClient.from('historico_importacoes').insert([{
-            "dataBase": strHistoricoDatas, "qtdViagens": viagensNovas, "dataLancamento": new Date().toLocaleString('pt-PT')
+            "dataBase": `Viagens: ${strHistoricoDatas}`,
+            "qtdViagens": viagensNovas,
+            "dataLancamento": new Date().toLocaleString('pt-PT')
         }]);
 
-        alert(`Sucesso! processadas ${newRows.length} viagens. (${viagensNovas} novas atualizadas).`);
+        alert(`Sucesso! processadas ${newRows.length} viagens. (${viagensNovas} novas salvas).`);
+        carregarHistoricoImportacoes(); // Atualiza visualmente a tabela
+        
     } catch (err) {
-        if(errorMsgDiv) {
-            errorMsgDiv.innerText = "Erro: " + err.message;
-            errorMsgDiv.classList.remove('hidden');
-        } else {
-            alert("Erro: " + err.message);
-        }
+        if(errorMsgDiv) { errorMsgDiv.innerText = "Erro: " + err.message; errorMsgDiv.classList.remove('hidden'); } 
+        else alert("Erro: " + err.message);
     } finally {
         if(loadingSpinner) { loadingSpinner.classList.add('hidden'); loadingSpinner.classList.remove('flex'); }
     }
@@ -442,11 +485,8 @@ if(dropZone && fileInput){
         if (e.dataTransfer.files.length > 0) processAndSaveFile(e.dataTransfer.files[0]);
     });
     
-    if (selectFileBtn) {
-        selectFileBtn.addEventListener('click', () => fileInput.click());
-    } else {
-        dropZone.addEventListener('click', () => fileInput.click());
-    }
+    if (selectFileBtn) selectFileBtn.addEventListener('click', () => fileInput.click());
+    else dropZone.addEventListener('click', () => fileInput.click());
     
     fileInput.addEventListener('change', e => { if(e.target.files.length) processAndSaveFile(e.target.files[0]); });
 }
