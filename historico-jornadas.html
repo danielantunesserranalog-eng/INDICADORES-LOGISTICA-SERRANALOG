@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Histórico de Produção - Serrana Florestal</title>
+    <title>Histórico de Jornadas - Serrana Florestal</title>
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -16,8 +16,8 @@
         <div class="max-w-[96rem] mx-auto px-6 py-8">
             <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
                 <div>
-                    <h1 class="text-2xl font-extrabold text-white">Histórico de Produção</h1>
-                    <p class="text-sm text-slate-400 font-medium">Consulte, pesquise e audite a base de dados de viagens na nuvem</p>
+                    <h1 class="text-2xl font-extrabold text-white">Histórico de Jornadas</h1>
+                    <p class="text-sm text-slate-400 font-medium">Consulte, pesquise e audite a base de dados de motoristas na nuvem</p>
                 </div>
             </div>
 
@@ -25,30 +25,30 @@
                 <div class="glass-card rounded-xl shadow-2xl overflow-hidden border border-slate-700/50 flex flex-col h-[calc(100vh-12rem)]">
                     <div class="bg-slate-800/80 px-6 py-5 border-b border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <h3 class="font-bold text-white tracking-wide flex items-center text-lg">
-                            <i class="fas fa-database text-sky-500 mr-3"></i> Tabela Geral de Viagens
+                            <i class="fas fa-database text-amber-500 mr-3"></i> Tabela Geral de Jornadas
                         </h3>
                         <div class="flex items-center gap-3 w-full sm:w-auto relative">
                             <i class="fas fa-search absolute left-4 text-slate-500"></i>
-                            <input type="text" id="searchHistorico" placeholder="Buscar por placa, transp ou mov..." class="bg-slate-900 text-white text-sm rounded-lg border border-slate-600 pl-10 pr-4 py-2 focus:outline-none focus:border-sky-500 w-full sm:w-72 shadow-inner placeholder-slate-500 transition-colors">
+                            <input type="text" id="searchHistoricoJornadas" placeholder="Buscar por motorista ou placa..." class="bg-slate-900 text-white text-sm rounded-lg border border-slate-600 pl-10 pr-4 py-2 focus:outline-none focus:border-amber-500 w-full sm:w-72 shadow-inner placeholder-slate-500 transition-colors">
                         </div>
                     </div>
+                    
                     <div class="overflow-x-auto flex-1 overflow-y-auto custom-scrollbar">
                         <table class="min-w-full text-sm text-left">
                             <thead class="bg-slate-900/95 text-slate-400 font-semibold uppercase text-[11px] tracking-wider border-b border-slate-700 sticky top-0 z-10 shadow-md backdrop-blur-sm">
                                 <tr>
-                                    <th class="px-6 py-4 whitespace-nowrap">Data Base</th>
-                                    <th class="px-6 py-4 whitespace-nowrap">Movimento</th>
-                                    <th class="px-6 py-4">Transportadora</th>
+                                    <th class="px-6 py-4 whitespace-nowrap">Motorista</th>
                                     <th class="px-6 py-4">Placa</th>
-                                    <th class="px-6 py-4 text-right">Peso (t)</th>
-                                    <th class="px-6 py-4 text-right">Vol (m³)</th>
-                                    <th class="px-6 py-4 text-right">Ciclo (h)</th>
-                                    <th class="px-6 py-4 text-right">Fila Cpo (h)</th>
-                                    <th class="px-6 py-4 text-right">Carreg. (h)</th>
-                                    <th class="px-6 py-4 text-right">Fila Fáb (h)</th>
+                                    <th class="px-6 py-4">Início</th>
+                                    <th class="px-6 py-4">Fim</th>
+                                    <th class="px-6 py-4 text-center">T. Trabalho</th>
+                                    <th class="px-6 py-4 text-center">Direção</th>
+                                    <th class="px-6 py-4 text-center">Refeição</th>
+                                    <th class="px-6 py-4 text-center">Repouso</th>
+                                    <th class="px-6 py-4 text-center">Status</th>
                                 </tr>
                             </thead>
-                            <tbody id="historicoGeralBody" class="divide-y divide-slate-800/80 text-slate-300"></tbody>
+                            <tbody id="historicoJornadasBody" class="divide-y divide-slate-800/80 text-slate-300"></tbody>
                         </table>
                     </div>
                 </div>
@@ -60,6 +60,6 @@
     <script src="js/supabaseClient.js"></script>
     <script src="js/common.js"></script>
     <script src="js/menu.js"></script>
-    <script src="js/historico.js"></script>
+    <script src="js/historico-jornadas.js"></script>
 </body>
 </html>
