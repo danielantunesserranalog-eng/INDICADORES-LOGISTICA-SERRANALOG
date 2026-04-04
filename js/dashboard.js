@@ -200,6 +200,10 @@ async function loadDashboardData() {
             document.getElementById('ociosidadeGlobal').innerText = '0%';
             document.getElementById('bestPlacaValue').innerText = '0.0';
             document.getElementById('bestPlacaName').innerText = 'Nenhum cavalo encontrado';
+            
+            if(document.getElementById('totalVolumeReal')) document.getElementById('totalVolumeReal').innerText = '0 m³';
+            if(document.getElementById('mediaVolumeViagem')) document.getElementById('mediaVolumeViagem').innerText = '0 m³';
+            
             if(document.getElementById('tempoCarregamento')) document.getElementById('tempoCarregamento').innerText = '0 h';
             if(chartCiclo) chartCiclo.destroy();
             if(chartTransp) chartTransp.destroy();
@@ -211,8 +215,12 @@ async function loadDashboardData() {
         const totalViagens = filteredData.length;
         const totalPesoKg = filteredData.reduce((sum, r) => sum + r.pesoLiquido, 0);
         const totalPesoTon = totalPesoKg / 1000;
-        const cargaMediaTon = totalViagens > 0 ? (totalPesoTon / totalViagens) : 0;
-        const mediaVolume = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.volumeReal, 0) / totalViagens : 0;
+        
+        const totalVolume = filteredData.reduce((sum, r) => sum + (r.volumeReal || 0), 0);
+        
+        // CÁLCULO DA MÉDIA DE VOLUME POR VIAGEM (Substituiu a Carga Média)
+        const mediaVolumeViagem = totalViagens > 0 ? (totalVolume / totalViagens) : 0;
+        
         const mediaAsfalto = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + (r.distanciaAsfalto||0), 0) / totalViagens : 0;
         const mediaTerra = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + (r.distanciaTerra||0), 0) / totalViagens : 0;
 
@@ -233,8 +241,11 @@ async function loadDashboardData() {
 
         document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
         document.getElementById('totalPesoLiq').innerText = totalPesoTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
-        document.getElementById('cargaMediaValue').innerText = cargaMediaTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
-        document.getElementById('mediaVolumeReal').innerText = mediaVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
+        
+        // Atualizando o Card da Média de Volume e do Volume Total
+        if(document.getElementById('mediaVolumeViagem')) document.getElementById('mediaVolumeViagem').innerText = mediaVolumeViagem.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
+        if(document.getElementById('totalVolumeReal')) document.getElementById('totalVolumeReal').innerText = totalVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
+        
         document.getElementById('mediaDistancia').innerText = (mediaAsfalto + mediaTerra).toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " km";
         document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
         document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
@@ -306,7 +317,8 @@ async function loadDashboardData() {
             data: { labels: labelsBarras, datasets: [{ label: 'Ciclo (h)', data: cicloMedioPorTransp, backgroundColor: gradientBar, borderRadius: 6, barPercentage: 0.6 }] },
             options: {
                 responsive: true, maintainAspectRatio: true, layout: { padding: { top: 30 } },
-                plugins: { legend: { display: false }, datalabels: { color: '#bae6fd', anchor: 'end', align: 'top', font: { weight: 'bold', size: 11 }, formatter: (v) => v > 0 ? formatarHorasMinutos(v) : '-' } }
+                plugins: { legend: { display: false }, datalabels: { color: '#bae6fd', anchor: 'end', align: 'top', font: { weight: 'bold', size: 11 }, formatter: (v) => v > 0 ? formatarHorasMinutos(v) : '-' } },
+                scales: { y: { beginAtZero: true }, x: { ticks: { font: { size: 10 } } } }
             }
         });
 
@@ -315,7 +327,10 @@ async function loadDashboardData() {
             type: 'doughnut',
             data: { labels: labelsDonut, datasets: [{ data: valoresDonut, backgroundColor: ['#0ea5e9', '#06b6d4', '#6366f1', '#8b5cf6', '#3b82f6'], borderWidth: 2, borderColor: '#1e293b' }] },
             plugins: [centerTextPlugin],
-            options: { responsive: true, maintainAspectRatio: true, cutout: '70%', layout: { padding: 20 }, plugins: { legend: { position: 'right' }, datalabels: { color: '#f8fafc', font: { weight: 'bold', size: 12 } } } }
+            options: {
+                responsive: true, maintainAspectRatio: true, cutout: '70%', layout: { padding: 20 },
+                plugins: { legend: { position: 'right', labels: { font: { size: 11, family: "'Inter', sans-serif" } } }, datalabels: { color: '#f8fafc', anchor: 'end', align: 'end', offset: 4, font: { weight: 'bold', size: 12 } } }
+            }
         });
     } catch (error) {
         console.error("Erro fatal ao renderizar Dashboard:", error);
