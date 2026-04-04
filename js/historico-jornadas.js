@@ -4,14 +4,11 @@
 
 let fullHistoricoJornadas = [];
 
-// Regex para padronizar exibição 
 const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadHistoricoJornadasCompleto();
-    
-    // Configura os ouvintes de eventos para ambos os filtros
     document.getElementById('searchHistoricoJornadas').addEventListener('input', renderHistoricoJornadasTable);
     document.getElementById('filterMotoristaDropdown').addEventListener('change', renderHistoricoJornadasTable);
 });
@@ -21,7 +18,6 @@ async function loadHistoricoJornadasCompleto() {
         const tbody = document.getElementById('historicoJornadasBody');
         if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i>Carregando banco de dados de jornadas...</td></tr>`;
 
-        // Puxa as jornadas do Supabase
         const { data, error } = await supabaseClient
             .from('historico_jornadas')
             .select('*')
@@ -39,12 +35,10 @@ async function loadHistoricoJornadasCompleto() {
     }
 }
 
-// Função que popula a caixa de seleção apenas com os nomes únicos
 function popularFiltroMotoristasDropdown() {
     const select = document.getElementById('filterMotoristaDropdown');
     if (!select) return;
 
-    // Extrai motoristas únicos e ordena alfabeticamente
     const motoristasUnicos = [...new Set(fullHistoricoJornadas.map(d => d.motorista))]
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b));
@@ -63,12 +57,8 @@ function renderHistoricoJornadasTable() {
     if(t) {
         t.innerHTML = '';
         
-        // Filtro Duplo: Avalia o Dropdown e depois a Busca por Texto Livre
         const filtrados = fullHistoricoJornadas.filter(r => {
-            // Verifica o Dropdown
             const matchDropdown = (motoristaSelecionado === 'ALL') || (r.motorista === motoristaSelecionado);
-            
-            // Verifica o Texto Livre
             const motoristaTexto = (r.motorista || "").toLowerCase();
             const placaTexto = (r.placa || "").toLowerCase();
             const matchTexto = motoristaTexto.includes(termoInput) || placaTexto.includes(termoInput);
@@ -81,12 +71,10 @@ function renderHistoricoJornadasTable() {
             return;
         }
 
-        // Renderiza no máximo 200 linhas para evitar travamento
         filtrados.slice(0, 200).forEach(r => {
             const horas = r.total_trabalho_horas || 0;
             const isEstouro = horas > 12;
 
-            // Extração de Horas
             let dtInicio = '-', hrInicio = '-', dtFim = '-', hrFim = '-';
             if (r.inicio) {
                 const mD = r.inicio.match(regexDate);
@@ -120,10 +108,10 @@ function renderHistoricoJornadasTable() {
                     <span class="text-[10px] text-slate-500 block">${dtFim}</span>
                     <span class="font-mono text-slate-200">${hrFim}</span>
                 </td>
+                <td class="px-6 py-3 text-center text-sm font-bold text-indigo-400">${formatarHorasMinutos(r.horas_noturnas)}</td>
+                <td class="px-6 py-3 text-center text-sm font-bold text-amber-400">${formatarHorasMinutos(r.horas_extras)}</td>
                 <td class="px-6 py-3 text-center text-sm ${corLinha}">${formatarHorasMinutos(horas)}</td>
                 <td class="px-6 py-3 text-center text-sm text-slate-400">${formatarHorasMinutos(r.direcao_horas)}</td>
-                <td class="px-6 py-3 text-center text-sm text-slate-400">${formatarHorasMinutos(r.refeicao_horas)}</td>
-                <td class="px-6 py-3 text-center text-sm text-slate-400">${formatarHorasMinutos(r.repouso_horas)}</td>
                 <td class="px-6 py-3 text-center">${badge}</td>
             </tr>`);
         });

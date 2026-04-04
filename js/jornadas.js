@@ -1,8 +1,7 @@
 // ==========================================
-// js/jornadas.js - ALERTAS, FILTROS E LÓGICA DE DATAS E HORAS
+// js/jornadas.js - ALERTAS E TOP 5 DE HORAS
 // ==========================================
 
-// Configuração Global do Chart.js
 Chart.register(ChartDataLabels);
 Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
@@ -162,8 +161,10 @@ function renderizarPainelJornadas() {
         document.getElementById('jorTotalMotoristas').innerText = '0';
         document.getElementById('jorQtdEstouros').innerText = '0';
         document.getElementById('jorMediaDirecao').innerText = '0h 00m';
-        document.getElementById('jorTabelaAnaliticaBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-slate-500">Nenhum dado encontrado para o filtro selecionado.</td></tr>';
+        document.getElementById('jorTabelaAnaliticaBody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-slate-500">Nenhum dado encontrado para o filtro.</td></tr>';
         document.getElementById('jorTopEstourosBody').innerHTML = '';
+        document.getElementById('jorTopNoturnasBody').innerHTML = '';
+        document.getElementById('jorTopExtrasBody').innerHTML = '';
         if(chartStatusFrota) chartStatusFrota.destroy();
         if(chartFaixaHoras) chartFaixaHoras.destroy();
         return; 
@@ -175,10 +176,14 @@ function renderizarPainelJornadas() {
     
     const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody'); tbodyAnalitica.innerHTML = '';
     const tbodyEstouro = document.getElementById('jorTopEstourosBody'); tbodyEstouro.innerHTML = '';
+    
+    // Objeto para somar as horas por motorista
+    const agregacaoMotoristas = new Map();
 
     dados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
         const isEstouro = horas > 12;
+        const motNome = linha.motorista;
         
         if (isEstouro) qtdEstouros++;
         else qtdOk++;
@@ -190,12 +195,21 @@ function renderizarPainelJornadas() {
 
         if (linha.direcao_horas > 0) { totalMinutosDirecao += (linha.direcao_horas * 60); qtdDirecao++; }
 
+        // Agregação para Top Noturnas e Extras
+        if (!agregacaoMotoristas.has(motNome)) {
+            agregacaoMotoristas.set(motNome, { nome: motNome, noturnas: 0, extras: 0, maxTrabalho: 0 });
+        }
+        const motObj = agregacaoMotoristas.get(motNome);
+        motObj.noturnas += (linha.horas_noturnas || 0);
+        motObj.extras += (linha.horas_extras || 0);
+        if (horas > motObj.maxTrabalho) motObj.maxTrabalho = horas;
+
+        // Extração de data/hora
         let dataInicioStr = '-', horaInicioStr = '-', dataFimStr = '-', horaFimStr = '-';
         if (linha.inicio) {
             const mD = linha.inicio.match(regexDate); const mT = linha.inicio.match(regexTime);
             if (mD) { dataInicioStr = mD[0]; if (dataInicioStr.length <= 5) dataInicioStr += '/' + new Date().getFullYear(); }
-            if (mT) horaInicioStr = mT[0];
-            if (!mD && !mT) horaInicioStr = linha.inicio;
+            if (mT) horaInicioStr = mT[0]; if (!mD && !mT) horaInicioStr = linha.inicio;
         }
         if (linha.fim) {
             const mDF = linha.fim.match(regexDate); const mTF = linha.fim.match(regexTime);
@@ -209,15 +223,19 @@ function renderizarPainelJornadas() {
         if(isEstouro) {
             corLinha = 'text-rose-500 font-bold';
             badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold animate-pulse">INFRAÇÃO</span>`;
-            tbodyEstouro.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${linha.motorista}</td><td class="px-3 py-2 text-right font-black text-rose-500">${formatarHorasMinutos(horas)}</td></tr>`);
+            
+            // Popula Lista de Maiores Infrações Individuais
+            tbodyEstouro.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${motNome}</td><td class="px-3 py-2 text-right font-black text-rose-500">${formatarHorasMinutos(horas)}</td></tr>`);
         }
 
         tbodyAnalitica.insertAdjacentHTML('beforeend', `
-            <tr class="hover:bg-slate-800/30 transition-colors">
-                <td class="px-4 py-3 text-sky-400 font-semibold truncate max-w-[150px]">${linha.motorista}</td>
+            <tr class="hover:bg-slate-800/30 transition-colors border-b border-slate-800/50">
+                <td class="px-4 py-3 text-sky-400 font-semibold truncate max-w-[150px]">${motNome}</td>
                 <td class="px-4 py-3"><span class="text-[10px] text-slate-500 mr-2"><i class="far fa-calendar-alt"></i> ${dataInicioStr}</span></td>
                 <td class="px-4 py-3 text-center text-slate-200 font-mono">${horaInicioStr}</td>
                 <td class="px-4 py-3 text-center text-slate-200 font-mono">${horaFimStr}</td>
+                <td class="px-4 py-3 text-center text-indigo-400 font-bold">${formatarHorasMinutos(linha.horas_noturnas)}</td>
+                <td class="px-4 py-3 text-center text-amber-400 font-bold">${formatarHorasMinutos(linha.horas_extras)}</td>
                 <td class="px-4 py-3 text-center ${corLinha}">${formatarHorasMinutos(horas)}</td>
                 <td class="px-4 py-3 text-center text-slate-400">${formatarHorasMinutos(linha.direcao_horas || 0)}</td>
                 <td class="px-4 py-3 text-center">${badge}</td>
@@ -225,16 +243,33 @@ function renderizarPainelJornadas() {
         `);
     });
 
-    const motoristasUnicos = new Set(dados.map(d => d.motorista)).size;
+    const arrMot = Array.from(agregacaoMotoristas.values());
+
+    // TOP 5 Noturnas (Acumulado)
+    const tbodyNoturnas = document.getElementById('jorTopNoturnasBody');
+    tbodyNoturnas.innerHTML = '';
+    const topNoturnas = arrMot.filter(m => m.noturnas > 0).sort((a,b) => b.noturnas - a.noturnas).slice(0,5);
+    if(topNoturnas.length === 0) tbodyNoturnas.innerHTML = '<tr><td colspan="2" class="p-2 text-center text-slate-500 text-xs">Sem horas noturnas no período.</td></tr>';
+    topNoturnas.forEach(m => {
+        tbodyNoturnas.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${m.nome}</td><td class="px-3 py-2 text-right font-black text-indigo-400">${formatarHorasMinutos(m.noturnas)}</td></tr>`);
+    });
+
+    // TOP 5 Extras (Acumulado)
+    const tbodyExtras = document.getElementById('jorTopExtrasBody');
+    tbodyExtras.innerHTML = '';
+    const topExtras = arrMot.filter(m => m.extras > 0).sort((a,b) => b.extras - a.extras).slice(0,5);
+    if(topExtras.length === 0) tbodyExtras.innerHTML = '<tr><td colspan="2" class="p-2 text-center text-slate-500 text-xs">Sem horas extras no período.</td></tr>';
+    topExtras.forEach(m => {
+        tbodyExtras.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${m.nome}</td><td class="px-3 py-2 text-right font-black text-amber-400">${formatarHorasMinutos(m.extras)}</td></tr>`);
+    });
+
+    const motoristasUnicos = arrMot.length;
     
     document.getElementById('jorTotalMotoristas').textContent = motoristasUnicos;
     document.getElementById('jorQtdEstouros').textContent = qtdEstouros;
     document.getElementById('jorMediaDirecao').textContent = formatarHorasMinutos(qtdDirecao > 0 ? (totalMinutosDirecao / qtdDirecao) / 60 : 0);
     document.getElementById('jorDataReferencia').textContent = `Filtro: ${dataEspec !== 'ALL' ? dataEspec : activeQuickFilterJor}`;
 
-    // ===================================
-    // RENDERIZAÇÃO DOS GRÁFICOS (Somente Verde e Vermelho)
-    // ===================================
     if (chartStatusFrota) chartStatusFrota.destroy();
     if (chartFaixaHoras) chartFaixaHoras.destroy();
 
@@ -267,7 +302,7 @@ function renderizarPainelJornadas() {
     });
 }
 
-// EXPORTAÇÃO EXCEL (Somente OK e INFRAÇÃO)
+// EXPORTAÇÃO EXCEL ATUALIZADA
 document.getElementById('btnExportarJornada').addEventListener('click', () => {
     if (jornadasGlobalData.length === 0) return alert("Nenhum dado para exportar.");
     const ws = XLSX.utils.json_to_sheet(jornadasGlobalData.map(d => {
@@ -284,6 +319,8 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
         }
         return {
             "Motorista": d.motorista, "Placa": d.placa, "Data Início": dI, "Hora Início": hI, "Data Fim": dF, "Hora Fim": hF,
+            "H. Noturnas": formatarHorasMinutos(d.horas_noturnas),
+            "H. Extras (Soma)": formatarHorasMinutos(d.horas_extras),
             "T. Trabalho (h)": d.total_trabalho_horas, "T. Direção (h)": d.direcao_horas, "Refeição (h)": d.refeicao_horas, "Repouso (h)": d.repouso_horas,
             "Status": d.total_trabalho_horas > 12 ? 'INFRAÇÃO' : 'OK'
         };

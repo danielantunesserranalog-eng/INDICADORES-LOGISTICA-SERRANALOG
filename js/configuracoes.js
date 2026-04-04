@@ -6,9 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarMetasGlobais();
 });
 
-// ==========================================
-// LÓGICA DE METAS GLOBAIS
-// ==========================================
 async function carregarMetasGlobais() {
     try {
         const { data } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
@@ -48,9 +45,6 @@ if (btnSalvarMetasGlobais) {
     });
 }
 
-// ==========================================
-// ZONA DE RISCO (EXCLUSÃO SELETIVA)
-// ==========================================
 const btnLimparBanco = document.getElementById('btnLimparBanco');
 if (btnLimparBanco) {
     btnLimparBanco.addEventListener('click', async () => {
@@ -100,7 +94,7 @@ if (btnLimparBanco) {
 }
 
 // ==========================================
-// IMPORTAÇÃO DE JORNADAS (CSV) - COM FILTRO ANTI-DUPLICAÇÃO
+// IMPORTAÇÃO DE JORNADAS COM NOTURNAS E EXTRAS
 // ==========================================
 async function processAndSaveJornadasFile(file) {
     const errorMsgDiv = document.getElementById('errorMsgJornadas');
@@ -144,6 +138,12 @@ async function processAndSaveJornadasFile(file) {
             const valTrabalho = getVal(['total de trabalho', 'total trabalho', 'tempo de trabalho']);
             const totalHoras = safeParseTime(valTrabalho);
             
+            // LEITURA DOS NOVOS INDICADORES DE HORAS
+            const horasNoturnas = safeParseTime(getVal(['noturnas', 'noturna', 'horas noturnas']));
+            const extraNormal = safeParseTime(getVal(['extra normal', 'extranormal', 'hora extra normal']));
+            const extraExcedente = safeParseTime(getVal(['extra excedente', 'extraexcedente', 'hora extra excedente']));
+            const horasExtrasTotal = extraNormal + extraExcedente; // Soma as duas colunas
+            
             const colDataExtra = getVal(['data', 'data da jornada', 'data inicial', 'data do movimento']);
             let strInicio = String(getVal(['início', 'inicio']) || '').trim();
             let strFim = String(getVal(['fim', 'final']) || '').trim();
@@ -164,7 +164,9 @@ async function processAndSaveJornadasFile(file) {
                 refeicao_horas: safeParseTime(getVal(['refeição', 'refeicao'])),
                 repouso_horas: safeParseTime(getVal(['repouso'])),
                 direcao_horas: safeParseTime(getVal(['direção', 'direcao'])),
-                estourou_jornada: totalHoras > 12
+                estourou_jornada: totalHoras > 12,
+                horas_noturnas: horasNoturnas,
+                horas_extras: horasExtrasTotal
             };
         }).filter(item => {
             return item !== null && item.motorista !== '' && item.total_trabalho_horas >= 8;
@@ -185,7 +187,6 @@ async function processAndSaveJornadasFile(file) {
         let duplicadasIgnoradas = 0;
         const jornadasNovas = mappedData.filter(item => {
             const chaveUnica = `${item.motorista}|${item.inicio}`;
-            
             if (chavesExistentes.has(chaveUnica)) {
                 duplicadasIgnoradas++;
                 return false; 
@@ -196,16 +197,14 @@ async function processAndSaveJornadasFile(file) {
         });
 
         if (jornadasNovas.length === 0) {
-            throw new Error(`Todas as ${mappedData.length} jornadas da planilha já existem no banco de dados. Nenhuma nova linha foi adicionada.`);
+            throw new Error(`Todas as ${mappedData.length} jornadas da planilha já existem no banco de dados.`);
         }
 
         const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(jornadasNovas);
         if (insErr) throw insErr;
         
         let msgSucesso = `Sucesso! Foram salvas ${jornadasNovas.length} NOVAS jornadas.`;
-        if (duplicadasIgnoradas > 0) {
-            msgSucesso += `\n(${duplicadasIgnoradas} jornadas foram ignoradas pois já existiam no sistema).`;
-        }
+        if (duplicadasIgnoradas > 0) msgSucesso += `\n(${duplicadasIgnoradas} jornadas foram ignoradas pois já existiam no sistema).`;
         
         alert(msgSucesso);
         
@@ -246,7 +245,7 @@ if(dropZoneJornadas && fileInputJornadas){
 }
 
 // ==========================================
-// IMPORTAÇÃO DE VIAGENS (EXCEL DE PRODUÇÃO)
+// IMPORTAÇÃO DE VIAGENS (PRODUÇÃO EXCEL)
 // ==========================================
 function parseSheetToData(sheet) {
     const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
