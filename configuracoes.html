@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Configurações - Serrana Florestal</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-900 min-h-screen text-slate-200 selection:bg-sky-500/30 flex overflow-hidden">
+
+    <aside class="w-72 bg-slate-800/80 border-r border-slate-700/50 backdrop-blur-xl flex flex-col justify-between h-screen shadow-2xl relative z-20">
+        <div>
+            <div class="p-6 border-b border-slate-700/50 flex flex-col items-center">
+                <div class="bg-slate-900/50 p-3 rounded-2xl shadow-inner border border-slate-700/50 mb-4"><img src="assets/logo.png" class="h-14 object-contain"></div>
+                <h2 class="text-xl font-black tracking-wider text-white text-center">Serrana Florestal</h2>
+            </div>
+            <nav class="p-4 space-y-2 mt-4">
+                <a href="index.html" class="menu-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all text-slate-400 hover:text-white hover:bg-slate-700/50"><i class="fas fa-chart-line text-lg w-6"></i> Visão Geral</a>
+                <a href="operacional.html" class="menu-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all text-slate-400 hover:text-white hover:bg-slate-700/50"><i class="fas fa-bullseye text-lg w-6"></i> Metas Operacionais</a>
+                <a href="jornadas.html" class="menu-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all text-slate-400 hover:text-white hover:bg-slate-700/50"><i class="fas fa-user-clock text-lg w-6"></i> Monitor de Jornadas</a>
+                <a href="historico.html" class="menu-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all text-slate-400 hover:text-white hover:bg-slate-700/50"><i class="fas fa-table-list text-lg w-6"></i> Histórico de Viagens</a>
+                <div class="my-4 border-t border-slate-700/50 mx-4"></div>
+                <a href="configuracoes.html" class="menu-btn active w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all text-sky-400 bg-slate-800/50"><i class="fas fa-cogs text-lg w-6"></i> Configurações</a>
+            </nav>
+        </div>
+    </aside>
+
+    <main class="flex-1 h-screen overflow-y-auto relative">
+        <div class="max-w-[96rem] mx-auto px-6 py-8">
+            <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
+                <div><h1 class="text-2xl font-extrabold text-white">Configurações da Torre</h1><p class="text-sm text-slate-400 font-medium">Gerenciamento de Metas Globais e Base de Dados</p></div>
+            </div>
+
+            <section class="space-y-6">
+                <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden">
+                    <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+                        <h3 class="font-bold text-white tracking-wide"><i class="fas fa-bullseye text-amber-500 mr-2"></i> Configurar Metas Globais</h3>
+                        <button id="btnSalvarMetasGlobais" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-6 rounded-lg shadow transition-colors text-sm"><i class="fas fa-save"></i> Salvar Metas Base</button>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-4 gap-6 bg-slate-900/50">
+                        <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Viagens Diárias (Qtd)</label><input type="number" id="cfg_v_prog" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white"></div>
+                        <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Volume Diário (m³)</label><input type="number" id="cfg_vol_prog" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white"></div>
+                        <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Caixa de Carga Média (m³)</label><input type="number" id="cfg_cx_prog" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white"></div>
+                        <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">PBTC Médio (t)</label><input type="number" id="cfg_pbtc" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white"></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden flex flex-col">
+                        <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700"><h3 class="font-bold text-white tracking-wide"><i class="fas fa-truck text-sky-400 mr-2"></i> Importar Produção (Viagens)</h3></div>
+                        <div class="p-6 bg-slate-900/50 flex-1">
+                            <div id="dropZone" class="upload-zone rounded-2xl p-8 text-center cursor-pointer transition-smooth group relative overflow-hidden bg-slate-800/50 border-2 border-dashed border-slate-600">
+                                <div class="relative z-10"><div class="w-14 h-14 mx-auto bg-slate-700 rounded-full flex items-center justify-center mb-3"><i class="fas fa-file-excel text-2xl text-emerald-500"></i></div><h3 class="text-slate-200 font-bold text-sm">Arraste a planilha aqui</h3><input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden" /><button id="selectFileBtn" class="mt-3 bg-sky-600 hover:bg-sky-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold">Buscar Arquivo</button></div>
+                            </div>
+                            <div id="loadingSpinner" class="hidden flex-col items-center justify-center py-4"><div class="w-8 h-8 border-4 border-sky-400 border-t-transparent rounded-full animate-spin mb-2"></div><span class="text-sky-200 font-bold text-xs">Salvando...</span></div>
+                            <div id="errorMsg" class="mt-4 text-rose-200 text-xs hidden bg-rose-900/50 p-3 rounded-lg border border-rose-800"></div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden flex flex-col">
+                        <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700"><h3 class="font-bold text-white tracking-wide"><i class="fas fa-user-clock text-amber-400 mr-2"></i> Importar Jornadas (CSV)</h3></div>
+                        <div class="p-6 bg-slate-900/50 flex-1">
+                            <div id="dropZoneJornadas" class="upload-zone rounded-2xl p-8 text-center cursor-pointer transition-smooth group relative overflow-hidden bg-slate-800/50 border-2 border-dashed border-slate-600">
+                                <div class="relative z-10"><div class="w-14 h-14 mx-auto bg-slate-700 rounded-full flex items-center justify-center mb-3"><i class="fas fa-file-csv text-2xl text-amber-500"></i></div><h3 class="text-slate-200 font-bold text-sm">Arraste o CSV aqui</h3><input type="file" id="fileInputJornadas" accept=".csv, .xlsx" class="hidden" /><button id="selectFileBtnJornadas" class="mt-3 bg-amber-600 hover:bg-amber-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold">Buscar Arquivo</button></div>
+                            </div>
+                            <div id="loadingSpinnerJornadas" class="hidden flex-col items-center justify-center py-4"><div class="w-8 h-8 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mb-2"></div><span class="text-amber-200 font-bold text-xs">Salvando...</span></div>
+                            <div id="errorMsgJornadas" class="mt-4 text-rose-200 text-xs hidden bg-rose-900/50 p-3 rounded-lg border border-rose-800"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl border border-rose-900/30 shadow-xl bg-rose-950/10 mt-6 p-6 flex justify-between items-center">
+                    <div><h3 class="font-bold text-rose-400 mb-1"><i class="fas fa-exclamation-triangle mr-2"></i> Zona de Risco</h3><p class="text-xs text-slate-400">Apaga permanentemente todo o histórico do Supabase.</p></div>
+                    <button id="btnLimparBanco" class="bg-rose-900/80 hover:bg-rose-700 text-rose-100 border border-rose-700 font-bold py-2 px-6 rounded-lg text-sm">Apagar Tudo</button>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabaseClient.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/configuracoes.js"></script>
+</body>
+</html>
