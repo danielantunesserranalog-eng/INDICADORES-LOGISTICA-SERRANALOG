@@ -36,7 +36,7 @@
             </div>
 
             <div class="flex items-center mb-6 bg-slate-800/40 p-3 rounded-2xl border border-slate-700/50 backdrop-blur-sm flex-wrap gap-4" id="jornadasFilters">
-                <div class="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase"><i class="fas fa-calendar-day"></i> Período:</div>
+                <div class="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase"><i class="fas fa-bolt"></i> Atalhos:</div>
                 <div class="flex items-center gap-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700/50">
                     <button data-qf="D-1" class="btn-qf-jor border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 px-3 py-1.5 rounded">D-1</button>
                     <button data-qf="D-2" class="btn-qf-jor border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 px-3 py-1.5 rounded">D-2</button>
@@ -44,12 +44,18 @@
                     <button data-qf="D-30" class="btn-qf-jor border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 px-3 py-1.5 rounded">D-30</button>
                     <button data-qf="ALL" class="btn-qf-jor active bg-sky-900/50 text-sky-400 border border-sky-800/50 text-[10px] font-bold px-3 py-1.5 rounded">Todos</button>
                 </div>
-                <div class="ml-auto bg-slate-900 border border-slate-700 rounded-full px-4 py-1.5 text-xs font-mono text-sky-300"><i class="fas fa-filter mr-1"></i> <span id="jorFilterStatus">Carregando...</span></div>
+                
+                <div class="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase ml-2 border-l border-slate-700 pl-4"><i class="fas fa-calendar-alt"></i> Data Específica:</div>
+                <select id="filterDataSelect" class="bg-slate-900 text-white text-sm font-bold rounded-lg border border-slate-600 px-3 py-2 cursor-pointer shadow-inner focus:border-emerald-500 outline-none transition-colors">
+                    <option value="ALL">TODAS AS DATAS</option>
+                </select>
+
+                <div class="ml-auto bg-slate-900 border border-slate-700 rounded-full px-4 py-1.5 text-xs font-mono text-sky-300"><i class="fas fa-database mr-1"></i> <span id="jorFilterStatus">Carregando...</span></div>
             </div>
 
             <section class="space-y-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-                    <div class="glass-card rounded-2xl p-5 glow-border-blue flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Motoristas Monitorados</p><p id="jorTotalMotoristas" class="text-3xl font-extrabold text-white mt-1">0</p></div><i class="fas fa-users text-blue-500 text-3xl self-end -mt-8"></i></div>
+                    <div class="glass-card rounded-2xl p-5 glow-border-blue flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Motoristas Monitorados (Únicos)</p><p id="jorTotalMotoristas" class="text-3xl font-extrabold text-white mt-1">0</p></div><i class="fas fa-users text-blue-500 text-3xl self-end -mt-8"></i></div>
                     <div class="glass-card rounded-2xl p-5 border-l-4 border-l-rose-500 flex flex-col justify-between"><div><p class="text-rose-400 text-[11px] font-bold uppercase tracking-widest">Estouros Registrados (>12h)</p><p id="jorQtdEstouros" class="text-3xl font-extrabold text-rose-400 mt-1">0</p></div><i class="fas fa-siren-on text-rose-500 text-3xl self-end -mt-8"></i></div>
                     <div class="glass-card rounded-2xl p-5 border-l-4 border-l-amber-500 flex flex-col justify-between bg-amber-900/10"><div><p class="text-amber-400 text-[11px] font-bold uppercase tracking-widest animate-pulse">Ação Preventiva (>10h30)</p><p id="jorQtdRisco" class="text-3xl font-extrabold text-amber-400 mt-1">0</p></div><i class="fas fa-exclamation-triangle text-amber-500 text-3xl self-end -mt-8"></i></div>
                     <div class="glass-card rounded-2xl p-5 glow-border-emerald flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Média de Refeição</p><p id="jorMediaRefeicao" class="text-3xl font-extrabold text-white mt-1">0h 00m</p></div><i class="fas fa-utensils text-emerald-400 text-3xl self-end -mt-8"></i></div>
@@ -75,11 +81,11 @@
                                     <tr>
                                         <th class="px-4 py-3">Motorista</th>
                                         <th class="px-4 py-3">Data</th>
-                                        <th class="px-4 py-3">Início</th>
-                                        <th class="px-4 py-3">Fim</th>
+                                        <th class="px-4 py-3 text-center">Início</th>
+                                        <th class="px-4 py-3 text-center">Fim</th>
                                         <th class="px-4 py-3 text-center">T. Trabalho</th>
                                         <th class="px-4 py-3 text-center">Direção</th>
-                                        <th class="px-4 py-3 text-center">Status Preditivo</th>
+                                        <th class="px-4 py-3 text-center">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody id="jorTabelaAnaliticaBody" class="divide-y divide-slate-800/80 text-slate-300"></tbody>
