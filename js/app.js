@@ -6,11 +6,13 @@ Chart.defaults.font.family = "'Inter', sans-serif";
 
 const viewDashboard = document.getElementById('viewDashboard');
 const viewOperacional = document.getElementById('viewOperacional');
+const viewJornadas = document.getElementById('viewJornadas');
 const viewHistorico = document.getElementById('viewHistorico');
 const viewConfiguracoes = document.getElementById('viewConfiguracoes');
 
 const btnMenuDashboard = document.getElementById('btnMenuDashboard');
 const btnMenuOperacional = document.getElementById('btnMenuOperacional');
+const btnMenuJornadas = document.getElementById('btnMenuJornadas');
 const btnMenuHistorico = document.getElementById('btnMenuHistorico');
 const btnMenuConfiguracoes = document.getElementById('btnMenuConfiguracoes');
 
@@ -30,10 +32,11 @@ let fullHistoricoData = [];
 function switchView(view) {
     viewDashboard.classList.add('hidden');
     viewOperacional.classList.add('hidden');
+    viewJornadas.classList.add('hidden');
     viewHistorico.classList.add('hidden');
     viewConfiguracoes.classList.add('hidden');
     
-    [btnMenuDashboard, btnMenuOperacional, btnMenuHistorico, btnMenuConfiguracoes].forEach(btn => {
+    [btnMenuDashboard, btnMenuOperacional, btnMenuJornadas, btnMenuHistorico, btnMenuConfiguracoes].forEach(btn => {
         btn.classList.remove('active', 'text-sky-400');
         btn.classList.add('text-slate-400');
     });
@@ -44,7 +47,7 @@ function switchView(view) {
         btnMenuDashboard.classList.add('active', 'text-sky-400'); btnMenuDashboard.classList.remove('text-slate-400');
         pageTitle.innerText = "Dashboard Analítico";
         pageSubtitle.innerText = "Análise do histórico acumulado de viagens";
-        loadDashboardData();
+        if(typeof loadDashboardData === 'function') loadDashboardData();
         
     } else if (view === 'operacional') {
         viewOperacional.classList.remove('hidden');
@@ -54,13 +57,21 @@ function switchView(view) {
         pageSubtitle.innerText = "Painel Executivo: Realizado vs Meta Global";
         if(typeof renderizarTabelaOperacional === 'function') renderizarTabelaOperacional();
 
+    } else if (view === 'jornadas') {
+        viewJornadas.classList.remove('hidden');
+        dashboardFilters.classList.add('hidden'); dashboardFilters.classList.remove('flex');
+        btnMenuJornadas.classList.add('active', 'text-sky-400'); btnMenuJornadas.classList.remove('text-slate-400');
+        pageTitle.innerText = "Monitoramento de Jornadas";
+        pageSubtitle.innerText = "Controle de carga horária e limites da lei do motorista";
+        if(typeof carregarPainelJornadas === 'function') carregarPainelJornadas();
+
     } else if (view === 'historico') {
         viewHistorico.classList.remove('hidden');
         dashboardFilters.classList.add('hidden'); dashboardFilters.classList.remove('flex');
         btnMenuHistorico.classList.add('active', 'text-sky-400'); btnMenuHistorico.classList.remove('text-slate-400');
         pageTitle.innerText = "Histórico de Viagens";
         pageSubtitle.innerText = "Consulte, pesquise e audite a base de dados";
-        loadHistoricoCompleto();
+        if(typeof loadHistoricoCompleto === 'function') loadHistoricoCompleto();
 
     } else if (view === 'configuracoes') {
         viewConfiguracoes.classList.remove('hidden');
@@ -68,13 +79,14 @@ function switchView(view) {
         btnMenuConfiguracoes.classList.add('active', 'text-sky-400'); btnMenuConfiguracoes.classList.remove('text-slate-400');
         pageTitle.innerText = "Configurações da Torre";
         pageSubtitle.innerText = "Gerenciamento de Metas Globais e Base de Dados";
-        carregarHistoricoImportacoes(); 
-        carregarMetasGlobais();
+        if(typeof carregarHistoricoImportacoes === 'function') carregarHistoricoImportacoes(); 
+        if(typeof carregarMetasGlobais === 'function') carregarMetasGlobais();
     }
 }
 
 btnMenuDashboard.addEventListener('click', () => switchView('dashboard'));
 btnMenuOperacional.addEventListener('click', () => switchView('operacional'));
+btnMenuJornadas.addEventListener('click', () => switchView('jornadas'));
 btnMenuHistorico.addEventListener('click', () => switchView('historico'));
 btnMenuConfiguracoes.addEventListener('click', () => switchView('configuracoes'));
 
@@ -167,10 +179,9 @@ function parseDateTime(dateVal, timeVal) {
     return baseDate;
 }
 
-// ATENÇÃO AQUI: isCiclo diferencia Fila de Ciclo!
 function calcHoursDiff(dtStart, hrStart, dtEnd, hrEnd, isCiclo = false) {
     let start = parseDateTime(dtStart, hrStart);
-    let end = parseDateTime(dtEnd || dtStart, hrEnd); // Fallback caso a data final não exista
+    let end = parseDateTime(dtEnd || dtStart, hrEnd); 
     
     if (start && end && !isNaN(start) && !isNaN(end)) {
         if (end < start) {
@@ -178,9 +189,6 @@ function calcHoursDiff(dtStart, hrStart, dtEnd, hrEnd, isCiclo = false) {
         }
         let diffHours = (end - start) / (1000 * 3600);
         
-        // REGRA DE NEGÓCIO FLORESTAL: 
-        // Se a diferença for menor que 2 horas E for um ciclo, e a planilha não informou data de fim,
-        // é porque na verdade cruzou a meia-noite (Ex: saiu 23h, chegou 00:40).
         if (isCiclo && diffHours > 0 && diffHours < 2 && (!dtEnd || dtEnd === dtStart)) {
             end.setDate(end.getDate() + 1);
             diffHours = (end - start) / (1000 * 3600);
@@ -194,6 +202,14 @@ function calcHoursDiff(dtStart, hrStart, dtEnd, hrEnd, isCiclo = false) {
 function normalizeStr(str) {
     if (!str) return "";
     return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+// FORMATADOR DE TEMPO PARA JORNADAS (Recebe "HH:MM")
+function parseTimeToHours(timeStr) {
+    if(!timeStr || timeStr === '-' || String(timeStr).trim() === '') return 0;
+    const parts = String(timeStr).split(':');
+    if(parts.length >= 2) return parseInt(parts[0], 10) + (parseInt(parts[1], 10) / 60);
+    return parseFloat(timeStr) || 0;
 }
 
 function parseSheetToData(sheet) {
@@ -218,17 +234,15 @@ function parseSheetToData(sheet) {
     const pesoLiqKey = findKey(['peso líquido', 'peso liquido']);
     const volumeKey = findKey(['volume real', 'volume_real']);
     
-    // RESTAURAÇÃO DAS CHAVES DE DISTÂNCIA
     const distAsfaltoKey = findKey(['distancia por asfalto', 'distância por asfalto', 'distancia asfalto']);
     const distTerraKey = findKey(['distancia por terra', 'distância por terra', 'distancia terra']);
     
-    // CHAVES DE FILA CAMPO / CARREGAMENTO / FÁBRICA
     const dtChegadaCampoKey = findKey(['data chegada campo']);
     const dtInicioCarregCpoKey = findKey(['dt início carreg cpo', 'dt inicio carreg cpo']);
     const hrChegadaCampoKey = findKey(['hora chegada campo', 'hr chegada campo']);
     const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo']);
 
-    // NOVAS CHAVES (TEMPO DE CARREGAMENTO)
+    // TEMPO DE CARREGAMENTO
     const dtFinalCarregCpoKey = findKey(['dt final carreg cpo', 'data final carreg cpo', 'data fim carreg cpo']);
     const hrFinalCarregCpoKey = findKey(['hr final carreg cpo', 'hora final carreg cpo', 'hr fim carreg cpo', 'hora fim carreg cpo']);
 
@@ -265,7 +279,6 @@ function parseSheetToData(sheet) {
             }
         }
 
-        // Tenta usar um ciclo que já veio na planilha pronto
         let ciclo = null;
         if (cicloProntoKey && row[cicloProntoKey] !== undefined && row[cicloProntoKey] !== "") {
             let rawCiclo = row[cicloProntoKey];
@@ -277,7 +290,6 @@ function parseSheetToData(sheet) {
             }
         }
         
-        // Se não veio ciclo pronto, calcula do zero (passando isCiclo = true para a regra de 2h)
         if ((ciclo === null || isNaN(ciclo) || ciclo <= 0) && getValue(hrInicioDescarFabKey)) {
              ciclo = calcHoursDiff(rawDtSaida, rawHrSaida, getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), true);
         }
@@ -294,22 +306,16 @@ function parseSheetToData(sheet) {
             distanciaTerra: parsePtBrNumber(getValue(distTerraKey)),
             cicloHoras: ciclo,
             
-            // Fila de Carregamento (Chegada Campo até Início Carregamento)
             filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), false),
             
-            // Tempo de Carregamento (Início Carregamento até Fim Carregamento)
             tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
             
-            // Fila Fábrica
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
             
             _timestamp: timestampSaida
         };
     });
 
-    // ========================================================
-    // TRELAMENTO DE PLACAS: Backup caso a mesma linha não gere ciclo
-    // ========================================================
     const viagensPorPlaca = {};
     mappedData.forEach(item => {
         if(item.placa && item.placa !== '-' && item._timestamp > 0) {
@@ -328,20 +334,21 @@ function parseSheetToData(sheet) {
             
             if (atual.cicloHoras === null || isNaN(atual.cicloHoras) || atual.cicloHoras <= 0) {
                 const diffHours = (proxima._timestamp - atual._timestamp) / (1000 * 3600);
-                if (diffHours >= 2 && diffHours <= 120) { // Garante mínimo de 2 horas pro trelamento
+                if (diffHours >= 2 && diffHours <= 120) { 
                     atual.cicloHoras = diffHours;
                 }
             }
         }
     });
 
-    // Limpa lixo temporário
     mappedData.forEach(d => delete d._timestamp);
 
     return mappedData.filter(item => item.pesoLiquido > 0 || item.volumeReal > 0);
 }
 
-// IMPORTAÇÃO E BD
+// ==========================================
+// IMPORTAÇÃO DE VIAGENS
+// ==========================================
 async function processAndSaveFile(file) {
     const errorMsgDiv = document.getElementById('errorMsg');
     const loadingSpinner = document.getElementById('loadingSpinner');
@@ -382,7 +389,7 @@ async function processAndSaveFile(file) {
 
         alert(`Sucesso! processadas ${newRows.length} viagens. (${viagensNovas} novas).`);
         carregarHistoricoImportacoes();
-        fullHistoricoData = []; // Força recarregar
+        fullHistoricoData = []; 
         loadHistoricoCompleto();
     } catch (err) {
         errorMsgDiv.innerText = "Erro: " + err.message;
@@ -405,10 +412,76 @@ if(dropZone){
     fileInput.addEventListener('change', e => { if(e.target.files.length) processAndSaveFile(e.target.files[0]); });
 }
 
+// ==========================================
+// IMPORTAÇÃO DE JORNADAS (CSV)
+// ==========================================
+async function processAndSaveJornadasFile(file) {
+    const errorMsgDiv = document.getElementById('errorMsgJornadas');
+    const loadingSpinner = document.getElementById('loadingSpinnerJornadas');
+    errorMsgDiv.classList.add('hidden');
+    loadingSpinner.classList.remove('hidden'); loadingSpinner.classList.add('flex');
+
+    try {
+        const text = await file.text();
+        const workbook = XLSX.read(text, { type: 'string', FS: ';' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+
+        if (!rawData || rawData.length === 0) throw new Error("Planilha vazia ou delimitador incorreto.");
+
+        const mappedData = rawData.map(row => {
+            if (!row['Pessoa']) return null;
+
+            const totalHoras = parseTimeToHours(row['Total de Trabalho']);
+            
+            return {
+                motorista: row['Pessoa'].trim(),
+                cpf: row['CPF'] || '',
+                placa: row['Placa'] || '',
+                inicio: row['Início'] || '',
+                fim: row['Fim'] || '',
+                total_trabalho_horas: totalHoras,
+                refeicao_horas: parseTimeToHours(row['Refeição']),
+                repouso_horas: parseTimeToHours(row['Repouso']),
+                direcao_horas: parseTimeToHours(row['Direção']),
+                estourou_jornada: totalHoras > 12
+            };
+        }).filter(item => item !== null && item.motorista !== '');
+
+        if(mappedData.length === 0) throw new Error("Nenhum dado válido de jornada encontrado na planilha.");
+
+        const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(mappedData);
+        if (insErr) throw insErr;
+
+        alert(`Sucesso! Foram importadas ${mappedData.length} jornadas.`);
+        
+    } catch (err) {
+        errorMsgDiv.innerText = "Erro: " + err.message;
+        errorMsgDiv.classList.remove('hidden');
+    } finally {
+        loadingSpinner.classList.add('hidden'); loadingSpinner.classList.remove('flex');
+    }
+}
+
+const dropZoneJornadas = document.getElementById('dropZoneJornadas');
+const fileInputJornadas = document.getElementById('fileInputJornadas');
+if(dropZoneJornadas){
+    dropZoneJornadas.addEventListener('dragover', e => { e.preventDefault(); dropZoneJornadas.classList.add('border-amber-400', 'bg-amber-900/20'); });
+    dropZoneJornadas.addEventListener('dragleave', () => dropZoneJornadas.classList.remove('border-amber-400', 'bg-amber-900/20'));
+    dropZoneJornadas.addEventListener('drop', e => {
+        e.preventDefault(); dropZoneJornadas.classList.remove('border-amber-400', 'bg-amber-900/20');
+        if (e.dataTransfer.files.length > 0) processAndSaveJornadasFile(e.dataTransfer.files[0]);
+    });
+    document.getElementById('selectFileBtnJornadas').addEventListener('click', () => fileInputJornadas.click());
+    fileInputJornadas.addEventListener('change', e => { if(e.target.files.length) processAndSaveJornadasFile(e.target.files[0]); });
+}
+
+// ZONA DE RISCO
 document.getElementById('btnLimparBanco').addEventListener('click', async () => {
     if(confirm("ATENÇÃO: Deseja apagar todo o histórico do banco de dados na nuvem?")) {
         await supabaseClient.from('historico_viagens').delete().neq('movimento', 'null');
         await supabaseClient.from('historico_importacoes').delete().gt('id', 0);
+        await supabaseClient.from('historico_jornadas').delete().gt('id', 0);
         alert("Histórico apagado com sucesso.");
         carregarHistoricoImportacoes();
         fullHistoricoData = [];
@@ -546,7 +619,6 @@ async function loadDashboardData() {
     const mediaTerra = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + (r.distanciaTerra||0), 0) / totalViagens : 0;
     const mediaDistTotal = mediaAsfalto + mediaTerra;
 
-    // FILAS E TEMPOS
     const validCycles = filteredData.filter(d => d.cicloHoras !== null && d.cicloHoras > 0);
     const somaCiclosTotais = validCycles.reduce((s, d) => s + d.cicloHoras, 0);
     const mediaCiclo = validCycles.length > 0 ? somaCiclosTotais / validCycles.length : 0;
@@ -577,12 +649,10 @@ async function loadDashboardData() {
     
     document.getElementById('produtividadeGlobal').innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
 
-    // TAXA DE OCIOSIDADE 
     const somaFilas = filteredData.reduce((s, d) => s + (d.filaCampoHoras || 0) + (d.filaFabricaHoras || 0), 0);
     const taxaOciosidade = somaCiclosTotais > 0 ? (somaFilas / somaCiclosTotais) * 100 : 0;
     document.getElementById('ociosidadeGlobal').innerText = taxaOciosidade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + '%';
 
-    // Melhor Cavalo
     const mapaPlacas = new Map();
     validCycles.forEach(d => {
         const placaFormatada = (d.placa && d.placa.trim() !== '-' && d.placa.trim() !== '') ? d.placa.trim().toUpperCase() : 'DESCONHECIDA';
@@ -603,7 +673,6 @@ async function loadDashboardData() {
     document.getElementById('bestPlacaValue').innerText = melhorPlacaProdutividade > 0 ? melhorPlacaProdutividade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) : "0.0";
     document.getElementById('bestPlacaName').innerText = `Placa: ${melhorPlacaNome}`;
 
-    // Gráficos 
     const transpCount = new Map();
     const transpCicloSum = new Map();
     const transpCicloCount = new Map();
