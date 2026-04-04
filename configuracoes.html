@@ -53,7 +53,7 @@
                         <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700"><h3 class="font-bold text-white tracking-wide"><i class="fas fa-truck text-sky-400 mr-2"></i> Importar Produção (Viagens)</h3></div>
                         <div class="p-6 bg-slate-900/50 flex-1">
                             <div id="dropZone" class="upload-zone rounded-2xl p-8 text-center cursor-pointer transition-smooth group relative overflow-hidden bg-slate-800/50 border-2 border-dashed border-slate-600">
-                                <div class="relative z-10"><div class="w-14 h-14 mx-auto bg-slate-700 rounded-full flex items-center justify-center mb-3"><i class="fas fa-file-excel text-2xl text-emerald-500"></i></div><h3 class="text-slate-200 font-bold text-sm">Arraste a planilha aqui</h3><input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden" /><button id="selectFileBtn" class="mt-3 bg-sky-600 hover:bg-sky-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold">Buscar Arquivo</button></div>
+                                <div class="relative z-10"><div class="w-14 h-14 mx-auto bg-slate-700 rounded-full flex items-center justify-center mb-3"><i class="fas fa-file-excel text-2xl text-emerald-500"></i></div><h3 class="text-slate-200 font-bold text-sm">Arraste a planilha de Viagens aqui</h3><input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden" /><button id="selectFileBtn" class="mt-3 bg-sky-600 hover:bg-sky-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold">Buscar Arquivo</button></div>
                             </div>
                             <div id="loadingSpinner" class="hidden flex-col items-center justify-center py-4"><div class="w-8 h-8 border-4 border-sky-400 border-t-transparent rounded-full animate-spin mb-2"></div><span class="text-sky-200 font-bold text-xs">Salvando...</span></div>
                             <div id="errorMsg" class="mt-4 text-rose-200 text-xs hidden bg-rose-900/50 p-3 rounded-lg border border-rose-800"></div>
@@ -64,7 +64,7 @@
                         <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700"><h3 class="font-bold text-white tracking-wide"><i class="fas fa-user-clock text-amber-400 mr-2"></i> Importar Jornadas (CSV)</h3></div>
                         <div class="p-6 bg-slate-900/50 flex-1">
                             <div id="dropZoneJornadas" class="upload-zone rounded-2xl p-8 text-center cursor-pointer transition-smooth group relative overflow-hidden bg-slate-800/50 border-2 border-dashed border-slate-600">
-                                <div class="relative z-10"><div class="w-14 h-14 mx-auto bg-slate-700 rounded-full flex items-center justify-center mb-3"><i class="fas fa-file-csv text-2xl text-amber-500"></i></div><h3 class="text-slate-200 font-bold text-sm">Arraste o CSV aqui</h3><input type="file" id="fileInputJornadas" accept=".csv, .xlsx" class="hidden" /><button id="selectFileBtnJornadas" class="mt-3 bg-amber-600 hover:bg-amber-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold">Buscar Arquivo</button></div>
+                                <div class="relative z-10"><div class="w-14 h-14 mx-auto bg-slate-700 rounded-full flex items-center justify-center mb-3"><i class="fas fa-file-csv text-2xl text-amber-500"></i></div><h3 class="text-slate-200 font-bold text-sm">Arraste o CSV de Jornadas aqui</h3><input type="file" id="fileInputJornadas" accept=".csv, .xlsx" class="hidden" /><button id="selectFileBtnJornadas" class="mt-3 bg-amber-600 hover:bg-amber-500 text-white px-4 py-1.5 rounded-lg text-xs font-bold">Buscar Arquivo</button></div>
                             </div>
                             <div id="loadingSpinnerJornadas" class="hidden flex-col items-center justify-center py-4"><div class="w-8 h-8 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mb-2"></div><span class="text-amber-200 font-bold text-xs">Salvando...</span></div>
                             <div id="errorMsgJornadas" class="mt-4 text-rose-200 text-xs hidden bg-rose-900/50 p-3 rounded-lg border border-rose-800"></div>
@@ -72,9 +72,22 @@
                     </div>
                 </div>
 
-                <div class="glass-card rounded-2xl border border-rose-900/30 shadow-xl bg-rose-950/10 mt-6 p-6 flex justify-between items-center">
-                    <div><h3 class="font-bold text-rose-400 mb-1"><i class="fas fa-exclamation-triangle mr-2"></i> Zona de Risco</h3><p class="text-xs text-slate-400">Apaga permanentemente todo o histórico do Supabase.</p></div>
-                    <button id="btnLimparBanco" class="bg-rose-900/80 hover:bg-rose-700 text-rose-100 border border-rose-700 font-bold py-2 px-6 rounded-lg text-sm">Apagar Tudo</button>
+                <div class="glass-card rounded-2xl border border-rose-900/30 shadow-xl bg-rose-950/20 mt-6 p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h3 class="font-bold text-rose-400 mb-1"><i class="fas fa-exclamation-triangle mr-2"></i> Zona de Risco: Exclusão de Dados</h3>
+                        <p class="text-xs text-slate-400">Selecione o tipo de dado que deseja apagar permanentemente da nuvem.</p>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                        <select id="tipoExclusao" class="bg-rose-950/80 border border-rose-800 text-rose-200 text-sm font-semibold rounded-lg px-4 py-2.5 outline-none focus:border-rose-500 w-full sm:w-auto shadow-inner cursor-pointer">
+                            <option value="tudo">Apagar TUDO (Viagens + Jornadas)</option>
+                            <option value="viagens">Apagar Apenas Viagens (Produção)</option>
+                            <option value="jornadas">Apagar Apenas Jornadas (CSV)</option>
+                        </select>
+                        <button id="btnLimparBanco" class="bg-rose-900/80 hover:bg-rose-700 text-rose-100 border border-rose-700 font-bold py-2.5 px-6 rounded-lg text-sm w-full sm:w-auto shadow-lg shadow-rose-900/20 transition-all flex items-center justify-center gap-2">
+                            <i class="fas fa-trash-alt"></i> Executar
+                        </button>
+                    </div>
                 </div>
             </section>
         </div>

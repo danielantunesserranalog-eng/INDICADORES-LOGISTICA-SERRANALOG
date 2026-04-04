@@ -6,7 +6,9 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarMetasGlobais();
 });
 
-// LOGICA DE METAS
+// ==========================================
+// LÓGICA DE METAS GLOBAIS
+// ==========================================
 async function carregarMetasGlobais() {
     try {
         const { data } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
@@ -38,21 +40,65 @@ document.getElementById('btnSalvarMetasGlobais').addEventListener('click', async
     setTimeout(() => btn.innerHTML = '<i class="fas fa-save"></i> Salvar Metas Base', 2000);
 });
 
-// ZONA DE RISCO
+
+// ==========================================
+// ZONA DE RISCO (EXCLUSÃO SELETIVA)
+// ==========================================
 document.getElementById('btnLimparBanco').addEventListener('click', async () => {
-    if(confirm("ATENÇÃO: Deseja apagar todo o histórico do banco de dados na nuvem?")) {
-        await supabaseClient.from('historico_viagens').delete().neq('movimento', 'null');
-        await supabaseClient.from('historico_importacoes').delete().gt('id', 0);
-        await supabaseClient.from('historico_jornadas').delete().gt('id', 0);
-        alert("Histórico apagado com sucesso.");
+    const tipo = document.getElementById('tipoExclusao').value;
+    let mensagemConfirmacao = "";
+
+    if (tipo === 'tudo') {
+        mensagemConfirmacao = "ALERTA MÁXIMO: Você está prestes a apagar TODOS os dados (Viagens e Jornadas). Deseja continuar?";
+    } else if (tipo === 'viagens') {
+        mensagemConfirmacao = "ATENÇÃO: Deseja apagar APENAS o banco de Produção (Viagens Excel)? As jornadas serão mantidas.";
+    } else if (tipo === 'jornadas') {
+        mensagemConfirmacao = "ATENÇÃO: Deseja apagar APENAS o banco de Jornadas (CSV)? O histórico de viagens será mantido.";
+    }
+
+    if(confirm(mensagemConfirmacao)) {
+        const btn = document.getElementById('btnLimparBanco');
+        const conteudoOriginal = btn.innerHTML;
+        
+        try {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Apagando...';
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            // Lógica Condicional de Deleção
+            if (tipo === 'tudo' || tipo === 'viagens') {
+                await supabaseClient.from('historico_viagens').delete().neq('movimento', 'null');
+                await supabaseClient.from('historico_importacoes').delete().gt('id', 0);
+            }
+            
+            if (tipo === 'tudo' || tipo === 'jornadas') {
+                await supabaseClient.from('historico_jornadas').delete().gt('id', 0);
+            }
+
+            alert("Operação concluída. Os dados selecionados foram apagados da nuvem.");
+            
+        } catch (error) {
+            console.error("Erro ao limpar banco:", error);
+            alert("Ocorreu um erro ao tentar apagar os dados.");
+        } finally {
+            // Restaura o botão
+            btn.innerHTML = conteudoOriginal;
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
     }
 });
 
-// IMPORTACAO DE JORNADAS
+
+// ==========================================
+// IMPORTAÇÃO DE JORNADAS (CSV) - CÁLCULO REAL
+// ==========================================
 async function processAndSaveJornadasFile(file) {
     const errorMsgDiv = document.getElementById('errorMsgJornadas');
     const loadingSpinner = document.getElementById('loadingSpinnerJornadas');
-    errorMsgDiv.classList.add('hidden'); loadingSpinner.classList.remove('hidden'); loadingSpinner.classList.add('flex');
+    errorMsgDiv.classList.add('hidden'); 
+    loadingSpinner.classList.remove('hidden'); 
+    loadingSpinner.classList.add('flex');
 
     try {
         const text = await file.text();
@@ -64,10 +110,10 @@ async function processAndSaveJornadasFile(file) {
 
         const mappedData = rawData.map(row => {
             if (!row['Pessoa'] || row['Pessoa'].trim() === '-' || row['Pessoa'].trim() === '') return null;
+            
             const strInicio = String(row['Início'] || '').trim();
             const strFim = String(row['Fim'] || '').trim();
             
-            // CÁLCULO REAL 
             const horasCalculadas = calcularDiferencaHorasJornada(strInicio, strFim);
             const totalHoras = horasCalculadas > 0 ? horasCalculadas : parseTimeToHours(row['Total de Trabalho']);
             
@@ -89,16 +135,18 @@ async function processAndSaveJornadasFile(file) {
 
         const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(mappedData);
         if (insErr) throw insErr;
+        
         alert(`Sucesso! Foram importadas ${mappedData.length} jornadas.`);
         
     } catch (err) {
-        errorMsgDiv.innerText = "Erro: " + err.message; errorMsgDiv.classList.remove('hidden');
+        errorMsgDiv.innerText = "Erro: " + err.message; 
+        errorMsgDiv.classList.remove('hidden');
     } finally {
-        loadingSpinner.classList.add('hidden'); loadingSpinner.classList.remove('flex');
+        loadingSpinner.classList.add('hidden'); 
+        loadingSpinner.classList.remove('flex');
     }
 }
 
-// LISTENERS DROPZONE JORNADAS
 const dropZoneJornadas = document.getElementById('dropZoneJornadas');
 const fileInputJornadas = document.getElementById('fileInputJornadas');
 if(dropZoneJornadas){
@@ -112,5 +160,198 @@ if(dropZoneJornadas){
     fileInputJornadas.addEventListener('change', e => { if(e.target.files.length) processAndSaveJornadasFile(e.target.files[0]); });
 }
 
-// IMPORTACAO DE VIAGENS (Mantivemos a lógica que você já tinha, mas encapsulada aqui)
-// Para o "processAndSaveFile", como ele usa a função gigante "parseSheetToData", você deve apenas mover a função "parseSheetToData(sheet)" e "processAndSaveFile(file)" do seu app.js antigo para cá. A mecânica do DropZone é idêntica ao código acima.
+
+// ==========================================
+// IMPORTAÇÃO DE VIAGENS (EXCEL DE PRODUÇÃO)
+// ==========================================
+function parseSheetToData(sheet) {
+    const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    if (!rawData || rawData.length === 0) throw new Error("Planilha vazia ou em formato incorreto.");
+
+    const keys = Object.keys(rawData[0]);
+    const normKeys = keys.map(k => ({ orig: k, norm: normalizeStr(k) }));
+
+    function findKey(possibilities) {
+        for (let p of possibilities) {
+            const normP = normalizeStr(p);
+            let found = normKeys.find(k => k.norm === normP || k.norm.includes(normP));
+            if (found) return found.orig;
+        }
+        return null;
+    }
+
+    const movimentoKey = findKey(['movimento', 'id_movimento']);
+    const transpKey = findKey(['transportadora', 'nome da transportadora']);
+    const placaKey = findKey(['placa do cavalo', 'placa cavalo', 'placa']);
+    const pesoLiqKey = findKey(['peso líquido', 'peso liquido']);
+    const volumeKey = findKey(['volume real', 'volume_real']);
+    
+    const distAsfaltoKey = findKey(['distancia por asfalto', 'distância por asfalto', 'distancia asfalto']);
+    const distTerraKey = findKey(['distancia por terra', 'distância por terra', 'distancia terra']);
+    
+    const dtChegadaCampoKey = findKey(['data chegada campo']);
+    const dtInicioCarregCpoKey = findKey(['dt início carreg cpo', 'dt inicio carreg cpo']);
+    const hrChegadaCampoKey = findKey(['hora chegada campo', 'hr chegada campo']);
+    const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo']);
+
+    const dtFinalCarregCpoKey = findKey(['dt final carreg cpo', 'data final carreg cpo', 'data fim carreg cpo']);
+    const hrFinalCarregCpoKey = findKey(['hr final carreg cpo', 'hora final carreg cpo', 'hr fim carreg cpo', 'hora fim carreg cpo']);
+
+    const dtEntradaKey = findKey(['data de entrada', 'data entrada', 'data chegada']);
+    const hrEntradaKey = findKey(['hora de entrada', 'hora entrada', 'hr entrada']);
+    const dtInicioDescarFabKey = findKey(['dt início descar fáb', 'dt inicio descar fab', 'data fim']);
+    const hrInicioDescarFabKey = findKey(['hr início descar fáb', 'hr inicio descar fab', 'hora fim']);
+    
+    const dtSaidaBaseKey = findKey(['data de saída', 'data saída', 'data saída fábrica']);
+    const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saída', 'hora saida']);
+    
+    const cicloProntoKey = findKey(['ciclo', 'tempo de ciclo', 'ciclo horas', 'horas ciclo', 'tempo ciclo']);
+
+    const today = new Date().toLocaleDateString('pt-PT');
+
+    const mappedData = rawData.map((row, idx) => {
+        const getValue = (key) => (key && row[key] !== undefined && row[key] !== "") ? row[key] : null;
+
+        const movimento = getValue(movimentoKey) || `MOV-GEN-${Date.now()}-${idx}`;
+        let transportadora = String(getValue(transpKey) || "Não identificada").trim().replace(/\s+(LTDA|Ltda|LTDA\.|S\.A\.|EIRELI)$/i, '').trim();
+        if(!transportadora || transportadora === "-") transportadora = "Outras";
+
+        const rawDtSaida = getValue(dtSaidaBaseKey);
+        const rawHrSaida = getValue(hrSaidaFabKey);
+        
+        let strDataBase = 'Desconhecida';
+        let timestampSaida = 0;
+
+        if (rawDtSaida) {
+            const parsed = parseDateTime(rawDtSaida, rawHrSaida);
+            if (parsed) {
+                strDataBase = parsed.toLocaleDateString('pt-PT');
+                timestampSaida = parsed.getTime();
+            }
+        }
+
+        let ciclo = null;
+        if (cicloProntoKey && row[cicloProntoKey] !== undefined && row[cicloProntoKey] !== "") {
+            let rawCiclo = row[cicloProntoKey];
+            if (typeof rawCiclo === 'number') { ciclo = rawCiclo * 24; } 
+            else if (typeof rawCiclo === 'string') {
+                let parts = rawCiclo.trim().split(':');
+                if(parts.length >= 2) ciclo = parseInt(parts[0], 10) + (parseInt(parts[1], 10) / 60);
+                else ciclo = parseFloat(rawCiclo.replace(',', '.'));
+            }
+        }
+        
+        if ((ciclo === null || isNaN(ciclo) || ciclo <= 0) && getValue(hrInicioDescarFabKey)) {
+             ciclo = calcHoursDiff(rawDtSaida, rawHrSaida, getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), true);
+        }
+
+        return {
+            movimento: String(movimento),
+            dataLancamento: today,
+            dataDaBaseExcel: strDataBase,
+            transportadora: transportadora,
+            placa: String(getValue(placaKey) || "-").trim(),
+            pesoLiquido: parsePtBrNumber(getValue(pesoLiqKey)),
+            volumeReal: parsePtBrNumber(getValue(volumeKey)),
+            distanciaAsfalto: parsePtBrNumber(getValue(distAsfaltoKey)),
+            distanciaTerra: parsePtBrNumber(getValue(distTerraKey)),
+            cicloHoras: ciclo,
+            
+            filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), false),
+            
+            tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
+            
+            filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
+            
+            _timestamp: timestampSaida
+        };
+    });
+
+    const viagensPorPlaca = {};
+    mappedData.forEach(item => {
+        if(item.placa && item.placa !== '-' && item._timestamp > 0) {
+            if(!viagensPorPlaca[item.placa]) viagensPorPlaca[item.placa] = [];
+            viagensPorPlaca[item.placa].push(item);
+        }
+    });
+
+    Object.keys(viagensPorPlaca).forEach(placa => {
+        const viagens = viagensPorPlaca[placa];
+        viagens.sort((a, b) => a._timestamp - b._timestamp);
+        
+        for(let i = 0; i < viagens.length - 1; i++) {
+            const atual = viagens[i];
+            const proxima = viagens[i+1];
+            
+            if (atual.cicloHoras === null || isNaN(atual.cicloHoras) || atual.cicloHoras <= 0) {
+                const diffHours = (proxima._timestamp - atual._timestamp) / (1000 * 3600);
+                if (diffHours >= 2 && diffHours <= 120) { 
+                    atual.cicloHoras = diffHours;
+                }
+            }
+        }
+    });
+
+    mappedData.forEach(d => delete d._timestamp);
+    return mappedData.filter(item => item.pesoLiquido > 0 || item.volumeReal > 0);
+}
+
+async function processAndSaveFile(file) {
+    const errorMsgDiv = document.getElementById('errorMsg');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    errorMsgDiv.classList.add('hidden');
+    loadingSpinner.classList.remove('hidden'); loadingSpinner.classList.add('flex');
+
+    try {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array', cellDates: false });
+        const newRows = parseSheetToData(workbook.Sheets[workbook.SheetNames[0]]);
+
+        let strHistoricoDatas = 'Desconhecida';
+        const datasEncontradas = [...new Set(newRows.map(r => r.dataDaBaseExcel).filter(d => d && d !== 'Desconhecida'))];
+        
+        if (datasEncontradas.length > 0) {
+            datasEncontradas.sort((a, b) => {
+                const pA = a.split('/'); const pB = b.split('/');
+                return new Date(pA[2], pA[1]-1, pA[0]) - new Date(pB[2], pB[1]-1, pB[0]);
+            });
+            strHistoricoDatas = datasEncontradas.length === 1 ? datasEncontradas[0] : 
+                                datasEncontradas.length <= 3 ? datasEncontradas.join(', ') : 
+                                `${datasEncontradas[0]} a ${datasEncontradas[datasEncontradas.length - 1]}`;
+        }
+
+        const { data: existingIds, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento');
+        if (selErr) throw selErr;
+        const existingSet = new Set(existingIds ? existingIds.map(e => e.movimento) : []);
+        
+        let viagensNovas = 0;
+        newRows.forEach(item => { if(!existingSet.has(item.movimento)) viagensNovas++; });
+
+        const { error: upErr } = await supabaseClient.from('historico_viagens').upsert(newRows);
+        if (upErr) throw upErr;
+
+        await supabaseClient.from('historico_importacoes').insert([{
+            "dataBase": strHistoricoDatas, "qtdViagens": viagensNovas, "dataLancamento": new Date().toLocaleString('pt-PT')
+        }]);
+
+        alert(`Sucesso! processadas ${newRows.length} viagens. (${viagensNovas} novas).`);
+    } catch (err) {
+        errorMsgDiv.innerText = "Erro: " + err.message;
+        errorMsgDiv.classList.remove('hidden');
+    } finally {
+        loadingSpinner.classList.add('hidden'); loadingSpinner.classList.remove('flex');
+    }
+}
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+if(dropZone){
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('border-sky-400', 'bg-sky-900/20'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-sky-400', 'bg-sky-900/20'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault(); dropZone.classList.remove('border-sky-400', 'bg-sky-900/20');
+        if (e.dataTransfer.files.length > 0) processAndSaveFile(e.dataTransfer.files[0]);
+    });
+    document.getElementById('selectFileBtn').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => { if(e.target.files.length) processAndSaveFile(e.target.files[0]); });
+}
