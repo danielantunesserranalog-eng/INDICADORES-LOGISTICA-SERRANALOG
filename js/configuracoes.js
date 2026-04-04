@@ -75,7 +75,6 @@ async function carregarHistoricoImportacoes() {
         }
 
         data.forEach(d => {
-            // Estiliza o Módulo com base na string salva
             let icone = '<i class="fas fa-database text-slate-500"></i>';
             if (d.dataBase.toUpperCase().includes('JORNADA')) icone = '<i class="fas fa-user-clock text-amber-500"></i>';
             if (d.dataBase.toUpperCase().includes('VIAGEN')) icone = '<i class="fas fa-truck text-sky-500"></i>';
@@ -129,7 +128,6 @@ if (btnLimparBanco) {
                     await supabaseClient.from('historico_jornadas').delete().gt('id', 0);
                 }
                 
-                // Registra quem limpou o banco
                 await supabaseClient.from('historico_importacoes').insert([{
                     "dataBase": `[DADOS APAGADOS] - Módulo: ${tipo.toUpperCase()}`,
                     "qtdViagens": 0,
@@ -137,7 +135,7 @@ if (btnLimparBanco) {
                 }]);
 
                 alert("Operação concluída. Os dados selecionados foram apagados da nuvem.");
-                carregarHistoricoImportacoes(); // Atualiza a tabela
+                carregarHistoricoImportacoes(); 
                 
             } catch (error) {
                 console.error("Erro ao limpar banco:", error);
@@ -152,7 +150,7 @@ if (btnLimparBanco) {
 }
 
 // ==========================================
-// IMPORTAÇÃO DE JORNADAS (CSV) - COM FILTRO ANTI-DUPLICAÇÃO E REGISTRO
+// IMPORTAÇÃO DE JORNADAS (CSV) - COM FILTRO ANTI-DUPLICAÇÃO
 // ==========================================
 async function processAndSaveJornadasFile(file) {
     const errorMsgDiv = document.getElementById('errorMsgJornadas');
@@ -246,7 +244,6 @@ async function processAndSaveJornadasFile(file) {
         const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(jornadasNovas);
         if (insErr) throw insErr;
 
-        // Extrai as datas para salvar no Histórico de Importações
         const regexPegaData = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
         const datasEncontradas = [...new Set(jornadasNovas.map(r => {
             const m = r.inicio.match(regexPegaData);
@@ -260,18 +257,17 @@ async function processAndSaveJornadasFile(file) {
                                  `${datasEncontradas[0]} a ${datasEncontradas[datasEncontradas.length - 1]}`;
         }
 
-        // Salva na tabela de histórico
         await supabaseClient.from('historico_importacoes').insert([{
             "dataBase": `Jornadas: ${strDatasFormatadas}`,
             "qtdViagens": jornadasNovas.length,
             "dataLancamento": new Date().toLocaleString('pt-PT')
         }]);
         
-        let msgSucesso = `Sucesso! Foram salvas ${jornadasNovas.length} NOVAS jornadas.`;
-        if (duplicadasIgnoradas > 0) msgSucesso += `\n(${duplicadasIgnoradas} jornadas foram ignoradas pois já existiam no sistema).`;
+        let msgSucesso = `Sucesso! Foram salvas ${jornadasNovas.length} NOVAS jornadas.\nDatas: ${strDatasFormatadas}`;
+        if (duplicadasIgnoradas > 0) msgSucesso += `\n\n(${duplicadasIgnoradas} jornadas foram ignoradas pois já existiam no sistema).`;
         
         alert(msgSucesso);
-        carregarHistoricoImportacoes(); // Atualiza visualmente a tabela
+        carregarHistoricoImportacoes(); 
         
     } catch (err) {
         if(errorMsgDiv) { errorMsgDiv.innerText = "Erro: " + err.message; errorMsgDiv.classList.remove('hidden'); } 
@@ -300,7 +296,7 @@ if(dropZoneJornadas && fileInputJornadas){
 }
 
 // ==========================================
-// IMPORTAÇÃO DE VIAGENS (PRODUÇÃO EXCEL) COM REGISTRO DE HISTÓRICO
+// IMPORTAÇÃO DE VIAGENS (PRODUÇÃO EXCEL) - COM FILTRO ANTI-DUPLICAÇÃO
 // ==========================================
 function parseSheetToData(sheet) {
     const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
@@ -388,11 +384,9 @@ function parseSheetToData(sheet) {
             distanciaAsfalto: parsePtBrNumber(getValue(distAsfaltoKey)),
             distanciaTerra: parsePtBrNumber(getValue(distTerraKey)),
             cicloHoras: ciclo,
-            
             filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), false),
             tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
-            
             _timestamp: timestampSaida
         };
     });
@@ -432,42 +426,67 @@ async function processAndSaveFile(file) {
         const workbook = XLSX.read(data, { type: 'array', cellDates: false });
         const newRows = parseSheetToData(workbook.Sheets[workbook.SheetNames[0]]);
 
-        let strHistoricoDatas = 'Desconhecida';
-        const datasEncontradas = [...new Set(newRows.map(r => r.dataDaBaseExcel).filter(d => d && d !== 'Desconhecida'))];
+        if (!newRows || newRows.length === 0) throw new Error("Planilha vazia ou sem dados válidos.");
+
+        const { data: existingIds, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento');
+        if (selErr) throw selErr;
         
+        const existingSet = new Set(existingIds ? existingIds.map(e => e.movimento) : []);
+        
+        let duplicadasIgnoradas = 0;
+        const viagensNovasArray = newRows.filter(item => {
+            if (existingSet.has(item.movimento)) {
+                duplicadasIgnoradas++;
+                return false;
+            } else {
+                existingSet.add(item.movimento);
+                return true;
+            }
+        });
+
+        if (viagensNovasArray.length === 0) {
+            throw new Error(`Todas as ${newRows.length} viagens da planilha já existem no banco. Nenhuma nova viagem adicionada.`);
+        }
+
+        const datasEncontradas = [...new Set(viagensNovasArray.map(r => r.dataDaBaseExcel).filter(d => d && d !== 'Desconhecida'))];
+        
+        let strHistoricoDatas = 'Desconhecida';
         if (datasEncontradas.length > 0) {
             datasEncontradas.sort((a, b) => {
                 const pA = a.split('/'); const pB = b.split('/');
-                return new Date(pA[2], pA[1]-1, pA[0]) - new Date(pB[2], pB[1]-1, pB[0]);
+                let anoA = parseInt(pA[2]); if(anoA < 100) anoA += 2000;
+                let anoB = parseInt(pB[2]); if(anoB < 100) anoB += 2000;
+                return new Date(anoA, parseInt(pA[1])-1, parseInt(pA[0])) - new Date(anoB, parseInt(pB[1])-1, parseInt(pB[0]));
             });
             strHistoricoDatas = datasEncontradas.length === 1 ? datasEncontradas[0] : 
                                 datasEncontradas.length <= 3 ? datasEncontradas.join(', ') : 
                                 `${datasEncontradas[0]} a ${datasEncontradas[datasEncontradas.length - 1]}`;
         }
 
-        const { data: existingIds, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento');
-        if (selErr) throw selErr;
-        const existingSet = new Set(existingIds ? existingIds.map(e => e.movimento) : []);
-        
-        let viagensNovas = 0;
-        newRows.forEach(item => { if(!existingSet.has(item.movimento)) viagensNovas++; });
+        const { error: insErr } = await supabaseClient.from('historico_viagens').insert(viagensNovasArray);
+        if (insErr) throw insErr;
 
-        const { error: upErr } = await supabaseClient.from('historico_viagens').upsert(newRows);
-        if (upErr) throw upErr;
-
-        // Salva na tabela de histórico
         await supabaseClient.from('historico_importacoes').insert([{
             "dataBase": `Viagens: ${strHistoricoDatas}`,
-            "qtdViagens": viagensNovas,
+            "qtdViagens": viagensNovasArray.length,
             "dataLancamento": new Date().toLocaleString('pt-PT')
         }]);
 
-        alert(`Sucesso! processadas ${newRows.length} viagens. (${viagensNovas} novas salvas).`);
-        carregarHistoricoImportacoes(); // Atualiza visualmente a tabela
+        let msgSucesso = `Sucesso! Foram salvas ${viagensNovasArray.length} NOVAS viagens.\nDatas: ${strHistoricoDatas}`;
+        if (duplicadasIgnoradas > 0) {
+            msgSucesso += `\n\n(${duplicadasIgnoradas} viagens foram ignoradas pois já existiam no sistema).`;
+        }
+
+        alert(msgSucesso);
+        carregarHistoricoImportacoes(); 
         
     } catch (err) {
-        if(errorMsgDiv) { errorMsgDiv.innerText = "Erro: " + err.message; errorMsgDiv.classList.remove('hidden'); } 
-        else alert("Erro: " + err.message);
+        if(errorMsgDiv) {
+            errorMsgDiv.innerText = "Erro: " + err.message;
+            errorMsgDiv.classList.remove('hidden');
+        } else {
+            alert("Erro: " + err.message);
+        }
     } finally {
         if(loadingSpinner) { loadingSpinner.classList.add('hidden'); loadingSpinner.classList.remove('flex'); }
     }
