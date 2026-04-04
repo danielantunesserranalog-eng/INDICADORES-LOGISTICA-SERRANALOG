@@ -15,7 +15,6 @@ let activeQuickFilterJor = 'ALL';
 let chartStatusFrota = null;
 let chartFaixaHoras = null;
 
-// Padrões Regex ATUALIZADOS: Aceita DD/MM
 const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 
@@ -162,31 +161,26 @@ function renderizarPainelJornadas() {
     if (dados.length === 0) { 
         document.getElementById('jorTotalMotoristas').innerText = '0';
         document.getElementById('jorQtdEstouros').innerText = '0';
-        document.getElementById('jorQtdRisco').innerText = '0';
         document.getElementById('jorMediaDirecao').innerText = '0h 00m';
         document.getElementById('jorTabelaAnaliticaBody').innerHTML = '<tr><td colspan="7" class="text-center py-4 text-slate-500">Nenhum dado encontrado para o filtro selecionado.</td></tr>';
-        document.getElementById('jorRiscoBody').innerHTML = '';
         document.getElementById('jorTopEstourosBody').innerHTML = '';
         if(chartStatusFrota) chartStatusFrota.destroy();
         if(chartFaixaHoras) chartFaixaHoras.destroy();
         return; 
     }
 
-    let qtdOk = 0, qtdRisco = 0, qtdEstouros = 0;
+    let qtdOk = 0, qtdEstouros = 0;
     let totalMinutosDirecao = 0; let qtdDirecao = 0;
     let fx8_10 = 0, fx10_12 = 0, fx12_14 = 0, fx14mais = 0;
     
     const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody'); tbodyAnalitica.innerHTML = '';
-    const tbodyRisco = document.getElementById('jorRiscoBody'); tbodyRisco.innerHTML = '';
     const tbodyEstouro = document.getElementById('jorTopEstourosBody'); tbodyEstouro.innerHTML = '';
 
     dados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
         const isEstouro = horas > 12;
-        const isRisco = horas >= 10.5 && horas <= 12;
         
         if (isEstouro) qtdEstouros++;
-        else if (isRisco) qtdRisco++;
         else qtdOk++;
 
         if (horas >= 8 && horas < 10) fx8_10++;
@@ -216,10 +210,6 @@ function renderizarPainelJornadas() {
             corLinha = 'text-rose-500 font-bold';
             badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold animate-pulse">INFRAÇÃO</span>`;
             tbodyEstouro.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${linha.motorista}</td><td class="px-3 py-2 text-right font-black text-rose-500">${formatarHorasMinutos(horas)}</td></tr>`);
-        } else if (isRisco) {
-            corLinha = 'text-amber-500 font-bold';
-            badge = `<span class="border border-amber-500 text-amber-500 bg-amber-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">PREVENTIVO</span>`;
-            tbodyRisco.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${linha.motorista}</td><td class="px-3 py-2 text-right font-black text-amber-400">${formatarHorasMinutos(horas)}</td></tr>`);
         }
 
         tbodyAnalitica.insertAdjacentHTML('beforeend', `
@@ -239,12 +229,11 @@ function renderizarPainelJornadas() {
     
     document.getElementById('jorTotalMotoristas').textContent = motoristasUnicos;
     document.getElementById('jorQtdEstouros').textContent = qtdEstouros;
-    document.getElementById('jorQtdRisco').textContent = qtdRisco;
     document.getElementById('jorMediaDirecao').textContent = formatarHorasMinutos(qtdDirecao > 0 ? (totalMinutosDirecao / qtdDirecao) / 60 : 0);
     document.getElementById('jorDataReferencia').textContent = `Filtro: ${dataEspec !== 'ALL' ? dataEspec : activeQuickFilterJor}`;
 
     // ===================================
-    // RENDERIZAÇÃO DOS GRÁFICOS
+    // RENDERIZAÇÃO DOS GRÁFICOS (Somente Verde e Vermelho)
     // ===================================
     if (chartStatusFrota) chartStatusFrota.destroy();
     if (chartFaixaHoras) chartFaixaHoras.destroy();
@@ -253,8 +242,8 @@ function renderizarPainelJornadas() {
     chartStatusFrota = new Chart(ctxStatus, {
         type: 'doughnut',
         data: {
-            labels: ['OK (<10h30)', 'Em Risco (10h30-12h)', 'Infração (>12h)'],
-            datasets: [{ data: [qtdOk, qtdRisco, qtdEstouros], backgroundColor: ['#10b981', '#f59e0b', '#f43f5e'], borderWidth: 2, borderColor: '#1e293b' }]
+            labels: ['OK (<= 12h)', 'Infração (> 12h)'],
+            datasets: [{ data: [qtdOk, qtdEstouros], backgroundColor: ['#10b981', '#f43f5e'], borderWidth: 2, borderColor: '#1e293b' }]
         },
         plugins: [centerTextPluginJornadas],
         options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } }, datalabels: { display: false } } }
@@ -262,13 +251,13 @@ function renderizarPainelJornadas() {
 
     const ctxFaixas = document.getElementById('faixaHorasChart').getContext('2d');
     let gradientBar = ctxFaixas.createLinearGradient(0, 0, 0, 400);
-    gradientBar.addColorStop(0, '#38bdf8'); gradientBar.addColorStop(1, '#0284c7'); 
+    gradientBar.addColorStop(0, '#10b981'); gradientBar.addColorStop(1, '#059669'); 
 
     chartFaixaHoras = new Chart(ctxFaixas, {
         type: 'bar',
         data: {
             labels: ['8h a 10h', '10h a 12h', '12h a 14h', '> 14h'],
-            datasets: [{ label: 'Qtd de Jornadas', data: [fx8_10, fx10_12, fx12_14, fx14mais], backgroundColor: [gradientBar, '#f59e0b', '#f43f5e', '#9f1239'], borderRadius: 4, barPercentage: 0.6 }]
+            datasets: [{ label: 'Qtd de Jornadas', data: [fx8_10, fx10_12, fx12_14, fx14mais], backgroundColor: [gradientBar, gradientBar, '#f43f5e', '#9f1239'], borderRadius: 4, barPercentage: 0.6 }]
         },
         options: {
             responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } },
@@ -278,7 +267,7 @@ function renderizarPainelJornadas() {
     });
 }
 
-// EXPORTAÇÃO EXCEL
+// EXPORTAÇÃO EXCEL (Somente OK e INFRAÇÃO)
 document.getElementById('btnExportarJornada').addEventListener('click', () => {
     if (jornadasGlobalData.length === 0) return alert("Nenhum dado para exportar.");
     const ws = XLSX.utils.json_to_sheet(jornadasGlobalData.map(d => {
@@ -296,7 +285,7 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
         return {
             "Motorista": d.motorista, "Placa": d.placa, "Data Início": dI, "Hora Início": hI, "Data Fim": dF, "Hora Fim": hF,
             "T. Trabalho (h)": d.total_trabalho_horas, "T. Direção (h)": d.direcao_horas, "Refeição (h)": d.refeicao_horas, "Repouso (h)": d.repouso_horas,
-            "Status": d.total_trabalho_horas > 12 ? 'INFRAÇÃO' : (d.total_trabalho_horas >= 10.5 ? 'ALERTA RISCO' : 'OK')
+            "Status": d.total_trabalho_horas > 12 ? 'INFRAÇÃO' : 'OK'
         };
     }));
     const wb = XLSX.utils.book_new(); XLSX.book_append_sheet(wb, ws, "Jornadas");

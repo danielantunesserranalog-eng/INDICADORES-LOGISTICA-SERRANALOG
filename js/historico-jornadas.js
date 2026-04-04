@@ -39,7 +39,7 @@ async function loadHistoricoJornadasCompleto() {
     }
 }
 
-// NOVO: Função que popula a caixa de seleção apenas com os nomes únicos
+// Função que popula a caixa de seleção apenas com os nomes únicos
 function popularFiltroMotoristasDropdown() {
     const select = document.getElementById('filterMotoristaDropdown');
     if (!select) return;
@@ -85,7 +85,6 @@ function renderHistoricoJornadasTable() {
         filtrados.slice(0, 200).forEach(r => {
             const horas = r.total_trabalho_horas || 0;
             const isEstouro = horas > 12;
-            const isRisco = horas >= 10.5 && horas <= 12;
 
             // Extração de Horas
             let dtInicio = '-', hrInicio = '-', dtFim = '-', hrFim = '-';
@@ -108,9 +107,6 @@ function renderHistoricoJornadasTable() {
             if(isEstouro) {
                 corLinha = 'text-rose-500 font-bold';
                 badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">INFRAÇÃO</span>`;
-            } else if (isRisco) {
-                corLinha = 'text-amber-500 font-bold';
-                badge = `<span class="border border-amber-500 text-amber-500 bg-amber-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">RISCO</span>`;
             }
 
             t.insertAdjacentHTML('beforeend', `<tr class="border-b border-slate-800 hover:bg-slate-800/50 transition-colors">
