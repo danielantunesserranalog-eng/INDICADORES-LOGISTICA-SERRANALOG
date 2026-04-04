@@ -1,115 +1,84 @@
 // ==========================================
-// js/jornadas.js - INTEGRAÇÃO SUPABASE
+// js/jornadas.js - ALERTAS PREDITIVOS E SUPABASE
 // ==========================================
+
+let jornadasGlobalData = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     carregarPainelJornadas();
 });
 
+// EXPORTAÇÃO EXCEL (SheetJS)
+document.getElementById('btnExportarJornada').addEventListener('click', () => {
+    if (jornadasGlobalData.length === 0) return alert("Nenhum dado para exportar.");
+    const ws = XLSX.utils.json_to_sheet(jornadasGlobalData.map(d => ({
+        "Motorista": d.motorista, "Placa": d.placa,
+        "Início": d.inicio, "Fim": d.fim,
+        "T. Trabalho (h)": d.total_trabalho_horas, "T. Direção (h)": d.direcao_horas,
+        "Refeição (h)": d.refeicao_horas, "Repouso (h)": d.repouso_horas,
+        "Status": d.total_trabalho_horas > 12 ? 'INFRAÇÃO' : (d.total_trabalho_horas >= 10.5 ? 'ALERTA RISCO' : 'OK')
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Jornadas");
+    XLSX.writeFile(wb, `SerranaLog_Jornadas_${new Date().toISOString().slice(0,10)}.xlsx`);
+});
+
 async function carregarPainelJornadas() {
     try {
-        const { data: dadosBrutos, error } = await supabaseClient
-            .from('historico_jornadas')
-            .select('*')
-            .order('total_trabalho_horas', { ascending: false });
-
+        const { data: dadosBrutos, error } = await supabaseClient.from('historico_jornadas').select('*').order('total_trabalho_horas', { ascending: false });
         if (error) throw error;
         
-        // FILTRO DE SEGURANÇA NO DASHBOARD: Ignora menores que 8h e descarta lixo do banco antigo
         const dados = dadosBrutos ? dadosBrutos.filter(d => d.total_trabalho_horas >= 8) : [];
-        
-        if (!dados || dados.length === 0) {
-            document.getElementById('jorTotalMotoristas').innerText = '0';
-            document.getElementById('jorDataReferencia').innerText = 'Nenhum dado na base';
-            
-            const tbodyTop = document.getElementById('jorTopEstourosBody');
-            if (tbodyTop) tbodyTop.innerHTML = `<tr><td colspan="3" class="p-4 text-sm text-gray-400 text-center">Nenhum dado válido.</td></tr>`;
-            
-            const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody');
-            if (tbodyAnalitica) tbodyAnalitica.innerHTML = `<tr><td colspan="7" class="p-4 text-sm text-gray-400 text-center">Nenhum dado válido.</td></tr>`;
-            
-            return;
-        }
+        jornadasGlobalData = dados;
 
-        let totalMotoristas = dados.length;
-        let qtdEstouros = 0;
-        let totalMinutosRefeicao = 0;
-        let qtdRefeicao = 0;
-        let totalMinutosRepouso = 0;
-        let qtdRepouso = 0;
-        let motoristasComTempo = [];
+        if (dados.length === 0) { document.getElementById('jorTotalMotoristas').innerText = '0'; return; }
 
-        const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody');
-        if (tbodyAnalitica) tbodyAnalitica.innerHTML = '';
+        let qtdEstouros = 0; let qtdRisco = 0;
+        let totalMinutosRefeicao = 0; let qtdRefeicao = 0;
+        const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody'); tbodyAnalitica.innerHTML = '';
+        const tbodyRisco = document.getElementById('jorRiscoBody'); tbodyRisco.innerHTML = '';
+        const tbodyEstouro = document.getElementById('jorTopEstourosBody'); tbodyEstouro.innerHTML = '';
 
         dados.forEach(linha => {
-            const motorista = linha.motorista || "-";
-            const placa = linha.placa || "-";
-            const inicio = linha.inicio || "-";
-            const fim = linha.fim || "-";
-            
-            const tTrabalhoHoras = linha.total_trabalho_horas || 0;
-            const isEstouro = linha.estourou_jornada || tTrabalhoHoras > 12;
+            const horas = linha.total_trabalho_horas || 0;
+            const isEstouro = horas > 12;
+            const isRisco = horas >= 10.5 && horas <= 12; // Alerta Preditivo!
             
             if (isEstouro) qtdEstouros++;
+            if (isRisco) qtdRisco++;
+            if (linha.refeicao_horas > 0) { totalMinutosRefeicao += (linha.refeicao_horas * 60); qtdRefeicao++; }
 
-            if (linha.refeicao_horas > 0) {
-                totalMinutosRefeicao += (linha.refeicao_horas * 60);
-                qtdRefeicao++;
-            }
-            if (linha.repouso_horas > 0) {
-                totalMinutosRepouso += (linha.repouso_horas * 60);
-                qtdRepouso++;
+            // Configuração Visual do Status
+            let corLinha = 'text-emerald-400';
+            let badge = `<span class="border border-emerald-500 text-emerald-500 bg-emerald-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">OK</span>`;
+            
+            if(isEstouro) {
+                corLinha = 'text-rose-500 font-bold';
+                badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold animate-pulse">INFRAÇÃO</span>`;
+                tbodyEstouro.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${linha.motorista}</td><td class="px-3 py-2 text-right font-black text-rose-500">${formatarHorasMinutos(horas)}</td></tr>`);
+            } else if (isRisco) {
+                corLinha = 'text-amber-500 font-bold';
+                badge = `<span class="border border-amber-500 text-amber-500 bg-amber-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">ALERTA PREVENTIVO</span>`;
+                tbodyRisco.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${linha.motorista}</td><td class="px-3 py-2 text-right font-black text-amber-400">${formatarHorasMinutos(horas)}</td></tr>`);
             }
 
-            motoristasComTempo.push({ motorista, horas: tTrabalhoHoras, inicio, fim });
-
-            if (tbodyAnalitica) {
-                const corTrabalho = isEstouro ? 'text-rose-500 font-bold' : 'text-emerald-400 font-semibold';
-                const badgeStatus = isEstouro 
-                    ? `<span class="border border-red-500 text-red-500 bg-red-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold tracking-wider shadow-inner">ESTOURO</span>` 
-                    : `<span class="border border-emerald-500 text-emerald-500 bg-emerald-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold tracking-wider shadow-inner">OK</span>`;
-                
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="px-4 py-3 text-sky-400 font-semibold whitespace-nowrap">${motorista}</td>
-                    <td class="px-4 py-3 text-slate-400">${placa}</td>
-                    <td class="px-4 py-3 text-slate-400 whitespace-nowrap">${inicio}</td>
-                    <td class="px-4 py-3 text-slate-400 whitespace-nowrap">${fim}</td>
-                    <td class="px-4 py-3 text-center ${corTrabalho}">${formatarHorasMinutos(tTrabalhoHoras)}</td>
-                    <td class="px-4 py-3 text-center text-amber-500">${formatarHorasMinutos(linha.direcao_horas || 0)}</td>
-                    <td class="px-4 py-3 text-center">${badgeStatus}</td>
-                `;
-                tbodyAnalitica.appendChild(tr);
-            }
+            // Tabela Analítica Geral
+            tbodyAnalitica.insertAdjacentHTML('beforeend', `
+                <tr class="hover:bg-slate-800/30">
+                    <td class="px-4 py-3 text-sky-400 font-semibold truncate max-w-[150px]">${linha.motorista}</td>
+                    <td class="px-4 py-3 text-slate-400">${linha.inicio || '-'}</td>
+                    <td class="px-4 py-3 text-center ${corLinha}">${formatarHorasMinutos(horas)}</td>
+                    <td class="px-4 py-3 text-center text-slate-400">${formatarHorasMinutos(linha.direcao_horas || 0)}</td>
+                    <td class="px-4 py-3 text-center">${badge}</td>
+                </tr>
+            `);
         });
 
-        document.getElementById('jorTotalMotoristas').textContent = totalMotoristas;
-        const taxaEstouro = totalMotoristas > 0 ? ((qtdEstouros / totalMotoristas) * 100).toFixed(1) : 0;
-        document.getElementById('jorTaxaEstouro').innerHTML = `${taxaEstouro}%`;
-
+        document.getElementById('jorTotalMotoristas').textContent = dados.length;
+        document.getElementById('jorQtdEstouros').textContent = qtdEstouros;
+        document.getElementById('jorQtdRisco').textContent = qtdRisco;
         document.getElementById('jorMediaRefeicao').textContent = formatarHorasMinutos(qtdRefeicao > 0 ? (totalMinutosRefeicao / qtdRefeicao) / 60 : 0);
-        document.getElementById('jorMediaRepouso').textContent = formatarHorasMinutos(qtdRepouso > 0 ? (totalMinutosRepouso / qtdRepouso) / 60 : 0);
-
-        const tbodyTop = document.getElementById('jorTopEstourosBody');
-        if (tbodyTop) {
-            tbodyTop.innerHTML = '';
-            const top5 = motoristasComTempo.filter(m => m.horas > 12).slice(0, 5);
-            if (top5.length === 0) {
-                tbodyTop.innerHTML = `<tr><td colspan="3" class="p-4 text-sm text-gray-400 text-center">Nenhum estouro registrado.</td></tr>`;
-            } else {
-                top5.forEach((item, index) => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="px-4 py-3 font-bold text-rose-500 text-center w-10">${index + 1}º</td>
-                        <td class="px-4 py-3 text-slate-300 font-semibold truncate max-w-[150px]">${item.motorista}</td>
-                        <td class="px-4 py-3 text-right font-bold text-rose-400">${formatarHorasMinutos(item.horas)}</td>
-                    `;
-                    tbodyTop.appendChild(tr);
-                });
-            }
-        }
-        document.getElementById('jorDataReferencia').textContent = `Base: ${dados.length} jornadas na nuvem`;
+        document.getElementById('jorDataReferencia').textContent = `Base: ${dados.length} registros`;
 
     } catch (error) { console.error("Erro ao carregar o painel:", error); }
 }
