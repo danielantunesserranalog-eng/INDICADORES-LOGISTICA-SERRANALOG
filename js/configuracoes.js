@@ -13,78 +13,91 @@ async function carregarMetasGlobais() {
     try {
         const { data } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
         if (data) {
-            document.getElementById('cfg_v_prog').value = data.v_prog || '';
-            document.getElementById('cfg_vol_prog').value = data.vol_prog || '';
-            document.getElementById('cfg_cx_prog').value = data.cx_prog || '';
-            document.getElementById('cfg_pbtc').value = data.pbtc_prog || '';
+            const elVProg = document.getElementById('cfg_v_prog');
+            const elVolProg = document.getElementById('cfg_vol_prog');
+            const elCxProg = document.getElementById('cfg_cx_prog');
+            const elPbtcProg = document.getElementById('cfg_pbtc');
+
+            if (elVProg) elVProg.value = data.v_prog || '';
+            if (elVolProg) elVolProg.value = data.vol_prog || '';
+            if (elCxProg) elCxProg.value = data.cx_prog || '';
+            if (elPbtcProg) elPbtcProg.value = data.pbtc_prog || '';
+            
             localStorage.setItem('cfg_metas', JSON.stringify(data));
         }
     } catch(e) {}
 }
 
-document.getElementById('btnSalvarMetasGlobais').addEventListener('click', async () => {
-    const btn = document.getElementById('btnSalvarMetasGlobais');
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
-    const payload = {
-        id: 1,
-        v_prog: parseFloat(document.getElementById('cfg_v_prog').value) || 0,
-        vol_prog: parseFloat(document.getElementById('cfg_vol_prog').value) || 0,
-        cx_prog: parseFloat(document.getElementById('cfg_cx_prog').value) || 0,
-        pbtc_prog: parseFloat(document.getElementById('cfg_pbtc').value) || 0
-    };
-    try {
-        await supabaseClient.from('metas_globais').upsert(payload);
-        localStorage.setItem('cfg_metas', JSON.stringify(payload));
-        btn.innerHTML = '<i class="fas fa-check"></i> Salvo!';
-    } catch(e) { btn.innerHTML = 'Erro!'; }
-    setTimeout(() => btn.innerHTML = '<i class="fas fa-save"></i> Salvar Metas Base', 2000);
-});
+const btnSalvarMetasGlobais = document.getElementById('btnSalvarMetasGlobais');
+if (btnSalvarMetasGlobais) {
+    btnSalvarMetasGlobais.addEventListener('click', async () => {
+        btnSalvarMetasGlobais.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+        const payload = {
+            id: 1,
+            v_prog: parseFloat(document.getElementById('cfg_v_prog').value) || 0,
+            vol_prog: parseFloat(document.getElementById('cfg_vol_prog').value) || 0,
+            cx_prog: parseFloat(document.getElementById('cfg_cx_prog').value) || 0,
+            pbtc_prog: parseFloat(document.getElementById('cfg_pbtc').value) || 0
+        };
+        try {
+            await supabaseClient.from('metas_globais').upsert(payload);
+            localStorage.setItem('cfg_metas', JSON.stringify(payload));
+            btnSalvarMetasGlobais.innerHTML = '<i class="fas fa-check"></i> Salvo!';
+        } catch(e) { btnSalvarMetasGlobais.innerHTML = 'Erro!'; }
+        setTimeout(() => btnSalvarMetasGlobais.innerHTML = '<i class="fas fa-save"></i> Salvar Metas Base', 2000);
+    });
+}
 
 // ==========================================
 // ZONA DE RISCO (EXCLUSÃO SELETIVA)
 // ==========================================
-document.getElementById('btnLimparBanco').addEventListener('click', async () => {
-    const tipo = document.getElementById('tipoExclusao').value;
-    let mensagemConfirmacao = "";
-
-    if (tipo === 'tudo') {
-        mensagemConfirmacao = "ALERTA MÁXIMO: Você está prestes a apagar TODOS os dados (Viagens e Jornadas). Deseja continuar?";
-    } else if (tipo === 'viagens') {
-        mensagemConfirmacao = "ATENÇÃO: Deseja apagar APENAS o banco de Produção (Viagens Excel)? As jornadas serão mantidas.";
-    } else if (tipo === 'jornadas') {
-        mensagemConfirmacao = "ATENÇÃO: Deseja apagar APENAS o banco de Jornadas (CSV)? O histórico de viagens será mantido.";
-    }
-
-    if(confirm(mensagemConfirmacao)) {
-        const btn = document.getElementById('btnLimparBanco');
-        const conteudoOriginal = btn.innerHTML;
+const btnLimparBanco = document.getElementById('btnLimparBanco');
+if (btnLimparBanco) {
+    btnLimparBanco.addEventListener('click', async () => {
+        const elTipoExclusao = document.getElementById('tipoExclusao');
+        if (!elTipoExclusao) return;
         
-        try {
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Apagando...';
-            btn.disabled = true;
-            btn.classList.add('opacity-50', 'cursor-not-allowed');
+        const tipo = elTipoExclusao.value;
+        let mensagemConfirmacao = "";
 
-            if (tipo === 'tudo' || tipo === 'viagens') {
-                await supabaseClient.from('historico_viagens').delete().neq('movimento', 'null');
-                await supabaseClient.from('historico_importacoes').delete().gt('id', 0);
-            }
-            
-            if (tipo === 'tudo' || tipo === 'jornadas') {
-                await supabaseClient.from('historico_jornadas').delete().gt('id', 0);
-            }
-
-            alert("Operação concluída. Os dados selecionados foram apagados da nuvem.");
-            
-        } catch (error) {
-            console.error("Erro ao limpar banco:", error);
-            alert("Ocorreu um erro ao tentar apagar os dados.");
-        } finally {
-            btn.innerHTML = conteudoOriginal;
-            btn.disabled = false;
-            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        if (tipo === 'tudo') {
+            mensagemConfirmacao = "ALERTA MÁXIMO: Você está prestes a apagar TODOS os dados (Viagens e Jornadas). Deseja continuar?";
+        } else if (tipo === 'viagens') {
+            mensagemConfirmacao = "ATENÇÃO: Deseja apagar APENAS o banco de Produção (Viagens Excel)? As jornadas serão mantidas.";
+        } else if (tipo === 'jornadas') {
+            mensagemConfirmacao = "ATENÇÃO: Deseja apagar APENAS o banco de Jornadas (CSV)? O histórico de viagens será mantido.";
         }
-    }
-});
+
+        if(confirm(mensagemConfirmacao)) {
+            const conteudoOriginal = btnLimparBanco.innerHTML;
+            
+            try {
+                btnLimparBanco.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Apagando...';
+                btnLimparBanco.disabled = true;
+                btnLimparBanco.classList.add('opacity-50', 'cursor-not-allowed');
+
+                if (tipo === 'tudo' || tipo === 'viagens') {
+                    await supabaseClient.from('historico_viagens').delete().neq('movimento', 'null');
+                    await supabaseClient.from('historico_importacoes').delete().gt('id', 0);
+                }
+                
+                if (tipo === 'tudo' || tipo === 'jornadas') {
+                    await supabaseClient.from('historico_jornadas').delete().gt('id', 0);
+                }
+
+                alert("Operação concluída. Os dados selecionados foram apagados da nuvem.");
+                
+            } catch (error) {
+                console.error("Erro ao limpar banco:", error);
+                alert("Ocorreu um erro ao tentar apagar os dados.");
+            } finally {
+                btnLimparBanco.innerHTML = conteudoOriginal;
+                btnLimparBanco.disabled = false;
+                btnLimparBanco.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+    });
+}
 
 // ==========================================
 // IMPORTAÇÃO DE JORNADAS (CSV) - COM JUNÇÃO DE DATA E HORA
@@ -92,9 +105,8 @@ document.getElementById('btnLimparBanco').addEventListener('click', async () => 
 async function processAndSaveJornadasFile(file) {
     const errorMsgDiv = document.getElementById('errorMsgJornadas');
     const loadingSpinner = document.getElementById('loadingSpinnerJornadas');
-    errorMsgDiv.classList.add('hidden'); 
-    loadingSpinner.classList.remove('hidden'); 
-    loadingSpinner.classList.add('flex');
+    if (errorMsgDiv) errorMsgDiv.classList.add('hidden'); 
+    if (loadingSpinner) { loadingSpinner.classList.remove('hidden'); loadingSpinner.classList.add('flex'); }
 
     try {
         const text = await file.text();
@@ -139,13 +151,8 @@ async function processAndSaveJornadasFile(file) {
 
             if (colDataExtra) {
                 const dataLimpa = String(colDataExtra).trim();
-                // Se a string "Início" tem algo, mas não possui uma data (bateu regex falso)
-                if (strInicio && !strInicio.match(regexDateCheck)) {
-                    strInicio = `${dataLimpa} ${strInicio}`;
-                }
-                if (strFim && !strFim.match(regexDateCheck)) {
-                    strFim = `${dataLimpa} ${strFim}`;
-                }
+                if (strInicio && !strInicio.match(regexDateCheck)) strInicio = `${dataLimpa} ${strInicio}`;
+                if (strFim && !strFim.match(regexDateCheck)) strFim = `${dataLimpa} ${strFim}`;
             }
 
             return {
@@ -172,24 +179,40 @@ async function processAndSaveJornadasFile(file) {
         alert(`Sucesso! Foram importadas ${mappedData.length} jornadas válidas (> 8h).`);
         
     } catch (err) {
-        errorMsgDiv.innerText = "Erro: " + err.message; 
-        errorMsgDiv.classList.remove('hidden');
+        if(errorMsgDiv) {
+            errorMsgDiv.innerText = "Erro: " + err.message; 
+            errorMsgDiv.classList.remove('hidden');
+        } else {
+            alert("Erro: " + err.message);
+        }
     } finally {
-        loadingSpinner.classList.add('hidden'); 
-        loadingSpinner.classList.remove('flex');
+        if(loadingSpinner) {
+            loadingSpinner.classList.add('hidden'); 
+            loadingSpinner.classList.remove('flex');
+        }
     }
 }
 
 const dropZoneJornadas = document.getElementById('dropZoneJornadas');
 const fileInputJornadas = document.getElementById('fileInputJornadas');
-if(dropZoneJornadas){
+const selectFileBtnJornadas = document.getElementById('selectFileBtnJornadas');
+
+if(dropZoneJornadas && fileInputJornadas){
     dropZoneJornadas.addEventListener('dragover', e => { e.preventDefault(); dropZoneJornadas.classList.add('bg-amber-900/20'); });
     dropZoneJornadas.addEventListener('dragleave', () => dropZoneJornadas.classList.remove('bg-amber-900/20'));
     dropZoneJornadas.addEventListener('drop', e => {
         e.preventDefault(); dropZoneJornadas.classList.remove('bg-amber-900/20');
         if (e.dataTransfer.files.length > 0) processAndSaveJornadasFile(e.dataTransfer.files[0]);
     });
-    document.getElementById('selectFileBtnJornadas').addEventListener('click', () => fileInputJornadas.click());
+    
+    // TRAVA DE SEGURANÇA AQUI:
+    if (selectFileBtnJornadas) {
+        selectFileBtnJornadas.addEventListener('click', () => fileInputJornadas.click());
+    } else {
+        // Se não tiver botão, clicar na zona inteira abre a janela de arquivo
+        dropZoneJornadas.addEventListener('click', () => fileInputJornadas.click());
+    }
+    
     fileInputJornadas.addEventListener('change', e => { if(e.target.files.length) processAndSaveJornadasFile(e.target.files[0]); });
 }
 
@@ -331,8 +354,8 @@ function parseSheetToData(sheet) {
 async function processAndSaveFile(file) {
     const errorMsgDiv = document.getElementById('errorMsg');
     const loadingSpinner = document.getElementById('loadingSpinner');
-    errorMsgDiv.classList.add('hidden');
-    loadingSpinner.classList.remove('hidden'); loadingSpinner.classList.add('flex');
+    if(errorMsgDiv) errorMsgDiv.classList.add('hidden');
+    if(loadingSpinner) { loadingSpinner.classList.remove('hidden'); loadingSpinner.classList.add('flex'); }
 
     try {
         const data = await file.arrayBuffer();
@@ -368,22 +391,35 @@ async function processAndSaveFile(file) {
 
         alert(`Sucesso! processadas ${newRows.length} viagens. (${viagensNovas} novas).`);
     } catch (err) {
-        errorMsgDiv.innerText = "Erro: " + err.message;
-        errorMsgDiv.classList.remove('hidden');
+        if(errorMsgDiv) {
+            errorMsgDiv.innerText = "Erro: " + err.message;
+            errorMsgDiv.classList.remove('hidden');
+        } else {
+            alert("Erro: " + err.message);
+        }
     } finally {
-        loadingSpinner.classList.add('hidden'); loadingSpinner.classList.remove('flex');
+        if(loadingSpinner) { loadingSpinner.classList.add('hidden'); loadingSpinner.classList.remove('flex'); }
     }
 }
 
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
-if(dropZone){
+const selectFileBtn = document.getElementById('selectFileBtn');
+
+if(dropZone && fileInput){
     dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('border-sky-400', 'bg-sky-900/20'); });
     dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-sky-400', 'bg-sky-900/20'));
     dropZone.addEventListener('drop', e => {
         e.preventDefault(); dropZone.classList.remove('border-sky-400', 'bg-sky-900/20');
         if (e.dataTransfer.files.length > 0) processAndSaveFile(e.dataTransfer.files[0]);
     });
-    document.getElementById('selectFileBtn').addEventListener('click', () => fileInput.click());
+    
+    // TRAVA DE SEGURANÇA AQUI:
+    if (selectFileBtn) {
+        selectFileBtn.addEventListener('click', () => fileInput.click());
+    } else {
+        dropZone.addEventListener('click', () => fileInput.click());
+    }
+    
     fileInput.addEventListener('change', e => { if(e.target.files.length) processAndSaveFile(e.target.files[0]); });
 }

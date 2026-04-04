@@ -6,8 +6,8 @@ let fullJornadasData = [];
 let jornadasGlobalData = [];
 let activeQuickFilterJor = 'ALL';
 
-// Padrões Regex mais flexíveis (Aceita anos com 2 ou 4 dígitos e dias com 1 ou 2 dígitos)
-const regexDate = /(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2})/;
+// Padrões Regex ATUALIZADOS: Agora aceita DD/MM (como no seu print "02/04 - 02:14")
+const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -36,6 +36,7 @@ function configurarFiltros() {
             activeQuickFilterJor = e.currentTarget.getAttribute('data-qf');
             atualizarBotoesFiltro();
             
+            // Se usou atalho rápido, zera o filtro de data específica
             if (activeQuickFilterJor !== 'ALL') {
                 document.getElementById('filterDataSelect').value = 'ALL';
             }
@@ -45,48 +46,69 @@ function configurarFiltros() {
     });
 }
 
-// EXTRAIR DATA COM SEGURANÇA PARA CÁLCULO DE DIFERENÇA DE DIAS
+// EXTRAIR DATA PARA CÁLCULO DE DIFERENÇA DE DIAS (Lendo o formato curto DD/MM)
 function extrairDataParaFiltro(dataStr) {
     if (!dataStr) return null;
-    const match = dataStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    
+    // 1. Tenta DD/MM/YYYY
+    let match = dataStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
     if (match) {
         let year = parseInt(match[3], 10);
-        if (year < 100) year += 2000; // Converte ano 26 para 2026
-        return new Date(year, match[2] - 1, match[1]); // Ano, Mês (0-11), Dia
+        if (year < 100) year += 2000;
+        return new Date(year, match[2] - 1, match[1]); 
     }
-    const matchISO = dataStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
-    if(matchISO) {
+    
+    // 2. Tenta YYYY-MM-DD
+    let matchISO = dataStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (matchISO) {
          return new Date(matchISO[1], matchISO[2] - 1, matchISO[3]);
     }
+
+    // 3. Tenta APENAS DD/MM (Que é o formato que está vindo no seu arquivo)
+    let matchCurto = dataStr.match(/(\d{1,2})\/(\d{1,2})/);
+    if (matchCurto) {
+         let year = new Date().getFullYear(); // Puxa 2026 automático
+         return new Date(year, matchCurto[2] - 1, matchCurto[1]);
+    }
+    
     return null;
 }
 
-// POPULAR DROPDOWN DE DATAS ESPECÍFICAS
+// POPULAR DROPDOWN DE DATAS ESPECÍFICAS PADRONIZADO
 function popularFiltroDatas() {
     const selectData = document.getElementById('filterDataSelect');
     const datasSet = new Set();
     
+    // Coleta todas as datas únicas
     fullJornadasData.forEach(d => {
         if (d.inicio) {
             const match = d.inicio.match(regexDate);
-            if (match) datasSet.add(match[0]);
+            if (match) {
+                let dtStr = match[0];
+                // Se a data for só 02/04, adiciona o ano /2026 para padronizar o visual
+                if (dtStr.length <= 5) dtStr += '/' + new Date().getFullYear();
+                datasSet.add(dtStr);
+            }
         }
     });
     
+    // Ordena da mais recente para a mais antiga
     const datasUnicas = Array.from(datasSet).sort((a, b) => {
         const dateA = extrairDataParaFiltro(a);
         const dateB = extrairDataParaFiltro(b);
         return dateB - dateA; 
     });
     
+    // Preenche o Select HTML
     selectData.innerHTML = '<option value="ALL">TODAS AS DATAS</option>';
     datasUnicas.forEach(dataStr => {
         selectData.insertAdjacentHTML('beforeend', `<option value="${dataStr}">${dataStr}</option>`);
     });
     
+    // Evento de Mudança
     selectData.addEventListener('change', (e) => {
         if(e.target.value !== 'ALL') {
-            activeQuickFilterJor = 'ALL'; 
+            activeQuickFilterJor = 'ALL';
             atualizarBotoesFiltro();
         }
         renderizarPainelJornadas();
@@ -114,7 +136,7 @@ async function carregarPainelJornadas() {
     }
 }
 
-// RENDERIZAR O PAINEL
+// RENDERIZAR O PAINEL E APLICAR FILTROS
 function renderizarPainelJornadas() {
     let dados = fullJornadasData;
     const dataEspec = document.getElementById('filterDataSelect').value;
@@ -122,12 +144,19 @@ function renderizarPainelJornadas() {
     dados = dados.filter(d => {
         let dataParsedStr = '-';
         const matchDate = d.inicio ? d.inicio.match(regexDate) : null;
-        if(matchDate) dataParsedStr = matchDate[0];
+        
+        // Padroniza a data lida do banco para comparar com o filtro
+        if(matchDate) {
+            dataParsedStr = matchDate[0];
+            if (dataParsedStr.length <= 5) dataParsedStr += '/' + new Date().getFullYear();
+        }
 
+        // 1. Filtro Data Específica
         if (dataEspec !== 'ALL' && dataParsedStr !== dataEspec) {
             return false;
         }
 
+        // 2. Filtro Atalho Rápido (D-1, D-2 etc)
         if (activeQuickFilterJor !== 'ALL') {
             const dataParsed = extrairDataParaFiltro(d.inicio);
             if (dataParsed) {
@@ -145,6 +174,7 @@ function renderizarPainelJornadas() {
                 return false;
             }
         }
+        
         return true;
     });
 
@@ -172,34 +202,43 @@ function renderizarPainelJornadas() {
     dados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
         const isEstouro = horas > 12;
-        const isRisco = horas >= 10.5 && horas <= 12; 
+        const isRisco = horas >= 10.5 && horas <= 12; // Alerta Preditivo
         
         if (isEstouro) qtdEstouros++;
         if (isRisco) qtdRisco++;
         if (linha.refeicao_horas > 0) { totalMinutosRefeicao += (linha.refeicao_horas * 60); qtdRefeicao++; }
 
+        // Variáveis visuais padronizadas
         let dataInicioStr = '-';
         let horaInicioStr = '-';
         let dataFimStr = '-';
         let horaFimStr = '-';
 
+        // MÁGICA DA EXTRAÇÃO ACONTECENDO AQUI
         if (linha.inicio) {
             const mD = linha.inicio.match(regexDate);
             const mT = linha.inicio.match(regexTime);
-            if (mD) dataInicioStr = mD[0];
+            if (mD) {
+                dataInicioStr = mD[0];
+                if (dataInicioStr.length <= 5) dataInicioStr += '/' + new Date().getFullYear();
+            }
             if (mT) horaInicioStr = mT[0];
-            if (!mD && !mT) horaInicioStr = linha.inicio;
+            if (!mD && !mT) horaInicioStr = linha.inicio; // Fallback
         }
 
         if (linha.fim) {
             const mDF = linha.fim.match(regexDate);
             const mTF = linha.fim.match(regexTime);
             
-            if (mDF) dataFimStr = mDF[0];
-            else dataFimStr = dataInicioStr; 
+            if (mDF) {
+                dataFimStr = mDF[0];
+                if (dataFimStr.length <= 5) dataFimStr += '/' + new Date().getFullYear();
+            } else {
+                dataFimStr = dataInicioStr; // Se não tem data no Fim, assume que é do mesmo dia
+            }
 
             if (mTF) horaFimStr = mTF[0];
-            else horaFimStr = linha.fim.replace(regexDate, '').trim() || linha.fim;
+            else horaFimStr = linha.fim.replace(regexDate, '').replace('-', '').trim() || linha.fim;
         }
 
         let corLinha = 'text-emerald-400';
@@ -252,15 +291,23 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
         if (d.inicio) {
             const mD = d.inicio.match(regexDate);
             const mT = d.inicio.match(regexTime);
-            if (mD) dI = mD[0];
+            if (mD) {
+                dI = mD[0];
+                if (dI.length <= 5) dI += '/' + new Date().getFullYear();
+            }
             if (mT) hI = mT[0];
             if (!mD && !mT) hI = d.inicio;
         }
         if (d.fim) {
             const mDF = d.fim.match(regexDate);
             const mTF = d.fim.match(regexTime);
-            if (mDF) dF = mDF[0]; else dF = dI;
-            if (mTF) hF = mTF[0]; else hF = d.fim.replace(regexDate, '').trim() || d.fim;
+            if (mDF) {
+                dF = mDF[0];
+                if (dF.length <= 5) dF += '/' + new Date().getFullYear();
+            } else {
+                dF = dI;
+            }
+            if (mTF) hF = mTF[0]; else hF = d.fim.replace(regexDate, '').replace('-', '').trim() || d.fim;
         }
 
         return {
