@@ -166,23 +166,29 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-4" id="kpiGridSecondary">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-4" id="kpiGridSecondary">
                     <div class="glass-card rounded-2xl p-6 glow-border-blue card-hover">
                         <div class="flex justify-between items-start">
-                            <div><p class="text-blue-400 text-xs font-bold uppercase tracking-widest">Ciclo Médio</p><p id="cicloMedio" class="text-3xl font-black text-white mt-2">0 h</p></div>
-                            <i class="fas fa-stopwatch text-blue-500/50 text-4xl"></i>
+                            <div><p class="text-blue-400 text-[10px] font-bold uppercase tracking-widest">Ciclo Médio</p><p id="cicloMedio" class="text-3xl font-black text-white mt-2">0 h</p></div>
+                            <i class="fas fa-stopwatch text-blue-500/50 text-3xl"></i>
                         </div>
                     </div>
                     <div class="glass-card rounded-2xl p-6 glow-border-amber card-hover">
                         <div class="flex justify-between items-start">
-                            <div><p class="text-amber-400 text-xs font-bold uppercase tracking-widest">Fila Média Campo</p><p id="filaCampo" class="text-3xl font-black text-white mt-2">0 h</p></div>
-                            <i class="fas fa-tractor text-amber-500/50 text-4xl"></i>
+                            <div><p class="text-amber-400 text-[10px] font-bold uppercase tracking-widest">Fila de Carregamento</p><p id="filaCampo" class="text-3xl font-black text-white mt-2">0 h</p></div>
+                            <i class="fas fa-tractor text-amber-500/50 text-3xl"></i>
+                        </div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-6 glow-border-emerald card-hover">
+                        <div class="flex justify-between items-start">
+                            <div><p class="text-emerald-400 text-[10px] font-bold uppercase tracking-widest">T. Médio Carregamento</p><p id="tempoCarregamento" class="text-3xl font-black text-white mt-2">0 h</p></div>
+                            <i class="fas fa-truck-loading text-emerald-500/50 text-3xl"></i>
                         </div>
                     </div>
                     <div class="glass-card rounded-2xl p-6 glow-border-rose card-hover">
                         <div class="flex justify-between items-start">
-                            <div><p class="text-rose-400 text-xs font-bold uppercase tracking-widest">Fila Média Fábrica</p><p id="filaFabrica" class="text-3xl font-black text-white mt-2">0 h</p></div>
-                            <i class="fas fa-industry text-rose-500/50 text-4xl"></i>
+                            <div><p class="text-rose-400 text-[10px] font-bold uppercase tracking-widest">Fila Média Fábrica</p><p id="filaFabrica" class="text-3xl font-black text-white mt-2">0 h</p></div>
+                            <i class="fas fa-industry text-rose-500/50 text-3xl"></i>
                         </div>
                     </div>
                 </div>
@@ -402,6 +408,7 @@
                                     <th class="px-6 py-4 text-right">Vol (m³)</th>
                                     <th class="px-6 py-4 text-right">Ciclo (h)</th>
                                     <th class="px-6 py-4 text-right">Fila Cpo (h)</th>
+                                    <th class="px-6 py-4 text-right">Carreg. (h)</th>
                                     <th class="px-6 py-4 text-right">Fila Fáb (h)</th>
                                 </tr>
                             </thead>

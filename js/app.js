@@ -222,11 +222,15 @@ function parseSheetToData(sheet) {
     const distAsfaltoKey = findKey(['distancia por asfalto', 'distância por asfalto', 'distancia asfalto']);
     const distTerraKey = findKey(['distancia por terra', 'distância por terra', 'distancia terra']);
     
-    // RESTAURAÇÃO DAS CHAVES DE FILA CAMPO / FÁBRICA
+    // CHAVES DE FILA CAMPO / CARREGAMENTO / FÁBRICA
     const dtChegadaCampoKey = findKey(['data chegada campo']);
     const dtInicioCarregCpoKey = findKey(['dt início carreg cpo', 'dt inicio carreg cpo']);
     const hrChegadaCampoKey = findKey(['hora chegada campo', 'hr chegada campo']);
     const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo']);
+
+    // NOVAS CHAVES (TEMPO DE CARREGAMENTO)
+    const dtFinalCarregCpoKey = findKey(['dt final carreg cpo', 'data final carreg cpo', 'data fim carreg cpo']);
+    const hrFinalCarregCpoKey = findKey(['hr final carreg cpo', 'hora final carreg cpo', 'hr fim carreg cpo', 'hora fim carreg cpo']);
 
     const dtEntradaKey = findKey(['data de entrada', 'data entrada', 'data chegada']);
     const hrEntradaKey = findKey(['hora de entrada', 'hora entrada', 'hr entrada']);
@@ -289,9 +293,16 @@ function parseSheetToData(sheet) {
             distanciaAsfalto: parsePtBrNumber(getValue(distAsfaltoKey)),
             distanciaTerra: parsePtBrNumber(getValue(distTerraKey)),
             cicloHoras: ciclo,
-            // AQUI RESTAURAMOS AS FILAS NO RETORNO (passando isCiclo = false)
+            
+            // Fila de Carregamento (Chegada Campo até Início Carregamento)
             filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), false),
+            
+            // Tempo de Carregamento (Início Carregamento até Fim Carregamento)
+            tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
+            
+            // Fila Fábrica
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
+            
             _timestamp: timestampSaida
         };
     });
@@ -514,9 +525,10 @@ async function loadDashboardData() {
         document.getElementById('totalViagens').innerText = '0';
         document.getElementById('totalPesoLiq').innerText = '0 t';
         document.getElementById('produtividadeGlobal').innerText = '0.0';
-        document.getElementById('ociosidadeGlobal').innerText = '0%'; // VALOR ZERADO QUANDO NÃO HÁ DADOS
+        document.getElementById('ociosidadeGlobal').innerText = '0%';
         document.getElementById('bestPlacaValue').innerText = '0.0';
         document.getElementById('bestPlacaName').innerText = 'Nenhum cavalo encontrado';
+        if(document.getElementById('tempoCarregamento')) document.getElementById('tempoCarregamento').innerText = '0 h';
         if(chartCiclo) chartCiclo.destroy();
         if(chartTransp) chartTransp.destroy();
         return;
@@ -530,18 +542,20 @@ async function loadDashboardData() {
     const cargaMediaTon = totalViagens > 0 ? (totalPesoTon / totalViagens) : 0;
     const mediaVolume = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + r.volumeReal, 0) / totalViagens : 0;
     
-    // DISTÂNCIAS RESTAURADAS AQUI!
     const mediaAsfalto = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + (r.distanciaAsfalto||0), 0) / totalViagens : 0;
     const mediaTerra = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + (r.distanciaTerra||0), 0) / totalViagens : 0;
     const mediaDistTotal = mediaAsfalto + mediaTerra;
 
-    // FILAS RESTAURADAS AQUI!
+    // FILAS E TEMPOS
     const validCycles = filteredData.filter(d => d.cicloHoras !== null && d.cicloHoras > 0);
     const somaCiclosTotais = validCycles.reduce((s, d) => s + d.cicloHoras, 0);
     const mediaCiclo = validCycles.length > 0 ? somaCiclosTotais / validCycles.length : 0;
     
     const validFilaCampo = filteredData.filter(d => d.filaCampoHoras !== null && d.filaCampoHoras > 0);
     const mediaFilaCampo = validFilaCampo.length > 0 ? validFilaCampo.reduce((s, d) => s + d.filaCampoHoras, 0) / validFilaCampo.length : 0;
+
+    const validTempoCarregamento = filteredData.filter(d => d.tempoCarregamentoHoras !== null && d.tempoCarregamentoHoras > 0);
+    const mediaTempoCarregamento = validTempoCarregamento.length > 0 ? validTempoCarregamento.reduce((s, d) => s + d.tempoCarregamentoHoras, 0) / validTempoCarregamento.length : 0;
     
     const validFilaFabrica = filteredData.filter(d => d.filaFabricaHoras !== null && d.filaFabricaHoras > 0);
     const mediaFilaFabrica = validFilaFabrica.length > 0 ? validFilaFabrica.reduce((s, d) => s + d.filaFabricaHoras, 0) / validFilaFabrica.length : 0;
@@ -558,11 +572,12 @@ async function loadDashboardData() {
     
     document.getElementById('cicloMedio').innerText = formatarHorasMinutos(mediaCiclo);
     document.getElementById('filaCampo').innerText = formatarHorasMinutos(mediaFilaCampo);
+    if(document.getElementById('tempoCarregamento')) document.getElementById('tempoCarregamento').innerText = formatarHorasMinutos(mediaTempoCarregamento);
     document.getElementById('filaFabrica').innerText = formatarHorasMinutos(mediaFilaFabrica);
     
     document.getElementById('produtividadeGlobal').innerText = produtividade.toLocaleString('pt-PT', {maximumFractionDigits: 2});
 
-    // TAXA DE OCIOSIDADE CALCULADA AQUI
+    // TAXA DE OCIOSIDADE 
     const somaFilas = filteredData.reduce((s, d) => s + (d.filaCampoHoras || 0) + (d.filaFabricaHoras || 0), 0);
     const taxaOciosidade = somaCiclosTotais > 0 ? (somaFilas / somaCiclosTotais) * 100 : 0;
     document.getElementById('ociosidadeGlobal').innerText = taxaOciosidade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + '%';
@@ -677,6 +692,7 @@ function renderHistoricoTable() {
             <td class="px-6 py-2 text-right">${(r.pesoLiquido/1000).toFixed(1)}</td><td class="px-6 py-2 text-right text-slate-400">${r.volumeReal}</td>
             <td class="px-6 py-2 text-right text-sky-300 font-bold">${formatarHorasMinutos(r.cicloHoras)}</td>
             <td class="px-6 py-2 text-right text-amber-400 font-bold">${formatarHorasMinutos(r.filaCampoHoras)}</td>
+            <td class="px-6 py-2 text-right text-emerald-400 font-bold">${formatarHorasMinutos(r.tempoCarregamentoHoras)}</td>
             <td class="px-6 py-2 text-right text-rose-400 font-bold">${formatarHorasMinutos(r.filaFabricaHoras)}</td></tr>`));
     }
 }
