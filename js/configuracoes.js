@@ -40,7 +40,6 @@ document.getElementById('btnSalvarMetasGlobais').addEventListener('click', async
     setTimeout(() => btn.innerHTML = '<i class="fas fa-save"></i> Salvar Metas Base', 2000);
 });
 
-
 // ==========================================
 // ZONA DE RISCO (EXCLUSÃO SELETIVA)
 // ==========================================
@@ -65,7 +64,6 @@ document.getElementById('btnLimparBanco').addEventListener('click', async () => 
             btn.disabled = true;
             btn.classList.add('opacity-50', 'cursor-not-allowed');
 
-            // Lógica Condicional de Deleção
             if (tipo === 'tudo' || tipo === 'viagens') {
                 await supabaseClient.from('historico_viagens').delete().neq('movimento', 'null');
                 await supabaseClient.from('historico_importacoes').delete().gt('id', 0);
@@ -81,7 +79,6 @@ document.getElementById('btnLimparBanco').addEventListener('click', async () => 
             console.error("Erro ao limpar banco:", error);
             alert("Ocorreu um erro ao tentar apagar os dados.");
         } finally {
-            // Restaura o botão
             btn.innerHTML = conteudoOriginal;
             btn.disabled = false;
             btn.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -89,9 +86,8 @@ document.getElementById('btnLimparBanco').addEventListener('click', async () => 
     }
 });
 
-
 // ==========================================
-// IMPORTAÇÃO DE JORNADAS (CSV) - CÁLCULO REAL
+// IMPORTAÇÃO DE JORNADAS (CSV) - >= 8h
 // ==========================================
 async function processAndSaveJornadasFile(file) {
     const errorMsgDiv = document.getElementById('errorMsgJornadas');
@@ -111,32 +107,32 @@ async function processAndSaveJornadasFile(file) {
         const mappedData = rawData.map(row => {
             if (!row['Pessoa'] || row['Pessoa'].trim() === '-' || row['Pessoa'].trim() === '') return null;
             
-            const strInicio = String(row['Início'] || '').trim();
-            const strFim = String(row['Fim'] || '').trim();
-            
-            const horasCalculadas = calcularDiferencaHorasJornada(strInicio, strFim);
-            const totalHoras = horasCalculadas > 0 ? horasCalculadas : parseTimeToHours(row['Total de Trabalho']);
+            // Pega o tempo EXATO da coluna "Total de Trabalho"
+            const totalHoras = parseTimeToHours(row['Total de Trabalho']);
             
             return {
                 motorista: row['Pessoa'].trim(),
                 cpf: row['CPF'] || '',
                 placa: row['Placa'] || '',
-                inicio: strInicio,
-                fim: strFim,
+                inicio: String(row['Início'] || '').trim(),
+                fim: String(row['Fim'] || '').trim(),
                 total_trabalho_horas: totalHoras,
                 refeicao_horas: parseTimeToHours(row['Refeição']),
                 repouso_horas: parseTimeToHours(row['Repouso']),
                 direcao_horas: parseTimeToHours(row['Direção']),
                 estourou_jornada: totalHoras > 12
             };
-        }).filter(item => item !== null && item.motorista !== '');
+        }).filter(item => {
+            // REGRA: Ignora jornadas menores que 8 horas
+            return item !== null && item.motorista !== '' && item.total_trabalho_horas >= 8;
+        });
 
-        if(mappedData.length === 0) throw new Error("Nenhum dado válido encontrado.");
+        if(mappedData.length === 0) throw new Error("Nenhuma jornada válida (>= 8h) foi encontrada no arquivo.");
 
         const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(mappedData);
         if (insErr) throw insErr;
         
-        alert(`Sucesso! Foram importadas ${mappedData.length} jornadas.`);
+        alert(`Sucesso! Foram importadas ${mappedData.length} jornadas válidas.`);
         
     } catch (err) {
         errorMsgDiv.innerText = "Erro: " + err.message; 
@@ -159,7 +155,6 @@ if(dropZoneJornadas){
     document.getElementById('selectFileBtnJornadas').addEventListener('click', () => fileInputJornadas.click());
     fileInputJornadas.addEventListener('change', e => { if(e.target.files.length) processAndSaveJornadasFile(e.target.files[0]); });
 }
-
 
 // ==========================================
 // IMPORTAÇÃO DE VIAGENS (EXCEL DE PRODUÇÃO)

@@ -8,16 +8,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function carregarPainelJornadas() {
     try {
-        const { data: dados, error } = await supabaseClient
+        const { data: dadosBrutos, error } = await supabaseClient
             .from('historico_jornadas')
             .select('*')
             .order('total_trabalho_horas', { ascending: false });
 
         if (error) throw error;
         
+        // FILTRO DE SEGURANÇA NO DASHBOARD: Ignora menores que 8h e descarta lixo do banco antigo
+        const dados = dadosBrutos ? dadosBrutos.filter(d => d.total_trabalho_horas >= 8) : [];
+        
         if (!dados || dados.length === 0) {
             document.getElementById('jorTotalMotoristas').innerText = '0';
             document.getElementById('jorDataReferencia').innerText = 'Nenhum dado na base';
+            
+            const tbodyTop = document.getElementById('jorTopEstourosBody');
+            if (tbodyTop) tbodyTop.innerHTML = `<tr><td colspan="3" class="p-4 text-sm text-gray-400 text-center">Nenhum dado válido.</td></tr>`;
+            
+            const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody');
+            if (tbodyAnalitica) tbodyAnalitica.innerHTML = `<tr><td colspan="7" class="p-4 text-sm text-gray-400 text-center">Nenhum dado válido.</td></tr>`;
+            
             return;
         }
 
