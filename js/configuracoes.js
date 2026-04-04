@@ -87,7 +87,7 @@ document.getElementById('btnLimparBanco').addEventListener('click', async () => 
 });
 
 // ==========================================
-// IMPORTAÇÃO DE JORNADAS (CSV) - >= 8h
+// IMPORTAÇÃO DE JORNADAS (CSV) - CÁLCULO SEGURO >= 8h
 // ==========================================
 async function processAndSaveJornadasFile(file) {
     const errorMsgDiv = document.getElementById('errorMsgJornadas');
@@ -98,41 +98,65 @@ async function processAndSaveJornadasFile(file) {
 
     try {
         const text = await file.text();
-        const workbook = XLSX.read(text, { type: 'string', FS: ';' });
+        // raw: true força a leitura como texto puro, evitando corromper as horas
+        const workbook = XLSX.read(text, { type: 'string', raw: true }); 
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-        if (!rawData || rawData.length === 0) throw new Error("Planilha vazia ou delimitador incorreto.");
+        if (!rawData || rawData.length === 0) throw new Error("Planilha vazia ou em formato incorreto.");
+
+        // Formatador blindado contra falhas na hora
+        const safeParseTime = (val) => {
+            if (val === null || val === undefined || val === '-' || String(val).trim() === '') return 0;
+            if (typeof val === 'number') return val < 24 ? val * 24 : val;
+            const str = String(val).trim();
+            if (str.includes(':')) {
+                const parts = str.split(':');
+                return parseInt(parts[0] || 0, 10) + (parseInt(parts[1] || 0, 10) / 60);
+            }
+            return parseFloat(str.replace(',', '.')) || 0;
+        };
 
         const mappedData = rawData.map(row => {
-            if (!row['Pessoa'] || row['Pessoa'].trim() === '-' || row['Pessoa'].trim() === '') return null;
+            // Buscador inteligente de coluna (ignora espaços extras e acentos que o sistema envia no cabeçalho)
+            const getVal = (possibleNames) => {
+                for (let k of Object.keys(row)) {
+                    const normK = k.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                    if (possibleNames.includes(normK)) return row[k];
+                }
+                return null;
+            };
+
+            const motorista = getVal(['pessoa', 'motorista', 'nome']);
+            if (!motorista || String(motorista).trim() === '-' || String(motorista).trim() === '') return null;
             
-            // Pega o tempo EXATO da coluna "Total de Trabalho"
-            const totalHoras = parseTimeToHours(row['Total de Trabalho']);
+            // Busca a coluna de Total de Trabalho e converte com segurança
+            const valTrabalho = getVal(['total de trabalho', 'total trabalho', 'tempo de trabalho']);
+            const totalHoras = safeParseTime(valTrabalho);
             
             return {
-                motorista: row['Pessoa'].trim(),
-                cpf: row['CPF'] || '',
-                placa: row['Placa'] || '',
-                inicio: String(row['Início'] || '').trim(),
-                fim: String(row['Fim'] || '').trim(),
+                motorista: String(motorista).trim(),
+                cpf: getVal(['cpf']) || '',
+                placa: getVal(['placa', 'placa do cavalo', 'veiculo', 'veículo']) || '',
+                inicio: String(getVal(['início', 'inicio']) || '').trim(),
+                fim: String(getVal(['fim', 'final']) || '').trim(),
                 total_trabalho_horas: totalHoras,
-                refeicao_horas: parseTimeToHours(row['Refeição']),
-                repouso_horas: parseTimeToHours(row['Repouso']),
-                direcao_horas: parseTimeToHours(row['Direção']),
+                refeicao_horas: safeParseTime(getVal(['refeição', 'refeicao'])),
+                repouso_horas: safeParseTime(getVal(['repouso'])),
+                direcao_horas: safeParseTime(getVal(['direção', 'direcao'])),
                 estourou_jornada: totalHoras > 12
             };
         }).filter(item => {
-            // REGRA: Ignora jornadas menores que 8 horas
+            // REGRA: Ignora as jornadas menores que 8 horas
             return item !== null && item.motorista !== '' && item.total_trabalho_horas >= 8;
         });
 
-        if(mappedData.length === 0) throw new Error("Nenhuma jornada válida (>= 8h) foi encontrada no arquivo.");
+        if(mappedData.length === 0) throw new Error("Nenhuma jornada válida (>= 8h) foi encontrada. Verifique os horários no CSV.");
 
         const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(mappedData);
         if (insErr) throw insErr;
         
-        alert(`Sucesso! Foram importadas ${mappedData.length} jornadas válidas.`);
+        alert(`Sucesso! Foram importadas ${mappedData.length} jornadas válidas (> 8h).`);
         
     } catch (err) {
         errorMsgDiv.innerText = "Erro: " + err.message; 
