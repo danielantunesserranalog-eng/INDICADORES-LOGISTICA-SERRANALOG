@@ -18,20 +18,23 @@ async function loadHistoricoJornadasCompleto() {
         const tbody = document.getElementById('historicoJornadasBody');
         if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-slate-400"><i class="fas fa-spinner fa-spin mr-2"></i>Carregando banco de dados de jornadas...</td></tr>`;
 
+        // Puxa os dados sem tentar ordenar pela coluna 'id' para evitar Erro 400
         const { data, error } = await supabaseClient
             .from('historico_jornadas')
-            .select('*')
-            .order('id', { ascending: false });
+            .select('*');
 
         if (error) throw error;
         
         if (data) { 
-            fullHistoricoJornadas = data; 
+            // Inverte no JavaScript para mais recentes ficarem no topo
+            fullHistoricoJornadas = data.reverse(); 
             popularFiltroMotoristasDropdown();
             renderHistoricoJornadasTable(); 
         }
     } catch(e) {
         console.error("Erro ao carregar histórico de jornadas:", e);
+        const tbody = document.getElementById('historicoJornadasBody');
+        if (tbody) tbody.innerHTML = `<tr><td colspan="9" class="text-center py-8 text-rose-500">Erro ao carregar dados. Verifique a conexão.</td></tr>`;
     }
 }
 
@@ -71,7 +74,7 @@ function renderHistoricoJornadasTable() {
             return;
         }
 
-        filtrados.slice(0, 200).forEach(r => {
+        filtrados.slice(0, 300).forEach(r => {
             const horas = r.total_trabalho_horas || 0;
             const isEstouro = horas > 12;
 
