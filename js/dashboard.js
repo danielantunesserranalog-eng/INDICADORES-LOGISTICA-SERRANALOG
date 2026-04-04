@@ -1,5 +1,5 @@
 // ==========================================
-// js/dashboard.js - LÓGICA DO DASHBOARD
+// js/dashboard.js
 // ==========================================
 Chart.register(ChartDataLabels);
 Chart.defaults.color = '#94a3b8';
@@ -7,7 +7,7 @@ Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
 Chart.defaults.font.family = "'Inter', sans-serif";
 
 let fullHistoricoData = []; 
-let filteredDataGlobal = []; // Guarda os dados filtrados para a exportação
+let filteredDataGlobal = [];
 let activeQuickFilter = 'ALL';
 let chartCiclo = null, chartTransp = null;
 
@@ -15,7 +15,6 @@ const filterTransportadora = document.getElementById('filterTransportadora');
 const filterData = document.getElementById('filterData');
 const btnQFs = document.querySelectorAll('.btn-qf');
 
-// EVENTOS DE FILTRO
 if(filterTransportadora) filterTransportadora.addEventListener('change', () => loadDashboardData());
 if(filterData) filterData.addEventListener('change', () => { setQuickFilterUI('ALL'); loadDashboardData(); });
 
@@ -28,7 +27,6 @@ btnQFs.forEach(btn => {
     });
 });
 
-// EXPORTAÇÃO EXCEL (SheetJS)
 const btnExportar = document.getElementById('btnExportar');
 if(btnExportar) {
     btnExportar.addEventListener('click', () => {
@@ -72,16 +70,65 @@ const centerTextPlugin = {
         ctx.textBaseline = "middle";
         ctx.fillStyle = "#38bdf8"; 
         const text = total.toLocaleString('pt-PT');
-        const textX = centerX - (ctx.measureText(text).width / 2);
-        ctx.fillText(text, textX, centerY - 8);
+        ctx.fillText(text, centerX - (ctx.measureText(text).width / 2), centerY - 8);
         ctx.font = "bold 11px 'Inter', sans-serif";
         ctx.fillStyle = "#94a3b8"; 
-        const subText = "VIAGENS";
-        const subTextX = centerX - (ctx.measureText(subText).width / 2);
-        ctx.fillText(subText, subTextX, centerY + 16);
+        ctx.fillText("VIAGENS", centerX - (ctx.measureText("VIAGENS").width / 2), centerY + 16);
         ctx.save();
     }
 };
+
+function verificarStatusAtualizacao(datasArray) {
+    const indicador = document.getElementById('indicadorAtualizacao');
+    const icone = document.getElementById('iconeAtualizacao');
+    const texto = document.getElementById('textoAtualizacao');
+    if(!indicador) return;
+
+    indicador.classList.remove('hidden');
+
+    if (!datasArray || datasArray.length === 0) {
+        indicador.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner bg-slate-900/50 text-slate-400 border-slate-600";
+        icone.className = "fas fa-times-circle";
+        texto.innerText = "Sem Dados";
+        return;
+    }
+
+    let maxDate = new Date(0);
+    let maxDateStr = "";
+
+    datasArray.forEach(dStr => {
+        let dt = null;
+        const p = String(dStr).split('/');
+        if(p.length === 3) {
+            let ano = parseInt(p[2]); if(ano < 100) ano += 2000;
+            dt = new Date(ano, parseInt(p[1])-1, parseInt(p[0]));
+        }
+
+        if (dt && dt > maxDate) {
+            maxDate = dt;
+            const dia = String(dt.getDate()).padStart(2, '0');
+            const mes = String(dt.getMonth() + 1).padStart(2, '0');
+            const ano = dt.getFullYear();
+            maxDateStr = `${dia}/${mes}/${ano}`;
+        }
+    });
+
+    const hoje = new Date();
+    const diaH = String(hoje.getDate()).padStart(2, '0');
+    const mesH = String(hoje.getMonth() + 1).padStart(2, '0');
+    const anoH = hoje.getFullYear();
+    const hojeStr = `${diaH}/${mesH}/${anoH}`;
+
+    if (maxDateStr === hojeStr) {
+        indicador.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner bg-emerald-900/30 text-emerald-400 border-emerald-500/50 transition-colors";
+        icone.className = "fas fa-check-circle";
+        texto.innerText = "Atualizado Hoje";
+    } else {
+        indicador.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner bg-amber-900/30 text-amber-400 border-amber-500/50 transition-colors";
+        icone.className = "fas fa-exclamation-triangle";
+        texto.innerText = `Base: ${maxDateStr}`;
+    }
+}
 
 async function loadDashboardData() {
     try {
@@ -96,10 +143,13 @@ async function loadDashboardData() {
         const storedData = fullHistoricoData;
         if(!storedData.length) {
             if(statusLabel) statusLabel.innerText = "Sem dados na nuvem";
+            verificarStatusAtualizacao([]);
             return;
         }
 
-        // Popula Filtro de Transportadora
+        const allDates = [...new Set(storedData.map(d => d.dataDaBaseExcel))].filter(d => d && d !== 'Desconhecida');
+        verificarStatusAtualizacao(allDates);
+
         const allTransps = [...new Set(storedData.map(d => d.transportadora))].filter(Boolean).sort();
         const currT = filterTransportadora ? filterTransportadora.value : 'ALL';
         if(filterTransportadora) {
@@ -107,19 +157,16 @@ async function loadDashboardData() {
             allTransps.forEach(t => filterTransportadora.insertAdjacentHTML('beforeend', `<option value="${t}" ${t===currT?'selected':''}>${t}</option>`));
         }
 
-        // Popula Filtro de Data (BLINDADO CONTRA ERRO DE SORT)
-        const allDates = [...new Set(storedData.map(d => d.dataDaBaseExcel))]
-            .filter(d => d && d !== 'Desconhecida')
-            .sort((a,b) => {
-                const dA = parseDateTime(String(a), null) || new Date(0);
-                const dB = parseDateTime(String(b), null) || new Date(0);
-                return dA - dB;
-            });
+        const sortedDates = allDates.sort((a,b) => {
+            const pA = a.split('/'); const dtA = new Date(pA[2], pA[1]-1, pA[0]);
+            const pB = b.split('/'); const dtB = new Date(pB[2], pB[1]-1, pB[0]);
+            return dtB - dtA;
+        });
             
         const currD = filterData ? filterData.value : 'ALL';
         if(filterData) {
             filterData.innerHTML = '<option value="ALL">TODO O PERÍODO</option>';
-            allDates.forEach(dt => filterData.insertAdjacentHTML('beforeend', `<option value="${dt}" ${dt===currD?'selected':''}>${dt}</option>`));
+            sortedDates.forEach(dt => filterData.insertAdjacentHTML('beforeend', `<option value="${dt}" ${dt===currD?'selected':''}>${dt}</option>`));
         }
 
         const activeT = filterTransportadora ? filterTransportadora.value : 'ALL';
@@ -129,8 +176,9 @@ async function loadDashboardData() {
             const mTransp = activeT === 'ALL' || d.transportadora === activeT;
             let mData = true;
             if (activeQuickFilter !== 'ALL') {
-                const parsed = parseDateTime(d.dataDaBaseExcel, null);
-                if (parsed) {
+                const p = d.dataDaBaseExcel.split('/');
+                if (p.length === 3) {
+                    const parsed = new Date(p[2], p[1]-1, p[0]);
                     parsed.setHours(0,0,0,0); const hj = new Date(); hj.setHours(0,0,0,0);
                     const diff = Math.round((hj - parsed)/86400000);
                     if (activeQuickFilter === 'D-1') mData = (diff === 1);
@@ -142,7 +190,7 @@ async function loadDashboardData() {
             return mTransp && mData;
         });
 
-        filteredDataGlobal = filteredData; // Salva para exportação
+        filteredDataGlobal = filteredData;
 
         if (filteredData.length === 0) {
             if(statusLabel) statusLabel.innerText = "Sem dados";
@@ -202,7 +250,6 @@ async function loadDashboardData() {
         const taxaOciosidade = somaCiclosTotais > 0 ? (somaFilas / somaCiclosTotais) * 100 : 0;
         document.getElementById('ociosidadeGlobal').innerText = taxaOciosidade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + '%';
 
-        // Best Placa
         const mapaPlacas = new Map();
         validCycles.forEach(d => {
             const placaFormatada = (d.placa && d.placa.trim() !== '-' && d.placa.trim() !== '') ? d.placa.trim().toUpperCase() : 'DESCONHECIDA';
@@ -223,7 +270,6 @@ async function loadDashboardData() {
         document.getElementById('bestPlacaValue').innerText = melhorPlacaProdutividade > 0 ? melhorPlacaProdutividade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) : "0.0";
         document.getElementById('bestPlacaName').innerText = `Placa: ${melhorPlacaNome}`;
 
-        // Gráficos
         const transpCount = new Map();
         const transpCicloSum = new Map();
         const transpCicloCount = new Map();
@@ -273,9 +319,7 @@ async function loadDashboardData() {
         });
     } catch (error) {
         console.error("Erro fatal ao renderizar Dashboard:", error);
-        document.getElementById('dbStatusLabel').innerText = "Erro ao processar dados";
     }
 }
 
-// Inicializa a tela
 loadDashboardData();

@@ -1,5 +1,5 @@
 // ==========================================
-// js/jornadas.js - ALERTAS E TOP 5 DE HORAS
+// js/jornadas.js
 // ==========================================
 
 Chart.register(ChartDataLabels);
@@ -41,9 +41,7 @@ function configurarFiltros() {
         btn.addEventListener('click', (e) => {
             activeQuickFilterJor = e.currentTarget.getAttribute('data-qf');
             atualizarBotoesFiltro();
-            if (activeQuickFilterJor !== 'ALL') {
-                document.getElementById('filterDataSelect').value = 'ALL';
-            }
+            if (activeQuickFilterJor !== 'ALL') { document.getElementById('filterDataSelect').value = 'ALL'; }
             renderizarPainelJornadas();
         });
     });
@@ -62,10 +60,56 @@ function extrairDataParaFiltro(dataStr) {
 
     let matchCurto = dataStr.match(/(\d{1,2})\/(\d{1,2})/);
     if (matchCurto) {
-         let year = new Date().getFullYear();
-         return new Date(year, matchCurto[2] - 1, matchCurto[1]);
+         return new Date(new Date().getFullYear(), matchCurto[2] - 1, matchCurto[1]);
     }
     return null;
+}
+
+// LOGICA DO INDICADOR VERDINHO/AMARELO
+function verificarStatusAtualizacao(datasArray) {
+    const indicador = document.getElementById('indicadorAtualizacao');
+    const icone = document.getElementById('iconeAtualizacao');
+    const texto = document.getElementById('textoAtualizacao');
+    if(!indicador) return;
+
+    indicador.classList.remove('hidden');
+
+    if (!datasArray || datasArray.length === 0) {
+        indicador.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner bg-slate-900/50 text-slate-400 border-slate-600";
+        icone.className = "fas fa-times-circle";
+        texto.innerText = "Sem Dados";
+        return;
+    }
+
+    let maxDate = new Date(0);
+    let maxDateStr = "";
+
+    datasArray.forEach(dStr => {
+        const dt = extrairDataParaFiltro(dStr);
+        if (dt && dt > maxDate) {
+            maxDate = dt;
+            const dia = String(dt.getDate()).padStart(2, '0');
+            const mes = String(dt.getMonth() + 1).padStart(2, '0');
+            const ano = dt.getFullYear();
+            maxDateStr = `${dia}/${mes}/${ano}`;
+        }
+    });
+
+    const hoje = new Date();
+    const diaH = String(hoje.getDate()).padStart(2, '0');
+    const mesH = String(hoje.getMonth() + 1).padStart(2, '0');
+    const anoH = hoje.getFullYear();
+    const hojeStr = `${diaH}/${mesH}/${anoH}`;
+
+    if (maxDateStr === hojeStr) {
+        indicador.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner bg-emerald-900/30 text-emerald-400 border-emerald-500/50 transition-colors";
+        icone.className = "fas fa-check-circle";
+        texto.innerText = "Atualizado Hoje";
+    } else {
+        indicador.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner bg-amber-900/30 text-amber-400 border-amber-500/50 transition-colors";
+        icone.className = "fas fa-exclamation-triangle";
+        texto.innerText = `Base: ${maxDateStr}`;
+    }
 }
 
 function popularFiltroDatas() {
@@ -81,6 +125,10 @@ function popularFiltroDatas() {
             }
         }
     });
+    
+    // Atualiza o Indicador de Atualização Geral do Sistema (antes dos filtros)
+    verificarStatusAtualizacao(Array.from(datasSet));
+
     const datasUnicas = Array.from(datasSet).sort((a, b) => {
         return extrairDataParaFiltro(b) - extrairDataParaFiltro(a); 
     });
@@ -121,8 +169,7 @@ const centerTextPluginJornadas = {
         ctx.fillText(text, centerX - (ctx.measureText(text).width / 2), centerY - 5);
         ctx.font = "bold 10px 'Inter', sans-serif";
         ctx.fillStyle = "#94a3b8"; 
-        const subText = "REGISTROS";
-        ctx.fillText(subText, centerX - (ctx.measureText(subText).width / 2), centerY + 15);
+        ctx.fillText("REGISTROS", centerX - (ctx.measureText("REGISTROS").width / 2), centerY + 15);
         ctx.save();
     }
 };
@@ -177,7 +224,6 @@ function renderizarPainelJornadas() {
     const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody'); tbodyAnalitica.innerHTML = '';
     const tbodyEstouro = document.getElementById('jorTopEstourosBody'); tbodyEstouro.innerHTML = '';
     
-    // Objeto para somar as horas por motorista
     const agregacaoMotoristas = new Map();
 
     dados.forEach(linha => {
@@ -185,8 +231,7 @@ function renderizarPainelJornadas() {
         const isEstouro = horas > 12;
         const motNome = linha.motorista;
         
-        if (isEstouro) qtdEstouros++;
-        else qtdOk++;
+        if (isEstouro) qtdEstouros++; else qtdOk++;
 
         if (horas >= 8 && horas < 10) fx8_10++;
         else if (horas >= 10 && horas <= 12) fx10_12++;
@@ -195,7 +240,6 @@ function renderizarPainelJornadas() {
 
         if (linha.direcao_horas > 0) { totalMinutosDirecao += (linha.direcao_horas * 60); qtdDirecao++; }
 
-        // Agregação para Top Noturnas e Extras
         if (!agregacaoMotoristas.has(motNome)) {
             agregacaoMotoristas.set(motNome, { nome: motNome, noturnas: 0, extras: 0, maxTrabalho: 0 });
         }
@@ -204,7 +248,6 @@ function renderizarPainelJornadas() {
         motObj.extras += (linha.horas_extras || 0);
         if (horas > motObj.maxTrabalho) motObj.maxTrabalho = horas;
 
-        // Extração de data/hora
         let dataInicioStr = '-', horaInicioStr = '-', dataFimStr = '-', horaFimStr = '-';
         if (linha.inicio) {
             const mD = linha.inicio.match(regexDate); const mT = linha.inicio.match(regexTime);
@@ -223,8 +266,6 @@ function renderizarPainelJornadas() {
         if(isEstouro) {
             corLinha = 'text-rose-500 font-bold';
             badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold animate-pulse">INFRAÇÃO</span>`;
-            
-            // Popula Lista de Maiores Infrações Individuais
             tbodyEstouro.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${motNome}</td><td class="px-3 py-2 text-right font-black text-rose-500">${formatarHorasMinutos(horas)}</td></tr>`);
         }
 
@@ -245,27 +286,23 @@ function renderizarPainelJornadas() {
 
     const arrMot = Array.from(agregacaoMotoristas.values());
 
-    // TOP 5 Noturnas (Acumulado)
     const tbodyNoturnas = document.getElementById('jorTopNoturnasBody');
     tbodyNoturnas.innerHTML = '';
     const topNoturnas = arrMot.filter(m => m.noturnas > 0).sort((a,b) => b.noturnas - a.noturnas).slice(0,5);
-    if(topNoturnas.length === 0) tbodyNoturnas.innerHTML = '<tr><td colspan="2" class="p-2 text-center text-slate-500 text-xs">Sem horas noturnas no período.</td></tr>';
+    if(topNoturnas.length === 0) tbodyNoturnas.innerHTML = '<tr><td colspan="2" class="p-2 text-center text-slate-500 text-xs">Sem horas noturnas.</td></tr>';
     topNoturnas.forEach(m => {
         tbodyNoturnas.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${m.nome}</td><td class="px-3 py-2 text-right font-black text-indigo-400">${formatarHorasMinutos(m.noturnas)}</td></tr>`);
     });
 
-    // TOP 5 Extras (Acumulado)
     const tbodyExtras = document.getElementById('jorTopExtrasBody');
     tbodyExtras.innerHTML = '';
     const topExtras = arrMot.filter(m => m.extras > 0).sort((a,b) => b.extras - a.extras).slice(0,5);
-    if(topExtras.length === 0) tbodyExtras.innerHTML = '<tr><td colspan="2" class="p-2 text-center text-slate-500 text-xs">Sem horas extras no período.</td></tr>';
+    if(topExtras.length === 0) tbodyExtras.innerHTML = '<tr><td colspan="2" class="p-2 text-center text-slate-500 text-xs">Sem horas extras.</td></tr>';
     topExtras.forEach(m => {
         tbodyExtras.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${m.nome}</td><td class="px-3 py-2 text-right font-black text-amber-400">${formatarHorasMinutos(m.extras)}</td></tr>`);
     });
 
-    const motoristasUnicos = arrMot.length;
-    
-    document.getElementById('jorTotalMotoristas').textContent = motoristasUnicos;
+    document.getElementById('jorTotalMotoristas').textContent = arrMot.length;
     document.getElementById('jorQtdEstouros').textContent = qtdEstouros;
     document.getElementById('jorMediaDirecao').textContent = formatarHorasMinutos(qtdDirecao > 0 ? (totalMinutosDirecao / qtdDirecao) / 60 : 0);
     document.getElementById('jorDataReferencia').textContent = `Filtro: ${dataEspec !== 'ALL' ? dataEspec : activeQuickFilterJor}`;
@@ -276,10 +313,7 @@ function renderizarPainelJornadas() {
     const ctxStatus = document.getElementById('statusFrotaChart').getContext('2d');
     chartStatusFrota = new Chart(ctxStatus, {
         type: 'doughnut',
-        data: {
-            labels: ['OK (<= 12h)', 'Infração (> 12h)'],
-            datasets: [{ data: [qtdOk, qtdEstouros], backgroundColor: ['#10b981', '#f43f5e'], borderWidth: 2, borderColor: '#1e293b' }]
-        },
+        data: { labels: ['OK (<= 12h)', 'Infração (> 12h)'], datasets: [{ data: [qtdOk, qtdEstouros], backgroundColor: ['#10b981', '#f43f5e'], borderWidth: 2, borderColor: '#1e293b' }] },
         plugins: [centerTextPluginJornadas],
         options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } }, datalabels: { display: false } } }
     });
@@ -290,19 +324,11 @@ function renderizarPainelJornadas() {
 
     chartFaixaHoras = new Chart(ctxFaixas, {
         type: 'bar',
-        data: {
-            labels: ['8h a 10h', '10h a 12h', '12h a 14h', '> 14h'],
-            datasets: [{ label: 'Qtd de Jornadas', data: [fx8_10, fx10_12, fx12_14, fx14mais], backgroundColor: [gradientBar, gradientBar, '#f43f5e', '#9f1239'], borderRadius: 4, barPercentage: 0.6 }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } },
-            plugins: { legend: { display: false }, datalabels: { color: '#fff', anchor: 'end', align: 'top', font: { weight: 'bold' } } },
-            scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 11 } } } }
-        }
+        data: { labels: ['8h a 10h', '10h a 12h', '12h a 14h', '> 14h'], datasets: [{ label: 'Qtd de Jornadas', data: [fx8_10, fx10_12, fx12_14, fx14mais], backgroundColor: [gradientBar, gradientBar, '#f43f5e', '#9f1239'], borderRadius: 4, barPercentage: 0.6 }] },
+        options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } }, plugins: { legend: { display: false }, datalabels: { color: '#fff', anchor: 'end', align: 'top', font: { weight: 'bold' } } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 11 } } } } }
     });
 }
 
-// EXPORTAÇÃO EXCEL ATUALIZADA
 document.getElementById('btnExportarJornada').addEventListener('click', () => {
     if (jornadasGlobalData.length === 0) return alert("Nenhum dado para exportar.");
     const ws = XLSX.utils.json_to_sheet(jornadasGlobalData.map(d => {
@@ -319,8 +345,7 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
         }
         return {
             "Motorista": d.motorista, "Placa": d.placa, "Data Início": dI, "Hora Início": hI, "Data Fim": dF, "Hora Fim": hF,
-            "H. Noturnas": formatarHorasMinutos(d.horas_noturnas),
-            "H. Extras (Soma)": formatarHorasMinutos(d.horas_extras),
+            "H. Noturnas": formatarHorasMinutos(d.horas_noturnas), "H. Extras (Soma)": formatarHorasMinutos(d.horas_extras),
             "T. Trabalho (h)": d.total_trabalho_horas, "T. Direção (h)": d.direcao_horas, "Refeição (h)": d.refeicao_horas, "Repouso (h)": d.repouso_horas,
             "Status": d.total_trabalho_horas > 12 ? 'INFRAÇÃO' : 'OK'
         };

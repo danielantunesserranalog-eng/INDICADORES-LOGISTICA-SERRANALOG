@@ -1,202 +1,221 @@
 // ==========================================
-// js/operacional.js - METAS OPERACIONAIS
+// js/operacional.js - LÓGICA DO PAINEL DE METAS
 // ==========================================
 
-let dadosHistorico = [];
-let metasBase = { v_prog: 0, vol_prog: 0, cx_prog: 0, pbtc_prog: 0 };
-let multiplicadorDias = 1;
-let modoFiltro = 'ALL';
+let fullHistoricoDataOp = [];
+let metasGlobais = {};
+let activeQuickFilterOp = 'ALL';
 
 document.addEventListener('DOMContentLoaded', () => {
-    inicializarEventosFiltros();
-    carregarDados();
+    setupOperacionalFilters();
+    loadOperacionalData();
 });
 
-function inicializarEventosFiltros() {
-    const qfBtns = document.querySelectorAll('.btn-op-qf');
+function setupOperacionalFilters() {
+    const btnQFs = document.querySelectorAll('.btn-op-qf');
     const datePicker = document.getElementById('opDatePicker');
-
-    qfBtns.forEach(btn => {
+    
+    btnQFs.forEach(btn => {
         btn.addEventListener('click', (e) => {
-            qfBtns.forEach(b => {
-                b.classList.remove('active', 'border-emerald-500/50', 'text-emerald-400', 'bg-emerald-900/30');
-                b.classList.add('border-transparent', 'text-slate-400');
+            activeQuickFilterOp = e.currentTarget.getAttribute('data-op-qf');
+            btnQFs.forEach(b => {
+                if(b.getAttribute('data-op-qf') === activeQuickFilterOp) {
+                    b.classList.add('active', 'border-emerald-500/50', 'text-emerald-400', 'bg-emerald-900/30');
+                    b.classList.remove('border-transparent', 'text-slate-400', 'hover:bg-slate-700/50');
+                } else {
+                    b.classList.remove('active', 'border-emerald-500/50', 'text-emerald-400', 'bg-emerald-900/30');
+                    b.classList.add('border-transparent', 'text-slate-400', 'hover:bg-slate-700/50');
+                }
             });
-            e.target.classList.add('active', 'border-emerald-500/50', 'text-emerald-400', 'bg-emerald-900/30');
-            e.target.classList.remove('border-transparent', 'text-slate-400');
-            
-            modoFiltro = e.target.getAttribute('data-op-qf');
-            
-            // Define o multiplicador para as metas de volume e viagem
-            if (modoFiltro === 'D-1' || modoFiltro === 'D-2') multiplicadorDias = 1;
-            else if (modoFiltro === 'D-7') multiplicadorDias = 7;
-            else if (modoFiltro === 'D-30') multiplicadorDias = 30;
-            else multiplicadorDias = 1; // Para "ALL", não multiplicaremos pelo absurdo de dias
-            
-            datePicker.value = '';
-            processarTela();
+            if(datePicker) datePicker.value = '';
+            atualizarPainelOperacional();
         });
     });
 
-    datePicker.addEventListener('change', () => {
-        if(datePicker.value) {
-            qfBtns.forEach(b => {
-                b.classList.remove('active', 'border-emerald-500/50', 'text-emerald-400', 'bg-emerald-900/30');
-                b.classList.add('border-transparent', 'text-slate-400');
-            });
-            modoFiltro = 'CUSTOM';
-            multiplicadorDias = 1;
-            processarTela();
-        }
-    });
-}
-
-async function carregarDados() {
-    try {
-        const lblStatus = document.getElementById('opStatusFetch');
-        lblStatus.innerText = "Sincronizando com a nuvem...";
-
-        // 1. Busca as Metas
-        const { data: mData } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
-        if (mData) {
-            metasBase.v_prog = mData.v_prog || 0;
-            metasBase.vol_prog = mData.vol_prog || 0;
-            metasBase.cx_prog = mData.cx_prog || 0;
-            metasBase.pbtc_prog = mData.pbtc_prog || 0;
-        }
-
-        // 2. Busca Viagens
-        const { data: vData } = await supabaseClient.from('historico_viagens').select('*');
-        if (vData) dadosHistorico = vData;
-
-        lblStatus.innerText = "Atualizado com sucesso.";
-        setTimeout(() => lblStatus.innerText = "", 3000);
-
-        processarTela();
-    } catch(e) {
-        console.error("Erro na tela operacional:", e);
-    }
-}
-
-function processarTela() {
-    let dadosFiltrados = dadosHistorico;
-
-    // Lógica de filtro por Data
-    if (modoFiltro !== 'ALL') {
-        const hj = new Date(); hj.setHours(0,0,0,0);
-        
-        dadosFiltrados = dadosHistorico.filter(d => {
-            const parsedDt = parseDateTime(d.dataDaBaseExcel, null);
-            if (!parsedDt) return false;
-            parsedDt.setHours(0,0,0,0);
-            
-            if (modoFiltro === 'CUSTOM') {
-                const pickDate = new Date(document.getElementById('opDatePicker').value + 'T00:00:00');
-                return parsedDt.getTime() === pickDate.getTime();
-            } else {
-                const diffDias = Math.round((hj - parsedDt) / 86400000);
-                if (modoFiltro === 'D-1') return diffDias === 1;
-                if (modoFiltro === 'D-2') return diffDias === 2;
-                if (modoFiltro === 'D-7') return diffDias >= 0 && diffDias <= 7;
-                if (modoFiltro === 'D-30') return diffDias >= 0 && diffDias <= 30;
+    if(datePicker) {
+        datePicker.addEventListener('change', () => {
+            if(datePicker.value) {
+                activeQuickFilterOp = 'DATE';
+                btnQFs.forEach(b => {
+                    b.classList.remove('active', 'border-emerald-500/50', 'text-emerald-400', 'bg-emerald-900/30');
+                    b.classList.add('border-transparent', 'text-slate-400', 'hover:bg-slate-700/50');
+                });
+                atualizarPainelOperacional();
             }
-            return true;
+        });
+    }
+}
+
+function verificarStatusAtualizacao(datasArray) {
+    const indicador = document.getElementById('indicadorAtualizacao');
+    const icone = document.getElementById('iconeAtualizacao');
+    const texto = document.getElementById('textoAtualizacao');
+    if(!indicador) return;
+
+    indicador.classList.remove('hidden');
+
+    if (!datasArray || datasArray.length === 0) {
+        indicador.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner bg-slate-900/50 text-slate-400 border-slate-600";
+        icone.className = "fas fa-times-circle";
+        texto.innerText = "Sem Dados";
+        return;
+    }
+
+    let maxDate = new Date(0);
+    let maxDateStr = "";
+
+    datasArray.forEach(dStr => {
+        let dt = null;
+        const p = String(dStr).split('/');
+        if(p.length === 3) {
+            let ano = parseInt(p[2]); if(ano < 100) ano += 2000;
+            dt = new Date(ano, parseInt(p[1])-1, parseInt(p[0]));
+        }
+
+        if (dt && dt > maxDate) {
+            maxDate = dt;
+            const dia = String(dt.getDate()).padStart(2, '0');
+            const mes = String(dt.getMonth() + 1).padStart(2, '0');
+            const ano = dt.getFullYear();
+            maxDateStr = `${dia}/${mes}/${ano}`;
+        }
+    });
+
+    const hoje = new Date();
+    const diaH = String(hoje.getDate()).padStart(2, '0');
+    const mesH = String(hoje.getMonth() + 1).padStart(2, '0');
+    const anoH = hoje.getFullYear();
+    const hojeStr = `${diaH}/${mesH}/${anoH}`;
+
+    if (maxDateStr === hojeStr) {
+        indicador.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner bg-emerald-900/30 text-emerald-400 border-emerald-500/50 transition-colors";
+        icone.className = "fas fa-check-circle";
+        texto.innerText = "Atualizado Hoje";
+    } else {
+        indicador.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner bg-amber-900/30 text-amber-400 border-amber-500/50 transition-colors";
+        icone.className = "fas fa-exclamation-triangle";
+        texto.innerText = `Base: ${maxDateStr}`;
+    }
+}
+
+async function loadOperacionalData() {
+    try {
+        const { data: metas } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
+        if(metas) metasGlobais = metas;
+
+        const { data: historico } = await supabaseClient.from('historico_viagens').select('*');
+        if(historico) {
+            fullHistoricoDataOp = historico;
+            const allDates = [...new Set(historico.map(d => d.dataDaBaseExcel))].filter(d => d && d !== 'Desconhecida');
+            verificarStatusAtualizacao(allDates);
+            atualizarPainelOperacional();
+        }
+    } catch(e) { console.error("Erro ao carregar dados operacionais:", e); }
+}
+
+function atualizarPainelOperacional() {
+    const dataRef = document.getElementById('opDatePicker') ? document.getElementById('opDatePicker').value : null;
+    let diasConsiderados = 1;
+
+    const filtered = fullHistoricoDataOp.filter(d => {
+        if(activeQuickFilterOp === 'ALL') return true;
+        
+        const p = d.dataDaBaseExcel.split('/');
+        if(p.length !== 3) return false;
+        
+        let ano = parseInt(p[2]); if(ano < 100) ano += 2000;
+        const parsed = new Date(ano, p[1]-1, p[0]);
+        parsed.setHours(0,0,0,0); const hj = new Date(); hj.setHours(0,0,0,0);
+        
+        if (activeQuickFilterOp === 'DATE' && dataRef) {
+            const dr = new Date(dataRef + "T00:00:00");
+            return parsed.getTime() === dr.getTime();
+        }
+        
+        const diff = Math.round((hj - parsed)/86400000);
+        if (activeQuickFilterOp === 'D-1') return diff === 1;
+        if (activeQuickFilterOp === 'D-2') return diff === 2;
+        if (activeQuickFilterOp === 'D-7') return diff >= 0 && diff <= 7;
+        if (activeQuickFilterOp === 'D-30') return diff >= 0 && diff <= 30;
+        return false;
+    });
+
+    if(activeQuickFilterOp === 'ALL') {
+        const dts = new Set(filtered.map(x=>x.dataDaBaseExcel));
+        diasConsiderados = dts.size || 1;
+    } else if (activeQuickFilterOp === 'D-7') diasConsiderados = 7;
+    else if (activeQuickFilterOp === 'D-30') diasConsiderados = 30;
+
+    document.getElementById('opStatusFetch').innerText = `${filtered.length} viagens em ${diasConsiderados} dia(s)`;
+    
+    document.getElementById('diasMultiplicador1').innerText = `${diasConsiderados}d`;
+    document.getElementById('diasMultiplicador2').innerText = `${diasConsiderados}d`;
+
+    const totalV = filtered.length;
+    const metaV = (metasGlobais.v_prog || 0) * diasConsiderados;
+    document.getElementById('disp_v_prog').innerText = metaV;
+    document.getElementById('disp_v_real').innerText = totalV;
+    atualizarBarra('bar_v_perc', 'disp_v_perc', totalV, metaV);
+
+    const totalVol = filtered.reduce((s,x)=>s+(x.volumeReal||0), 0);
+    const metaVol = (metasGlobais.vol_prog || 0) * diasConsiderados;
+    document.getElementById('disp_vol_prog').innerText = metaVol.toLocaleString('pt-PT');
+    document.getElementById('disp_vol_real').innerText = totalVol.toLocaleString('pt-PT', {maximumFractionDigits:1});
+    atualizarBarra('bar_vol_perc', 'disp_vol_perc', totalVol, metaVol);
+
+    const mediaCx = totalV > 0 ? (totalVol/totalV) : 0;
+    const metaCx = metasGlobais.cx_prog || 0;
+    document.getElementById('disp_cx_prog').innerText = metaCx;
+    document.getElementById('disp_cx_real').innerText = mediaCx.toLocaleString('pt-PT', {maximumFractionDigits:2});
+    atualizarBarra('bar_cx_perc', 'disp_cx_perc', mediaCx, metaCx);
+
+    const totalP = filtered.reduce((s,x)=>s+(x.pesoLiquido||0), 0)/1000;
+    const mediaPbtc = totalV > 0 ? (totalP/totalV) : 0;
+    const metaPbtc = metasGlobais.pbtc_prog || 0;
+    document.getElementById('disp_pbtc_prog').innerText = metaPbtc;
+    document.getElementById('disp_pbtc_real').innerText = mediaPbtc.toLocaleString('pt-PT', {maximumFractionDigits:2});
+    atualizarBarra('bar_pbtc_perc', 'disp_pbtc_perc', mediaPbtc, metaPbtc);
+
+    renderLeaderboards(filtered);
+}
+
+function atualizarBarra(barId, txtId, real, meta) {
+    const perc = meta > 0 ? Math.min((real/meta)*100, 100) : 0;
+    const b = document.getElementById(barId);
+    const t = document.getElementById(txtId);
+    if(b) b.style.width = `${perc}%`;
+    if(t) t.innerText = `${perc.toFixed(1)}%`;
+}
+
+function renderLeaderboards(data) {
+    const pMap = new Map();
+    data.forEach(d => {
+        const pl = d.placa || 'N/A';
+        if(!pMap.has(pl)) pMap.set(pl, {p: pl, t: d.transportadora||'-', vol: 0, v: 0, ciclos: 0, cCount: 0});
+        const o = pMap.get(pl);
+        o.vol += (d.volumeReal||0); o.v++;
+        if(d.cicloHoras > 0) { o.ciclos += d.cicloHoras; o.cCount++; }
+    });
+
+    const arr = Array.from(pMap.values());
+    const topVol = [...arr].sort((a,b)=>b.vol - a.vol).slice(0,10);
+    const topCiclo = [...arr].filter(x=>x.cCount > 0).map(x=>({...x, cMedio: x.ciclos/x.cCount})).sort((a,b)=>a.cMedio - b.cMedio).slice(0,10);
+
+    const bVol = document.getElementById('leaderboardBody');
+    if(bVol) {
+        bVol.innerHTML = '';
+        topVol.forEach((x,i) => {
+            const tr = `<tr><td class="px-4 py-3 text-center"><div class="w-6 h-6 rounded-full ${i<3?'bg-emerald-500 text-white shadow-[0_0_10px_rgba(16,185,129,0.5)]':'bg-slate-800 text-slate-400'} flex items-center justify-center text-xs font-bold">${i+1}</div></td><td class="px-4 py-3 font-bold text-white">${x.p}</td><td class="px-4 py-3 text-slate-400 truncate max-w-[100px]">${x.t}</td><td class="px-4 py-3 text-center text-slate-300">${x.v}</td><td class="px-4 py-3 text-right font-mono text-emerald-400">${x.vol.toLocaleString('pt-PT',{maximumFractionDigits:1})}</td></tr>`;
+            bVol.insertAdjacentHTML('beforeend', tr);
         });
     }
 
-    // Calcula Acumulados Reais
-    const totalVReal = dadosFiltrados.length;
-    const totalVolReal = dadosFiltrados.reduce((acc, curr) => acc + (curr.volumeReal || 0), 0);
-    const totalPesoKg = dadosFiltrados.reduce((acc, curr) => acc + (curr.pesoLiquido || 0), 0);
-    
-    const mediaCxReal = totalVReal > 0 ? totalVolReal / totalVReal : 0;
-    const mediaPbtcReal = totalVReal > 0 ? (totalPesoKg / 1000) / totalVReal : 0;
-
-    // Metas Calculadas pelo Multiplicador
-    const metaViagemCalc = metasBase.v_prog * multiplicadorDias;
-    const metaVolCalc = metasBase.vol_prog * multiplicadorDias;
-    
-    // Atualiza Labels de "Dias" nos Cards
-    document.getElementById('diasMultiplicador1').innerText = `${multiplicadorDias}d`;
-    document.getElementById('diasMultiplicador2').innerText = `${multiplicadorDias}d`;
-
-    // Função auxiliar para injetar metas na UI
-    function updateCard(idProg, idReal, idPerc, idBar, vProg, vReal) {
-        document.getElementById(idProg).innerText = vProg.toLocaleString('pt-PT', { maximumFractionDigits: 1 });
-        document.getElementById(idReal).innerText = vReal.toLocaleString('pt-PT', { maximumFractionDigits: 1 });
-        
-        const perc = vProg > 0 ? (vReal / vProg) * 100 : 0;
-        const percLabel = Math.min(perc, 100).toFixed(1);
-        
-        document.getElementById(idPerc).innerText = `${percLabel}%`;
-        document.getElementById(idBar).style.width = `${Math.min(perc, 100)}%`;
+    const bCiclo = document.getElementById('leaderboardCicloBody');
+    if(bCiclo) {
+        bCiclo.innerHTML = '';
+        topCiclo.forEach((x,i) => {
+            const tr = `<tr><td class="px-4 py-3 text-center"><div class="w-6 h-6 rounded-full ${i<3?'bg-sky-500 text-white shadow-[0_0_10px_rgba(14,165,233,0.5)]':'bg-slate-800 text-slate-400'} flex items-center justify-center text-xs font-bold">${i+1}</div></td><td class="px-4 py-3 font-bold text-white">${x.p}</td><td class="px-4 py-3 text-slate-400 truncate max-w-[100px]">${x.t}</td><td class="px-4 py-3 text-center text-slate-300">${x.v}</td><td class="px-4 py-3 text-right font-mono text-sky-400">${formatarHorasMinutos(x.cMedio)}</td></tr>`;
+            bCiclo.insertAdjacentHTML('beforeend', tr);
+        });
     }
-
-    updateCard('disp_v_prog', 'disp_v_real', 'disp_v_perc', 'bar_v_perc', metaViagemCalc, totalVReal);
-    updateCard('disp_vol_prog', 'disp_vol_real', 'disp_vol_perc', 'bar_vol_perc', metaVolCalc, totalVolReal);
-    updateCard('disp_cx_prog', 'disp_cx_real', 'disp_cx_perc', 'bar_cx_perc', metasBase.cx_prog, mediaCxReal);
-    updateCard('disp_pbtc_prog', 'disp_pbtc_real', 'disp_pbtc_perc', 'bar_pbtc_perc', metasBase.pbtc_prog, mediaPbtcReal);
-
-    // ===================================
-    // Lógica dos Leaderboards
-    // ===================================
-    const mapaPlacas = new Map();
-    
-    dadosFiltrados.forEach(d => {
-        const p = d.placa || 'Sem Placa';
-        if (p === '-' || p === 'Sem Placa') return;
-        
-        if (!mapaPlacas.has(p)) {
-            mapaPlacas.set(p, { placa: p, transp: d.transportadora, viagens: 0, volume: 0, somaCiclos: 0, qtdCiclos: 0 });
-        }
-        
-        const obj = mapaPlacas.get(p);
-        obj.viagens++;
-        obj.volume += (d.volumeReal || 0);
-        if (d.cicloHoras > 0) {
-            obj.somaCiclos += d.cicloHoras;
-            obj.qtdCiclos++;
-        }
-    });
-
-    const arrayPlacas = Array.from(mapaPlacas.values());
-
-    // 1. Top Volume (Maior para o Menor)
-    const topVolume = [...arrayPlacas].sort((a, b) => b.volume - a.volume).slice(0, 10);
-    const tbVol = document.getElementById('leaderboardBody');
-    tbVol.innerHTML = '';
-    topVolume.forEach((item, index) => {
-        const medal = index === 0 ? '<i class="fas fa-medal text-amber-400 text-lg"></i>' : 
-                      index === 1 ? '<i class="fas fa-medal text-slate-300 text-lg"></i>' : 
-                      index === 2 ? '<i class="fas fa-medal text-amber-700 text-lg"></i>' : `${index + 1}º`;
-        
-        tbVol.insertAdjacentHTML('beforeend', `<tr>
-            <td class="px-4 py-3 font-bold text-slate-400 text-center">${medal}</td>
-            <td class="px-4 py-3 font-bold text-emerald-400">${item.placa}</td>
-            <td class="px-4 py-3 text-slate-300 text-[11px] truncate max-w-[120px]">${item.transp}</td>
-            <td class="px-4 py-3 text-center text-sky-300 font-bold">${item.viagens}</td>
-            <td class="px-4 py-3 text-right font-bold text-white">${item.volume.toLocaleString('pt-PT', {maximumFractionDigits:1})}</td>
-        </tr>`);
-    });
-
-    // 2. Top Ciclo (Menor para o Maior)
-    const tbCiclo = document.getElementById('leaderboardCicloBody');
-    tbCiclo.innerHTML = '';
-    
-    // Filtra placas que tenham pelo menos 1 ciclo registrado para entrar no ranking
-    const placasComCiclo = arrayPlacas.filter(p => p.qtdCiclos > 0);
-    placasComCiclo.forEach(p => p.mediaCiclo = p.somaCiclos / p.qtdCiclos);
-    
-    const topCiclo = placasComCiclo.sort((a, b) => a.mediaCiclo - b.mediaCiclo).slice(0, 10);
-    
-    topCiclo.forEach((item, index) => {
-        const medal = index === 0 ? '<i class="fas fa-trophy text-amber-400 text-lg"></i>' : `${index + 1}º`;
-        tbCiclo.insertAdjacentHTML('beforeend', `<tr>
-            <td class="px-4 py-3 font-bold text-slate-400 text-center">${medal}</td>
-            <td class="px-4 py-3 font-bold text-sky-400">${item.placa}</td>
-            <td class="px-4 py-3 text-slate-300 text-[11px] truncate max-w-[120px]">${item.transp}</td>
-            <td class="px-4 py-3 text-center text-emerald-300 font-bold">${item.viagens}</td>
-            <td class="px-4 py-3 text-right font-bold text-white">${formatarHorasMinutos(item.mediaCiclo)}</td>
-        </tr>`);
-    });
 }

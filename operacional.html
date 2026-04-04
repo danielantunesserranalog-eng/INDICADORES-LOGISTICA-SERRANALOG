@@ -14,10 +14,16 @@
 
     <main class="flex-1 h-screen overflow-y-auto relative">
         <div class="max-w-[96rem] mx-auto px-6 py-8">
-            <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
-                <div>
-                    <h1 class="text-2xl font-extrabold text-white">Indicadores Operacionais</h1>
-                    <p class="text-sm text-slate-400 font-medium">Painel Executivo: Realizado vs Meta Global</p>
+            <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm flex-wrap gap-4">
+                <div class="flex items-center gap-4 flex-wrap">
+                    <div>
+                        <h1 class="text-2xl font-extrabold text-white">Indicadores Operacionais</h1>
+                        <p class="text-sm text-slate-400 font-medium">Painel Executivo: Realizado vs Meta Global</p>
+                    </div>
+                    <div id="indicadorAtualizacao" class="hidden flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner transition-all duration-500">
+                        <i id="iconeAtualizacao" class="fas fa-sync fa-spin"></i>
+                        <span id="textoAtualizacao">Verificando...</span>
+                    </div>
                 </div>
             </div>
 
@@ -52,20 +58,11 @@
                         <div>
                             <h3 class="text-blue-400 font-bold tracking-widest text-[11px] uppercase mb-4 relative z-10">Meta de Viagens</h3>
                             <div class="flex justify-between items-end mb-6 relative z-10">
-                                <div class="w-1/2 pr-2">
-                                    <label class="text-[10px] text-slate-500 uppercase font-bold">Prog. (<span id="diasMultiplicador1">1d</span>)</label>
-                                    <p id="disp_v_prog" class="text-2xl font-black text-slate-300 mt-1">0</p>
-                                </div>
-                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50">
-                                    <label class="text-[10px] text-slate-500 uppercase font-bold">Realizado</label>
-                                    <p id="disp_v_real" class="text-3xl font-black text-white mt-1">0</p>
-                                </div>
+                                <div class="w-1/2 pr-2"><label class="text-[10px] text-slate-500 uppercase font-bold">Prog. (<span id="diasMultiplicador1">1d</span>)</label><p id="disp_v_prog" class="text-2xl font-black text-slate-300 mt-1">0</p></div>
+                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50"><label class="text-[10px] text-slate-500 uppercase font-bold">Realizado</label><p id="disp_v_real" class="text-3xl font-black text-white mt-1">0</p></div>
                             </div>
                         </div>
-                        <div class="relative z-10">
-                            <div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Atingimento</span><span id="disp_v_perc" class="text-blue-400 text-sm">0%</span></div>
-                            <div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_v_perc" class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div>
-                        </div>
+                        <div class="relative z-10"><div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Atingimento</span><span id="disp_v_perc" class="text-blue-400 text-sm">0%</span></div><div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_v_perc" class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div></div>
                     </div>
 
                     <div class="glass-card p-6 rounded-2xl glow-border-emerald flex flex-col justify-between relative overflow-hidden group">
@@ -73,20 +70,11 @@
                         <div>
                             <h3 class="text-emerald-400 font-bold tracking-widest text-[11px] uppercase mb-4 relative z-10">Volume Realizado (m³)</h3>
                             <div class="flex justify-between items-end mb-6 relative z-10">
-                                <div class="w-1/2 pr-2">
-                                    <label class="text-[10px] text-slate-500 uppercase font-bold">Prog. (<span id="diasMultiplicador2">1d</span>)</label>
-                                    <p id="disp_vol_prog" class="text-2xl font-black text-slate-300 mt-1">0</p>
-                                </div>
-                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50">
-                                    <label class="text-[10px] text-slate-500 uppercase font-bold">Realizado</label>
-                                    <p id="disp_vol_real" class="text-3xl font-black text-white mt-1">0</p>
-                                </div>
+                                <div class="w-1/2 pr-2"><label class="text-[10px] text-slate-500 uppercase font-bold">Prog. (<span id="diasMultiplicador2">1d</span>)</label><p id="disp_vol_prog" class="text-2xl font-black text-slate-300 mt-1">0</p></div>
+                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50"><label class="text-[10px] text-slate-500 uppercase font-bold">Realizado</label><p id="disp_vol_real" class="text-3xl font-black text-white mt-1">0</p></div>
                             </div>
                         </div>
-                        <div class="relative z-10">
-                            <div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Atingimento</span><span id="disp_vol_perc" class="text-emerald-400 text-sm">0%</span></div>
-                            <div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_vol_perc" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div>
-                        </div>
+                        <div class="relative z-10"><div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Atingimento</span><span id="disp_vol_perc" class="text-emerald-400 text-sm">0%</span></div><div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_vol_perc" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div></div>
                     </div>
 
                     <div class="glass-card p-6 rounded-2xl glow-border-amber flex flex-col justify-between relative overflow-hidden group">
@@ -94,20 +82,11 @@
                         <div>
                             <h3 class="text-amber-400 font-bold tracking-widest text-[11px] uppercase mb-4 relative z-10">Caixa de Carga Média (m³)</h3>
                             <div class="flex justify-between items-end mb-6 relative z-10">
-                                <div class="w-1/2 pr-2">
-                                    <label class="text-[10px] text-slate-500 uppercase font-bold">Meta Base</label>
-                                    <p id="disp_cx_prog" class="text-2xl font-black text-slate-300 mt-1">0</p>
-                                </div>
-                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50">
-                                    <label class="text-[10px] text-slate-500 uppercase font-bold">Realizada</label>
-                                    <p id="disp_cx_real" class="text-3xl font-black text-white mt-1">0</p>
-                                </div>
+                                <div class="w-1/2 pr-2"><label class="text-[10px] text-slate-500 uppercase font-bold">Meta Base</label><p id="disp_cx_prog" class="text-2xl font-black text-slate-300 mt-1">0</p></div>
+                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50"><label class="text-[10px] text-slate-500 uppercase font-bold">Realizada</label><p id="disp_cx_real" class="text-3xl font-black text-white mt-1">0</p></div>
                             </div>
                         </div>
-                        <div class="relative z-10">
-                            <div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Desempenho</span><span id="disp_cx_perc" class="text-amber-400 text-sm">0%</span></div>
-                            <div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_cx_perc" class="bg-amber-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div>
-                        </div>
+                        <div class="relative z-10"><div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Desempenho</span><span id="disp_cx_perc" class="text-amber-400 text-sm">0%</span></div><div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_cx_perc" class="bg-amber-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div></div>
                     </div>
 
                     <div class="glass-card p-6 rounded-2xl glow-border-rose flex flex-col justify-between relative overflow-hidden group">
@@ -115,66 +94,22 @@
                         <div>
                             <h3 class="text-rose-400 font-bold tracking-widest text-[11px] uppercase mb-4 relative z-10">PBTC Médio Realizado</h3>
                             <div class="flex justify-between items-end mb-6 relative z-10">
-                                <div class="w-1/2 pr-2">
-                                    <label class="text-[10px] text-slate-500 uppercase font-bold">Meta Base</label>
-                                    <p id="disp_pbtc_prog" class="text-2xl font-black text-slate-300 mt-1">0</p>
-                                </div>
-                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50">
-                                    <label class="text-[10px] text-slate-500 uppercase font-bold">Realizado</label>
-                                    <p id="disp_pbtc_real" class="text-3xl font-black text-white mt-1">0</p>
-                                </div>
+                                <div class="w-1/2 pr-2"><label class="text-[10px] text-slate-500 uppercase font-bold">Meta Base</label><p id="disp_pbtc_prog" class="text-2xl font-black text-slate-300 mt-1">0</p></div>
+                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50"><label class="text-[10px] text-slate-500 uppercase font-bold">Realizado</label><p id="disp_pbtc_real" class="text-3xl font-black text-white mt-1">0</p></div>
                             </div>
                         </div>
-                        <div class="relative z-10">
-                            <div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Atingimento</span><span id="disp_pbtc_perc" class="text-rose-400 text-sm">0%</span></div>
-                            <div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_pbtc_perc" class="bg-rose-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div>
-                        </div>
+                        <div class="relative z-10"><div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Atingimento</span><span id="disp_pbtc_perc" class="text-rose-400 text-sm">0%</span></div><div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_pbtc_perc" class="bg-rose-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div></div>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                     <div class="glass-card rounded-xl shadow-2xl overflow-hidden border border-slate-700/50 flex flex-col">
-                        <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
-                            <h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase">
-                                <i class="fas fa-trophy text-emerald-400 mr-2 text-lg"></i> Top Volume (Produtividade)
-                            </h3>
-                        </div>
-                        <div class="overflow-x-auto max-h-[350px] overflow-y-auto custom-scrollbar">
-                            <table class="min-w-full text-xs text-left">
-                                <thead class="bg-slate-900/95 text-slate-400 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-700 sticky top-0 z-10 shadow-md backdrop-blur-sm">
-                                    <tr>
-                                        <th class="px-4 py-3 w-10 text-center">Pos</th>
-                                        <th class="px-4 py-3">Placa</th>
-                                        <th class="px-4 py-3">Transportadora</th>
-                                        <th class="px-4 py-3 text-center">Viagens</th>
-                                        <th class="px-4 py-3 text-right">Vol (m³)</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="leaderboardBody" class="divide-y divide-slate-800/80 text-slate-300"></tbody>
-                            </table>
-                        </div>
+                        <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center"><h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase"><i class="fas fa-trophy text-emerald-400 mr-2 text-lg"></i> Top Volume (Produtividade)</h3></div>
+                        <div class="overflow-x-auto max-h-[350px] overflow-y-auto custom-scrollbar"><table class="min-w-full text-xs text-left"><thead class="bg-slate-900/95 text-slate-400 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-700 sticky top-0 z-10 shadow-md backdrop-blur-sm"><tr><th class="px-4 py-3 w-10 text-center">Pos</th><th class="px-4 py-3">Placa</th><th class="px-4 py-3">Transportadora</th><th class="px-4 py-3 text-center">Viagens</th><th class="px-4 py-3 text-right">Vol (m³)</th></tr></thead><tbody id="leaderboardBody" class="divide-y divide-slate-800/80 text-slate-300"></tbody></table></div>
                     </div>
-
                     <div class="glass-card rounded-xl shadow-2xl overflow-hidden border border-slate-700/50 flex flex-col">
-                        <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
-                            <h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase">
-                                <i class="fas fa-stopwatch text-sky-400 mr-2 text-lg"></i> Top Ciclo (Menor Tempo)
-                            </h3>
-                        </div>
-                        <div class="overflow-x-auto max-h-[350px] overflow-y-auto custom-scrollbar">
-                            <table class="min-w-full text-xs text-left">
-                                <thead class="bg-slate-900/95 text-slate-400 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-700 sticky top-0 z-10 shadow-md backdrop-blur-sm">
-                                    <tr>
-                                        <th class="px-4 py-3 w-10 text-center">Pos</th>
-                                        <th class="px-4 py-3">Placa</th>
-                                        <th class="px-4 py-3">Transportadora</th>
-                                        <th class="px-4 py-3 text-center">Viagens</th>
-                                        <th class="px-4 py-3 text-right">T. Médio</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="leaderboardCicloBody" class="divide-y divide-slate-800/80 text-slate-300"></tbody>
-                            </table>
-                        </div>
+                        <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center"><h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase"><i class="fas fa-stopwatch text-sky-400 mr-2 text-lg"></i> Top Ciclo (Menor Tempo)</h3></div>
+                        <div class="overflow-x-auto max-h-[350px] overflow-y-auto custom-scrollbar"><table class="min-w-full text-xs text-left"><thead class="bg-slate-900/95 text-slate-400 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-700 sticky top-0 z-10 shadow-md backdrop-blur-sm"><tr><th class="px-4 py-3 w-10 text-center">Pos</th><th class="px-4 py-3">Placa</th><th class="px-4 py-3">Transportadora</th><th class="px-4 py-3 text-center">Viagens</th><th class="px-4 py-3 text-right">T. Médio</th></tr></thead><tbody id="leaderboardCicloBody" class="divide-y divide-slate-800/80 text-slate-300"></tbody></table></div>
                     </div>
                 </div>
             </section>
