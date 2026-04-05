@@ -307,7 +307,18 @@ async function loadDashboardData() {
             return count > 0 ? parseFloat((transpCicloSum.get(nome) / count).toFixed(1)) : 0;
         });
 
-        const topParaDonut = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+        // =========================================================
+        // NOVO: GRÁFICO DE DONUT COM A FATIA "OUTRAS" PARA BATER O TOTAL
+        // =========================================================
+        const todasTranspOrdenadas = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]);
+        
+        let topParaDonut = todasTranspOrdenadas.slice(0, 5);
+        
+        if (todasTranspOrdenadas.length > 5) {
+            const somaResto = todasTranspOrdenadas.slice(5).reduce((acc, curr) => acc + curr[1], 0);
+            topParaDonut.push(["Outras", somaResto]);
+        }
+
         const labelsDonut = topParaDonut.map(t => t[0].length > 18 ? t[0].substring(0, 16) + "..." : t[0]);
         const valoresDonut = topParaDonut.map(t => t[1]);
 
@@ -331,7 +342,7 @@ async function loadDashboardData() {
         const ctxTransp = document.getElementById('transportadorasChart').getContext('2d');
         chartTransp = new Chart(ctxTransp, {
             type: 'doughnut',
-            data: { labels: labelsDonut, datasets: [{ data: valoresDonut, backgroundColor: ['#0ea5e9', '#06b6d4', '#6366f1', '#8b5cf6', '#3b82f6'], borderWidth: 2, borderColor: '#1e293b' }] },
+            data: { labels: labelsDonut, datasets: [{ data: valoresDonut, backgroundColor: ['#0ea5e9', '#06b6d4', '#6366f1', '#8b5cf6', '#3b82f6', '#475569'], borderWidth: 2, borderColor: '#1e293b' }] },
             plugins: [centerTextPlugin],
             options: {
                 responsive: true, maintainAspectRatio: true, cutout: '70%', layout: { padding: 20 },
