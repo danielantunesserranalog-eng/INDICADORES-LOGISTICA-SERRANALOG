@@ -103,7 +103,6 @@ async function loadOperacionalData() {
         const { data: metas } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
         if(metas) metasGlobais = metas;
 
-        // CORRIGIDO O LIMITE DO SUPABASE AQUI (limit(100000))
         const { data: historico } = await supabaseClient.from('historico_viagens').select('*').limit(100000);
         if(historico) {
             fullHistoricoDataOp = historico;
@@ -119,6 +118,12 @@ function atualizarPainelOperacional() {
     let diasConsiderados = 1;
 
     const filtered = fullHistoricoDataOp.filter(d => {
+        // =================================================================
+        // NOVO: FILTRA EXCLUSIVAMENTE A TRANSPORTADORA "SERRANALOG"
+        // =================================================================
+        const transp = String(d.transportadora || "").toUpperCase();
+        if (!transp.includes('SERRANALOG')) return false;
+
         if(activeQuickFilterOp === 'ALL') return true;
         
         const p = d.dataDaBaseExcel.split('/');
@@ -141,35 +146,50 @@ function atualizarPainelOperacional() {
         return false;
     });
 
+    // Calcula dias considerados
     if(activeQuickFilterOp === 'ALL') {
         const dts = new Set(filtered.map(x=>x.dataDaBaseExcel));
         diasConsiderados = dts.size || 1;
     } else if (activeQuickFilterOp === 'D-7') diasConsiderados = 7;
     else if (activeQuickFilterOp === 'D-30') diasConsiderados = 30;
 
-    document.getElementById('opStatusFetch').innerText = `${filtered.length} viagens em ${diasConsiderados} dia(s)`;
-    
-    document.getElementById('diasMultiplicador1').innerText = `${diasConsiderados}d`;
-    document.getElementById('diasMultiplicador2').innerText = `${diasConsiderados}d`;
+    // CÁLCULO DINÂMICO DE PLACAS/CAVALOS ÚNICOS (Agora exclusivo SerranaLog)
+    const placasUnicas = new Set(filtered.map(d => d.placa).filter(p => p && p !== '-' && p.trim() !== '')).size || 1;
 
+    // Atualiza a informação visual do filtro destacando a Frota Própria
+    const opStatusFetch = document.getElementById('opStatusFetch');
+    if(opStatusFetch) {
+        opStatusFetch.innerHTML = `<span class="text-sky-400 font-bold">Frota Própria (SerranaLog)</span> | ${filtered.length} viagens | ${diasConsiderados} dia(s) | ${placasUnicas} cavalo(s)`;
+    }
+    
+    // Atualiza as labels dos cards para mostrar que o cálculo é baseado na Frota (F)
+    const lblMultiplicador1 = document.getElementById('diasMultiplicador1');
+    const lblMultiplicador2 = document.getElementById('diasMultiplicador2');
+    if(lblMultiplicador1) lblMultiplicador1.innerText = `${diasConsiderados}d | F:${placasUnicas}`;
+    if(lblMultiplicador2) lblMultiplicador2.innerText = `${diasConsiderados}d | F:${placasUnicas}`;
+
+    // 1. VIAGENS: (Meta baseada em Cavalo/Dia) * (Qtd de Cavalos) * (Qtd de Dias)
     const totalV = filtered.length;
-    const metaV = (metasGlobais.v_prog || 0) * diasConsiderados;
+    const metaV = (metasGlobais.v_prog || 0) * placasUnicas * diasConsiderados;
     document.getElementById('disp_v_prog').innerText = metaV;
     document.getElementById('disp_v_real').innerText = totalV;
     atualizarBarra('bar_v_perc', 'disp_v_perc', totalV, metaV);
 
+    // 2. VOLUME: (Meta baseada em Cavalo/Dia) * (Qtd de Cavalos) * (Qtd de Dias)
     const totalVol = filtered.reduce((s,x)=>s+(x.volumeReal||0), 0);
-    const metaVol = (metasGlobais.vol_prog || 0) * diasConsiderados;
+    const metaVol = (metasGlobais.vol_prog || 0) * placasUnicas * diasConsiderados;
     document.getElementById('disp_vol_prog').innerText = metaVol.toLocaleString('pt-PT');
     document.getElementById('disp_vol_real').innerText = totalVol.toLocaleString('pt-PT', {maximumFractionDigits:1});
     atualizarBarra('bar_vol_perc', 'disp_vol_perc', totalVol, metaVol);
 
+    // 3. CAIXA DE CARGA MÉDIA (A meta se mantém fixa como média global por viagem)
     const mediaCx = totalV > 0 ? (totalVol/totalV) : 0;
     const metaCx = metasGlobais.cx_prog || 0;
     document.getElementById('disp_cx_prog').innerText = metaCx;
     document.getElementById('disp_cx_real').innerText = mediaCx.toLocaleString('pt-PT', {maximumFractionDigits:2});
     atualizarBarra('bar_cx_perc', 'disp_cx_perc', mediaCx, metaCx);
 
+    // 4. PBTC MÉDIO (A meta se mantém fixa como média global por viagem)
     const totalP = filtered.reduce((s,x)=>s+(x.pesoLiquido||0), 0)/1000;
     const mediaPbtc = totalV > 0 ? (totalP/totalV) : 0;
     const metaPbtc = metasGlobais.pbtc_prog || 0;
