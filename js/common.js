@@ -1,6 +1,13 @@
 // ==========================================
-// js/common.js - FUNÇÕES GLOBAIS
+// js/common.js - FUNÇÕES GLOBAIS E SEGURANÇA
 // ==========================================
+
+// BLOQUEIO DE SEGURANÇA GLOBAL: Redireciona se não houver sessão ativa (exceto na tela de login)
+if (!window.location.pathname.includes('login.html')) {
+    if (!localStorage.getItem('serranalog_user')) {
+        window.location.href = 'login.html';
+    }
+}
 
 function parsePtBrNumber(val) {
     if (typeof val === 'number') return val;

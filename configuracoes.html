@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Configurações - Serrana Florestal</title>
+    
+    <script>
+        if (!localStorage.getItem('serranalog_user')) {
+            window.location.href = 'login.html';
+        }
+    </script>
+
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -92,6 +99,34 @@
                     </div>
                 </div>
 
+                <div class="glass-card rounded-2xl border border-indigo-700/50 shadow-xl overflow-hidden mt-6 mb-6">
+                    <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+                        <h3 class="font-bold text-white tracking-wide text-[13px] uppercase">
+                            <i class="fas fa-users-cog text-indigo-400 mr-2"></i> Integração de Login (Banco Centralizado)
+                        </h3>
+                        <button id="btnPuxarUsuarios" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-6 rounded-lg shadow transition-colors text-xs">
+                            <i class="fas fa-cloud-download-alt mr-1"></i> Sincronizar / Visualizar Usuários
+                        </button>
+                    </div>
+                    <div class="bg-slate-900/50 p-4 border-b border-slate-700/50 text-[11px] text-slate-400">
+                        <i class="fas fa-info-circle text-sky-400 mr-1"></i> A autenticação da plataforma está vinculada ao banco de dados externo mestre. Qualquer alteração de senha deve ser feita na plataforma de origem.
+                    </div>
+                    <div class="overflow-x-auto max-h-[300px] overflow-y-auto custom-scrollbar">
+                        <table class="min-w-full text-xs text-left">
+                            <thead class="bg-slate-900/95 text-slate-400 uppercase text-[10px] border-b border-slate-700 sticky top-0">
+                                <tr>
+                                    <th class="px-6 py-3">ID</th>
+                                    <th class="px-6 py-3">Username</th>
+                                    <th class="px-6 py-3">Cargo / Função</th>
+                                    <th class="px-6 py-3 text-center">Primeiro Acesso</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usuariosExternosBody" class="divide-y divide-slate-800/80 text-slate-300">
+                                <tr><td colspan="4" class="text-center py-6 text-slate-500"><i class="fas fa-database text-slate-600 text-2xl block mb-2"></i>Clique em "Sincronizar" para carregar usuários do banco mestre.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
                 <div class="glass-card rounded-2xl border border-rose-900/30 shadow-xl bg-rose-950/20 p-6 flex flex-col md:flex-row justify-between items-center gap-4">
                     <div><h3 class="font-bold text-rose-400"><i class="fas fa-exclamation-triangle mr-2"></i> Zona de Risco</h3><p class="text-[10px] text-slate-400">Limpeza permanente de tabelas.</p></div>
                     <div class="flex flex-col sm:flex-row items-center gap-3">
