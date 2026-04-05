@@ -208,6 +208,11 @@ async function loadDashboardData() {
             if(document.getElementById('tempoCarregamento')) document.getElementById('tempoCarregamento').innerText = '0 h';
             if(chartCiclo) chartCiclo.destroy();
             if(chartTransp) chartTransp.destroy();
+            
+            // Limpar comparativo se vazio
+            const tbodyComp = document.getElementById('comparativoBody');
+            if (tbodyComp) tbodyComp.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-slate-500">Nenhum dado encontrado para o comparativo.</td></tr>';
+            
             return;
         }
 
@@ -333,6 +338,86 @@ async function loadDashboardData() {
                 plugins: { legend: { position: 'right', labels: { font: { size: 11, family: "'Inter', sans-serif" } } }, datalabels: { color: '#f8fafc', anchor: 'end', align: 'end', offset: 4, font: { weight: 'bold', size: 12 } } }
             }
         });
+
+        // =========================================================
+        // NOVO: LÓGICA DO COMPARATIVO SERRANALOG VS OUTRAS VS GERAL
+        // =========================================================
+        const dataSerrana = filteredData.filter(d => (d.transportadora || "").toUpperCase().includes('SERRANALOG'));
+        const dataOutros = filteredData.filter(d => !(d.transportadora || "").toUpperCase().includes('SERRANALOG'));
+        const dataGeral = filteredData;
+
+        function calcResumo(arr) {
+            const viagens = arr.length;
+            const peso = arr.reduce((s, r) => s + (r.pesoLiquido || 0), 0) / 1000;
+            const vol = arr.reduce((s, r) => s + (r.volumeReal || 0), 0);
+            
+            const validCiclo = arr.filter(d => d.cicloHoras !== null && d.cicloHoras > 0);
+            const mCiclo = validCiclo.length > 0 ? validCiclo.reduce((s, d) => s + d.cicloHoras, 0) / validCiclo.length : 0;
+            
+            const validFilaC = arr.filter(d => d.filaCampoHoras !== null && d.filaCampoHoras > 0);
+            const mFilaC = validFilaC.length > 0 ? validFilaC.reduce((s, d) => s + d.filaCampoHoras, 0) / validFilaC.length : 0;
+            
+            const validFilaF = arr.filter(d => d.filaFabricaHoras !== null && d.filaFabricaHoras > 0);
+            const mFilaF = validFilaF.length > 0 ? validFilaF.reduce((s, d) => s + d.filaFabricaHoras, 0) / validFilaF.length : 0;
+
+            const somaCiclosTotais = validCiclo.reduce((s, d) => s + d.cicloHoras, 0);
+            const produtividade = somaCiclosTotais > 0 ? (peso / somaCiclosTotais) : 0;
+
+            return { viagens, peso, vol, mCiclo, mFilaC, mFilaF, produtividade };
+        }
+
+        const rSer = calcResumo(dataSerrana);
+        const rOut = calcResumo(dataOutros);
+        const rGer = calcResumo(dataGeral);
+
+        const tbodyComp = document.getElementById('comparativoBody');
+        if (tbodyComp) {
+            tbodyComp.innerHTML = `
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                    <td class="px-6 py-3 font-bold text-slate-300">Viagens Realizadas</td>
+                    <td class="px-6 py-3 text-right font-black text-emerald-400 bg-emerald-900/10">${rSer.viagens.toLocaleString('pt-PT')}</td>
+                    <td class="px-6 py-3 text-right font-bold text-amber-400 bg-amber-900/10">${rOut.viagens.toLocaleString('pt-PT')}</td>
+                    <td class="px-6 py-3 text-right font-bold text-sky-400 bg-sky-900/10">${rGer.viagens.toLocaleString('pt-PT')}</td>
+                </tr>
+                <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-800/50">
+                    <td class="px-6 py-3 font-bold text-slate-300">Volume Transportado (m³)</td>
+                    <td class="px-6 py-3 text-right font-black text-emerald-400 bg-emerald-900/10">${rSer.vol.toLocaleString('pt-PT', {maximumFractionDigits:1})} m³</td>
+                    <td class="px-6 py-3 text-right font-bold text-amber-400 bg-amber-900/10">${rOut.vol.toLocaleString('pt-PT', {maximumFractionDigits:1})} m³</td>
+                    <td class="px-6 py-3 text-right font-bold text-sky-400 bg-sky-900/10">${rGer.vol.toLocaleString('pt-PT', {maximumFractionDigits:1})} m³</td>
+                </tr>
+                <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-800/50">
+                    <td class="px-6 py-3 font-bold text-slate-300">Peso Total (t)</td>
+                    <td class="px-6 py-3 text-right font-black text-emerald-400 bg-emerald-900/10">${rSer.peso.toLocaleString('pt-PT', {maximumFractionDigits:1})} t</td>
+                    <td class="px-6 py-3 text-right font-bold text-amber-400 bg-amber-900/10">${rOut.peso.toLocaleString('pt-PT', {maximumFractionDigits:1})} t</td>
+                    <td class="px-6 py-3 text-right font-bold text-sky-400 bg-sky-900/10">${rGer.peso.toLocaleString('pt-PT', {maximumFractionDigits:1})} t</td>
+                </tr>
+                <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-800/50">
+                    <td class="px-6 py-3 font-bold text-slate-300">Ciclo Médio</td>
+                    <td class="px-6 py-3 text-right font-black text-emerald-400 bg-emerald-900/10">${formatarHorasMinutos(rSer.mCiclo)}</td>
+                    <td class="px-6 py-3 text-right font-bold text-amber-400 bg-amber-900/10">${formatarHorasMinutos(rOut.mCiclo)}</td>
+                    <td class="px-6 py-3 text-right font-bold text-sky-400 bg-sky-900/10">${formatarHorasMinutos(rGer.mCiclo)}</td>
+                </tr>
+                <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-800/50">
+                    <td class="px-6 py-3 font-bold text-slate-300">Fila de Campo Média</td>
+                    <td class="px-6 py-3 text-right font-black text-emerald-400 bg-emerald-900/10">${formatarHorasMinutos(rSer.mFilaC)}</td>
+                    <td class="px-6 py-3 text-right font-bold text-amber-400 bg-amber-900/10">${formatarHorasMinutos(rOut.mFilaC)}</td>
+                    <td class="px-6 py-3 text-right font-bold text-sky-400 bg-sky-900/10">${formatarHorasMinutos(rGer.mFilaC)}</td>
+                </tr>
+                <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-800/50">
+                    <td class="px-6 py-3 font-bold text-slate-300">Fila de Fábrica Média</td>
+                    <td class="px-6 py-3 text-right font-black text-emerald-400 bg-emerald-900/10">${formatarHorasMinutos(rSer.mFilaF)}</td>
+                    <td class="px-6 py-3 text-right font-bold text-amber-400 bg-amber-900/10">${formatarHorasMinutos(rOut.mFilaF)}</td>
+                    <td class="px-6 py-3 text-right font-bold text-sky-400 bg-sky-900/10">${formatarHorasMinutos(rGer.mFilaF)}</td>
+                </tr>
+                <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-800/50">
+                    <td class="px-6 py-3 font-bold text-slate-300">Produtividade (ton/h)</td>
+                    <td class="px-6 py-3 text-right font-black text-emerald-400 bg-emerald-900/10">${rSer.produtividade.toLocaleString('pt-PT', {maximumFractionDigits:2})}</td>
+                    <td class="px-6 py-3 text-right font-bold text-amber-400 bg-amber-900/10">${rOut.produtividade.toLocaleString('pt-PT', {maximumFractionDigits:2})}</td>
+                    <td class="px-6 py-3 text-right font-bold text-sky-400 bg-sky-900/10">${rGer.produtividade.toLocaleString('pt-PT', {maximumFractionDigits:2})}</td>
+                </tr>
+            `;
+        }
+
     } catch (error) {
         console.error("Erro fatal ao renderizar Dashboard:", error);
     }

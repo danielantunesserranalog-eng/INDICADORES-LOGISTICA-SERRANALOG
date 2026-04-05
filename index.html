@@ -94,6 +94,28 @@
                     <div class="glass-card rounded-2xl p-6 glow-border-rose card-hover"><div class="flex justify-between items-start"><div><p class="text-rose-400 text-[10px] font-bold uppercase tracking-widest">Fila Média Fábrica</p><p id="filaFabrica" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-industry text-rose-500/50 text-3xl"></i></div></div>
                 </div>
 
+                <div class="glass-card rounded-xl border border-slate-700/50 shadow-xl overflow-hidden mb-6">
+                    <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700">
+                        <h3 class="font-bold text-white tracking-wide uppercase text-[13px]">
+                            <i class="fas fa-balance-scale text-sky-400 mr-2"></i> Comparativo de Desempenho (SerranaLog vs Terceiros)
+                        </h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-xs text-left">
+                            <thead class="bg-slate-900/95 text-slate-400 font-semibold uppercase text-[10px] tracking-wider border-b border-slate-700">
+                                <tr>
+                                    <th class="px-6 py-4">Indicador de Performance</th>
+                                    <th class="px-6 py-4 text-emerald-400 bg-emerald-900/10 text-right"><i class="fas fa-star mr-1"></i> SerranaLog Transportes</th>
+                                    <th class="px-6 py-4 text-amber-400 bg-amber-900/10 text-right"><i class="fas fa-truck-moving mr-1"></i> Outras Transportadoras</th>
+                                    <th class="px-6 py-4 text-sky-400 bg-sky-900/10 text-right"><i class="fas fa-globe mr-1"></i> Visão Geral (Todas)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="comparativoBody" class="divide-y divide-slate-800/80 text-slate-300">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div class="glass-card rounded-xl p-5 border border-slate-700/50"><h3 class="font-bold text-slate-200 border-b border-slate-700 pb-3 mb-4 text-sm uppercase"><i class="fas fa-chart-bar text-sky-500 mr-2"></i> Ciclo Médio por Transportadora (h)</h3><canvas id="cicloChart" width="400" height="250" style="max-height: 280px;"></canvas></div>
                     <div class="glass-card rounded-xl p-5 border border-slate-700/50"><h3 class="font-bold text-slate-200 border-b border-slate-700 pb-3 mb-4 text-sm uppercase"><i class="fas fa-chart-pie text-cyan-500 mr-2"></i> Distribuição de Viagens</h3><canvas id="transportadorasChart" width="400" height="250" style="max-height: 280px;"></canvas></div>
