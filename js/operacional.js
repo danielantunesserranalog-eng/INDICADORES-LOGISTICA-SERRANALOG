@@ -117,13 +117,8 @@ function atualizarPainelOperacional() {
     const dataRef = document.getElementById('opDatePicker') ? document.getElementById('opDatePicker').value : null;
     let diasConsiderados = 1;
 
-    const filtered = fullHistoricoDataOp.filter(d => {
-        // =================================================================
-        // NOVO: FILTRA EXCLUSIVAMENTE A TRANSPORTADORA "SERRANALOG"
-        // =================================================================
-        const transp = String(d.transportadora || "").toUpperCase();
-        if (!transp.includes('SERRANALOG')) return false;
-
+    // 1. FILTRO GLOBAL (Todas as transportadoras)
+    const filteredGlobal = fullHistoricoDataOp.filter(d => {
         if(activeQuickFilterOp === 'ALL') return true;
         
         const p = d.dataDaBaseExcel.split('/');
@@ -146,58 +141,83 @@ function atualizarPainelOperacional() {
         return false;
     });
 
+    // 2. FILTRO SERRANALOG (Apenas frota própria)
+    const filteredSerrana = filteredGlobal.filter(d => {
+        const transp = String(d.transportadora || "").toUpperCase();
+        return transp.includes('SERRANALOG');
+    });
+
     // Calcula dias considerados
     if(activeQuickFilterOp === 'ALL') {
-        const dts = new Set(filtered.map(x=>x.dataDaBaseExcel));
+        const dts = new Set(filteredGlobal.map(x=>x.dataDaBaseExcel));
         diasConsiderados = dts.size || 1;
     } else if (activeQuickFilterOp === 'D-7') diasConsiderados = 7;
     else if (activeQuickFilterOp === 'D-30') diasConsiderados = 30;
 
-    // CÁLCULO DINÂMICO DE PLACAS/CAVALOS ÚNICOS (Agora exclusivo SerranaLog)
-    const placasUnicas = new Set(filtered.map(d => d.placa).filter(p => p && p !== '-' && p.trim() !== '')).size || 1;
+    // CÁLCULO DE FROTAS (Placas Únicas)
+    const placasUnicasSerrana = new Set(filteredSerrana.map(d => d.placa).filter(p => p && p !== '-' && p.trim() !== '')).size || 0;
+    const placasUnicasGlobal = new Set(filteredGlobal.map(d => d.placa).filter(p => p && p !== '-' && p.trim() !== '')).size || 0;
 
-    // Atualiza a informação visual do filtro destacando a Frota Própria
+    // Status visual do topo (mostra um resumo de ambas as frotas)
     const opStatusFetch = document.getElementById('opStatusFetch');
     if(opStatusFetch) {
-        opStatusFetch.innerHTML = `<span class="text-sky-400 font-bold">Frota Própria (SerranaLog)</span> | ${filtered.length} viagens | ${diasConsiderados} dia(s) | ${placasUnicas} cavalo(s)`;
+        opStatusFetch.innerHTML = `
+            <span class="text-sky-400 font-bold">F. Própria: ${placasUnicasSerrana}</span> | 
+            <span class="text-emerald-400 font-bold">F. Global: ${placasUnicasGlobal}</span> | 
+            ${diasConsiderados} dia(s)
+        `;
     }
     
-    // Atualiza as labels dos cards para mostrar que o cálculo é baseado na Frota (F)
+    // Atualiza as labels dos cards
     const lblMultiplicador1 = document.getElementById('diasMultiplicador1');
     const lblMultiplicador2 = document.getElementById('diasMultiplicador2');
-    if(lblMultiplicador1) lblMultiplicador1.innerText = `${diasConsiderados}d | F:${placasUnicas}`;
-    if(lblMultiplicador2) lblMultiplicador2.innerText = `${diasConsiderados}d | F:${placasUnicas}`;
+    
+    // Viagens tem multiplicador de frota
+    if(lblMultiplicador1) lblMultiplicador1.innerText = `${diasConsiderados}d | F:${placasUnicasSerrana} (Serrana)`;
+    
+    // Volume NÃO tem multiplicador de frota, é só a quantidade de dias
+    if(lblMultiplicador2) lblMultiplicador2.innerText = `${diasConsiderados}d`;
 
-    // 1. VIAGENS: (Meta baseada em Cavalo/Dia) * (Qtd de Cavalos) * (Qtd de Dias)
-    const totalV = filtered.length;
-    const metaV = (metasGlobais.v_prog || 0) * placasUnicas * diasConsiderados;
+    // ========================================================
+    // CARD 1 - VIAGENS (Apenas Frota Própria - SerranaLog)
+    // Multiplica a Meta de Viagens pelo Número de Caminhões e Dias
+    // ========================================================
+    const totalV_Serrana = filteredSerrana.length;
+    const metaV = (metasGlobais.v_prog || 0) * (placasUnicasSerrana === 0 ? 0 : placasUnicasSerrana) * diasConsiderados;
     document.getElementById('disp_v_prog').innerText = metaV;
-    document.getElementById('disp_v_real').innerText = totalV;
-    atualizarBarra('bar_v_perc', 'disp_v_perc', totalV, metaV);
+    document.getElementById('disp_v_real').innerText = totalV_Serrana;
+    atualizarBarra('bar_v_perc', 'disp_v_perc', totalV_Serrana, metaV);
 
-    // 2. VOLUME: (Meta baseada em Cavalo/Dia) * (Qtd de Cavalos) * (Qtd de Dias)
-    const totalVol = filtered.reduce((s,x)=>s+(x.volumeReal||0), 0);
-    const metaVol = (metasGlobais.vol_prog || 0) * placasUnicas * diasConsiderados;
+    // ========================================================
+    // CARD 2 - VOLUME (Frota Global - Todas)
+    // Multiplica a Meta de Volume APENAS pelos Dias (Meta do Contrato)
+    // ========================================================
+    const totalVol_Global = filteredGlobal.reduce((s,x)=>s+(x.volumeReal||0), 0);
+    const metaVol = (metasGlobais.vol_prog || 0) * diasConsiderados; // <--- CORREÇÃO AQUI
     document.getElementById('disp_vol_prog').innerText = metaVol.toLocaleString('pt-PT');
-    document.getElementById('disp_vol_real').innerText = totalVol.toLocaleString('pt-PT', {maximumFractionDigits:1});
-    atualizarBarra('bar_vol_perc', 'disp_vol_perc', totalVol, metaVol);
+    document.getElementById('disp_vol_real').innerText = totalVol_Global.toLocaleString('pt-PT', {maximumFractionDigits:1});
+    atualizarBarra('bar_vol_perc', 'disp_vol_perc', totalVol_Global, metaVol);
 
-    // 3. CAIXA DE CARGA MÉDIA (A meta se mantém fixa como média global por viagem)
-    const mediaCx = totalV > 0 ? (totalVol/totalV) : 0;
+    // ========================================================
+    // CARD 3 E 4 - CAIXA E PBTC MÉDIO (Frota Global)
+    // ========================================================
+    const totalV_Global = filteredGlobal.length;
+    
+    const mediaCx = totalV_Global > 0 ? (totalVol_Global / totalV_Global) : 0;
     const metaCx = metasGlobais.cx_prog || 0;
     document.getElementById('disp_cx_prog').innerText = metaCx;
     document.getElementById('disp_cx_real').innerText = mediaCx.toLocaleString('pt-PT', {maximumFractionDigits:2});
     atualizarBarra('bar_cx_perc', 'disp_cx_perc', mediaCx, metaCx);
 
-    // 4. PBTC MÉDIO (A meta se mantém fixa como média global por viagem)
-    const totalP = filtered.reduce((s,x)=>s+(x.pesoLiquido||0), 0)/1000;
-    const mediaPbtc = totalV > 0 ? (totalP/totalV) : 0;
+    const totalP_Global = filteredGlobal.reduce((s,x)=>s+(x.pesoLiquido||0), 0)/1000;
+    const mediaPbtc = totalV_Global > 0 ? (totalP_Global / totalV_Global) : 0;
     const metaPbtc = metasGlobais.pbtc_prog || 0;
     document.getElementById('disp_pbtc_prog').innerText = metaPbtc;
     document.getElementById('disp_pbtc_real').innerText = mediaPbtc.toLocaleString('pt-PT', {maximumFractionDigits:2});
     atualizarBarra('bar_pbtc_perc', 'disp_pbtc_perc', mediaPbtc, metaPbtc);
 
-    renderLeaderboards(filtered);
+    // Leaderboards agora mostram o TOP Geral para refletir a meta global de volume
+    renderLeaderboards(filteredGlobal);
 }
 
 function atualizarBarra(barId, txtId, real, meta) {
