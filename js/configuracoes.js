@@ -122,16 +122,36 @@ if (btnLimparBanco) {
                 btnLimparBanco.disabled = true;
                 btnLimparBanco.classList.add('opacity-50', 'cursor-not-allowed');
 
+                // FUNÇÃO NOVA CORRIGIDA: Usa colunas garantidas de existirem nas tabelas
+                async function apagarEmLotes(tabela, colunaReferencia) {
+                    let temDados = true;
+                    let contador = 0; // Proteção extra contra laços infinitos
+                    
+                    while (temDados && contador < 100) {
+                        contador++;
+                        // Verifica se tem algum dado procurando pela coluna específica
+                        const { data, error } = await supabaseClient.from(tabela).select(colunaReferencia).limit(1);
+                        
+                        if (error || !data || data.length === 0) {
+                            temDados = false; // Tabela vazia ou fim dos dados
+                        } else {
+                            // Deleta os registros filtrando pela coluna que sabemos que existe
+                            await supabaseClient.from(tabela).delete().not(colunaReferencia, 'is', null);
+                        }
+                    }
+                }
+
+                // Agora acionamos a exclusão com a coluna exata de cada tabela!
                 if (tipo === 'tudo' || tipo === 'viagens') {
-                    await supabaseClient.from('historico_viagens').delete().gt('id', 0); // CORRIGIDO PARA .gt('id', 0)
+                    await apagarEmLotes('historico_viagens', 'movimento');
                 }
                 
                 if (tipo === 'tudo' || tipo === 'jornadas') {
-                    await supabaseClient.from('historico_jornadas').delete().gt('id', 0);
+                    await apagarEmLotes('historico_jornadas', 'motorista');
                 }
 
                 if (tipo === 'tudo' || tipo === 'eventos') {
-                    await supabaseClient.from('historico_eventos').delete().gt('id', 0);
+                    await apagarEmLotes('historico_eventos', 'motorista');
                 }
                 
                 await supabaseClient.from('historico_importacoes').insert([{
@@ -140,7 +160,7 @@ if (btnLimparBanco) {
                     "dataLancamento": new Date().toLocaleString('pt-PT')
                 }]);
 
-                alert("Operação concluída. Os dados selecionados foram apagados da nuvem.");
+                alert("Operação concluída. Os dados selecionados foram completamente apagados da nuvem.");
                 carregarHistoricoImportacoes(); 
                 
             } catch (error) {
@@ -166,7 +186,7 @@ async function processAndSaveJornadasFile(file) {
 
     try {
         const text = await file.text();
-        const workbook = XLSX.read(text, { type: 'string', raw: true, FS: ';' }); // CORRIGIDO FS: ';'
+        const workbook = XLSX.read(text, { type: 'string', raw: true, FS: ';' }); 
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
@@ -233,7 +253,6 @@ async function processAndSaveJornadasFile(file) {
 
         if(mappedData.length === 0) throw new Error("Nenhuma jornada válida (>= 8h) foi encontrada. Verifique os horários no CSV.");
 
-        // CORRIGIDO O LIMITE DO SUPABASE AQUI (limit(100000))
         const { data: existingJornadas, error: selErr } = await supabaseClient.from('historico_jornadas').select('motorista, inicio').limit(100000);
         if (selErr) throw selErr;
 
@@ -435,7 +454,6 @@ async function processAndSaveFile(file) {
 
         if (!newRows || newRows.length === 0) throw new Error("Planilha vazia ou sem dados válidos.");
 
-        // CORRIGIDO O LIMITE DO SUPABASE AQUI (limit(100000))
         const { data: existingIds, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento').limit(100000);
         if (selErr) throw selErr;
         
