@@ -103,16 +103,16 @@ async function loadOperacionalData() {
         const { data: metas } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
         if(metas) metasGlobais = metas;
 
-        // Otimização: Buscando os 15.000 mais recentes apenas
+        // Otimização: Buscando os 15.000 mais recentes (SEM o .order('id') para evitar o Erro 400)
         const { data: historico } = await supabaseClient
             .from('historico_viagens')
             .select('*')
-            .order('id', { ascending: false })
             .limit(15000);
 
         if(historico) {
-            fullHistoricoDataOp = historico;
-            const allDates = [...new Set(historico.map(d => d.dataDaBaseExcel))].filter(d => d && d !== 'Desconhecida');
+            // Invertemos a matriz no JavaScript como nos outros arquivos
+            fullHistoricoDataOp = historico.reverse();
+            const allDates = [...new Set(fullHistoricoDataOp.map(d => d.dataDaBaseExcel))].filter(d => d && d !== 'Desconhecida');
             verificarStatusAtualizacao(allDates);
             atualizarPainelOperacional();
         }
