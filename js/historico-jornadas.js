@@ -40,11 +40,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function carregarDropdownMotoristas() {
     try {
+        // Sem order('id')
         const { data } = await supabaseClient
             .from('historico_jornadas')
             .select('motorista')
-            .order('id', { ascending: false })
-            .limit(5000); // Puxa os motoristas recentes para criar as opções
+            .limit(5000); 
             
         if (data) {
             const select = document.getElementById('filterMotoristaDropdown');
@@ -77,10 +77,10 @@ async function loadHistoricoJornadasCompleto(reset = false) {
         const de = paginaAtualJor * itensPorPaginaJor;
         const ate = de + itensPorPaginaJor - 1;
 
+        // Sem order('id')
         let query = supabaseClient
             .from('historico_jornadas')
             .select('*')
-            .order('id', { ascending: false })
             .range(de, ate);
 
         if (motoristaFiltroJor !== 'ALL') {
@@ -97,7 +97,8 @@ async function loadHistoricoJornadasCompleto(reset = false) {
         
         if (data) { 
             if (data.length < itensPorPaginaJor) fimDosDadosJor = true;
-            fullHistoricoJornadas = [...fullHistoricoJornadas, ...data];
+            // Inverte os dados com reverse()
+            fullHistoricoJornadas = [...fullHistoricoJornadas, ...data.reverse()];
             paginaAtualJor++;
             renderHistoricoJornadasTable(); 
         }

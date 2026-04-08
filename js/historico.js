@@ -46,14 +46,13 @@ async function loadHistoricoCompleto(reset = false) {
         const de = paginaAtual * itensPorPagina;
         const ate = de + itensPorPagina - 1;
 
+        // Sem o order('id') para não dar Erro 400
         let query = supabaseClient
             .from('historico_viagens')
             .select('*')
-            .order('id', { ascending: false })
             .range(de, ate);
 
         if (termoBuscaAtual) {
-            // Busca otimizada direto no banco de dados (muito mais rápido)
             query = query.or(`placa.ilike.%${termoBuscaAtual}%,transportadora.ilike.%${termoBuscaAtual}%,movimento.ilike.%${termoBuscaAtual}%`);
         }
 
@@ -65,7 +64,8 @@ async function loadHistoricoCompleto(reset = false) {
             if (data.length < itensPorPagina) {
                 fimDosDados = true;
             }
-            fullHistoricoData = [...fullHistoricoData, ...data];
+            // Inverte os dados novos que chegarem para os mais recentes ficarem no topo
+            fullHistoricoData = [...fullHistoricoData, ...data.reverse()];
             paginaAtual++;
             renderHistoricoTable(); 
         }

@@ -136,15 +136,15 @@ async function loadDashboardData() {
         if(statusLabel) statusLabel.innerText = "Carregando...";
 
         if(fullHistoricoData.length === 0) {
-            // Alterado para trazer os 15.000 mais recentes e não travar o Dashboard
+            // Removido o order('id')
             const { data, error } = await supabaseClient
                 .from('historico_viagens')
                 .select('*')
-                .order('id', { ascending: false })
                 .limit(15000); 
 
             if(error) throw error;
-            if(data) fullHistoricoData = data;
+            // Usando reverse no JavaScript
+            if(data) fullHistoricoData = data.reverse();
         }
         const storedData = fullHistoricoData;
         if(!storedData.length) {
