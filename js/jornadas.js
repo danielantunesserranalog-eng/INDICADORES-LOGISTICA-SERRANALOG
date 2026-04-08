@@ -314,12 +314,22 @@ function renderizarPainelJornadas() {
     if (chartStatusFrota) chartStatusFrota.destroy();
     if (chartFaixaHoras) chartFaixaHoras.destroy();
 
+    const totalStatus = qtdOk + qtdEstouros;
+    const percOk = totalStatus > 0 ? ((qtdOk / totalStatus) * 100).toFixed(1) : 0;
+    const percEstouros = totalStatus > 0 ? ((qtdEstouros / totalStatus) * 100).toFixed(1) : 0;
+
     const ctxStatus = document.getElementById('statusFrotaChart').getContext('2d');
     chartStatusFrota = new Chart(ctxStatus, {
         type: 'doughnut',
-        data: { labels: ['OK (<= 12h)', 'Infração (> 12h)'], datasets: [{ data: [qtdOk, qtdEstouros], backgroundColor: ['#10b981', '#f43f5e'], borderWidth: 2, borderColor: '#1e293b' }] },
+        data: { 
+            labels: [
+                `OK (<= 12h): ${qtdOk} (${percOk}%)`, 
+                `Infração (> 12h): ${qtdEstouros} (${percEstouros}%)`
+            ], 
+            datasets: [{ data: [qtdOk, qtdEstouros], backgroundColor: ['#10b981', '#f43f5e'], borderWidth: 2, borderColor: '#1e293b' }] 
+        },
         plugins: [centerTextPluginJornadas],
-        options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } }, datalabels: { display: false } } }
+        options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }, datalabels: { display: false } } }
     });
 
     const ctxFaixas = document.getElementById('faixaHorasChart').getContext('2d');
