@@ -10,6 +10,7 @@ Chart.defaults.font.family = "'Inter', sans-serif";
 let fullJornadasData = []; 
 let jornadasGlobalData = [];
 let activeQuickFilterJor = 'ALL';
+let currentStatusFilter = 'ALL'; // Nova variável para o filtro clicável do gráfico
 
 let chartStatusFrota = null;
 let chartFaixaHoras = null;
@@ -42,6 +43,7 @@ function configurarFiltros() {
             activeQuickFilterJor = e.currentTarget.getAttribute('data-qf');
             atualizarBotoesFiltro();
             if (activeQuickFilterJor !== 'ALL') { document.getElementById('filterDataSelect').value = 'ALL'; }
+            currentStatusFilter = 'ALL'; // Reseta o filtro do gráfico ao mudar de data
             renderizarPainelJornadas();
         });
     });
@@ -136,13 +138,13 @@ function popularFiltroDatas() {
     
     selectData.addEventListener('change', (e) => {
         if(e.target.value !== 'ALL') { activeQuickFilterJor = 'ALL'; atualizarBotoesFiltro(); }
+        currentStatusFilter = 'ALL'; // Reseta o filtro do gráfico ao mudar de data
         renderizarPainelJornadas();
     });
 }
 
 async function carregarPainelJornadas() {
     try {
-        // Otimizado: Busca as 10.000 jornadas mais recentes.
         const { data: dadosBrutos, error } = await supabaseClient
             .from('historico_jornadas')
             .select('*')
@@ -182,6 +184,7 @@ function renderizarPainelJornadas() {
     let dados = fullJornadasData;
     const dataEspec = document.getElementById('filterDataSelect').value;
 
+    // 1. Filtra por Data e Filtros Rápidos (D-1, etc)
     dados = dados.filter(d => {
         let dataParsedStr = '-';
         const matchDate = d.inicio ? d.inicio.match(regexDate) : null;
@@ -206,9 +209,9 @@ function renderizarPainelJornadas() {
     });
 
     jornadasGlobalData = dados;
-    document.getElementById('jorFilterStatus').innerText = `${dados.length} Registros`;
 
     if (dados.length === 0) { 
+        document.getElementById('jorFilterStatus').innerText = '0 Registros';
         document.getElementById('jorTotalMotoristas').innerText = '0';
         document.getElementById('jorQtdEstouros').innerText = '0';
         document.getElementById('jorMediaDirecao').innerText = '0h 00m';
@@ -221,7 +224,22 @@ function renderizarPainelJornadas() {
         return; 
     }
 
+    // 2. Calcula total do gráfico ANTES de aplicar o filtro do clique
     let qtdOk = 0, qtdEstouros = 0;
+    dados.forEach(linha => {
+        if ((linha.total_trabalho_horas || 0) > 12) qtdEstouros++; else qtdOk++;
+    });
+
+    // 3. Aplica o filtro de clique no gráfico para renderizar os dados abaixo
+    let dadosFiltrados = dados.filter(d => {
+        const isEstouro = (d.total_trabalho_horas || 0) > 12;
+        if (currentStatusFilter === 'OK' && isEstouro) return false;
+        if (currentStatusFilter === 'INFRACAO' && !isEstouro) return false;
+        return true;
+    });
+
+    document.getElementById('jorFilterStatus').innerText = `${dadosFiltrados.length} Registros`;
+
     let totalMinutosDirecao = 0; let qtdDirecao = 0;
     let fx8_10 = 0, fx10_12 = 0, fx12_14 = 0, fx14mais = 0;
     
@@ -230,12 +248,11 @@ function renderizarPainelJornadas() {
     
     const agregacaoMotoristas = new Map();
 
-    dados.forEach(linha => {
+    // 4. Popula tabelas com dadosFiltrados
+    dadosFiltrados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
         const isEstouro = horas > 12;
         const motNome = linha.motorista;
-        
-        if (isEstouro) qtdEstouros++; else qtdOk++;
 
         if (horas >= 8 && horas < 10) fx8_10++;
         else if (horas >= 10 && horas <= 12) fx10_12++;
@@ -307,29 +324,77 @@ function renderizarPainelJornadas() {
     });
 
     document.getElementById('jorTotalMotoristas').textContent = arrMot.length;
-    document.getElementById('jorQtdEstouros').textContent = qtdEstouros;
+    document.getElementById('jorQtdEstouros').textContent = dadosFiltrados.filter(d => (d.total_trabalho_horas || 0) > 12).length;
     document.getElementById('jorMediaDirecao').textContent = formatarHorasMinutos(qtdDirecao > 0 ? (totalMinutosDirecao / qtdDirecao) / 60 : 0);
-    document.getElementById('jorDataReferencia').textContent = `Filtro: ${dataEspec !== 'ALL' ? dataEspec : activeQuickFilterJor}`;
+    
+    let filterText = dataEspec !== 'ALL' ? dataEspec : activeQuickFilterJor;
+    if (currentStatusFilter !== 'ALL') filterText += ` | Status: ${currentStatusFilter}`;
+    document.getElementById('jorDataReferencia').textContent = `Filtro: ${filterText}`;
 
     if (chartStatusFrota) chartStatusFrota.destroy();
     if (chartFaixaHoras) chartFaixaHoras.destroy();
 
     const totalStatus = qtdOk + qtdEstouros;
-    const percOk = totalStatus > 0 ? ((qtdOk / totalStatus) * 100).toFixed(1) : 0;
-    const percEstouros = totalStatus > 0 ? ((qtdEstouros / totalStatus) * 100).toFixed(1) : 0;
+    
+    // Deixa transparente a fatia que não está filtrada
+    const bgColors = ['#10b981', '#f43f5e'];
+    if (currentStatusFilter === 'OK') bgColors[1] = '#f43f5e33'; 
+    if (currentStatusFilter === 'INFRACAO') bgColors[0] = '#10b98133';
 
     const ctxStatus = document.getElementById('statusFrotaChart').getContext('2d');
     chartStatusFrota = new Chart(ctxStatus, {
         type: 'doughnut',
         data: { 
-            labels: [
-                `OK (<= 12h): ${qtdOk} (${percOk}%)`, 
-                `Infração (> 12h): ${qtdEstouros} (${percEstouros}%)`
-            ], 
-            datasets: [{ data: [qtdOk, qtdEstouros], backgroundColor: ['#10b981', '#f43f5e'], borderWidth: 2, borderColor: '#1e293b' }] 
+            labels: ['OK (<= 12h)', 'Infração (> 12h)'], 
+            datasets: [{ 
+                data: [qtdOk, qtdEstouros], 
+                backgroundColor: bgColors, 
+                borderWidth: 2, 
+                borderColor: '#1e293b' 
+            }] 
         },
         plugins: [centerTextPluginJornadas],
-        options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }, datalabels: { display: false } } }
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            cutout: '65%', // Reduzido para dar espaço as labels por fora
+            layout: {
+                padding: { top: 20, bottom: 20, left: 30, right: 30 } // Espaço para as labels
+            },
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const index = elements[0].index;
+                    if (index === 0) currentStatusFilter = currentStatusFilter === 'OK' ? 'ALL' : 'OK';
+                    else currentStatusFilter = currentStatusFilter === 'INFRACAO' ? 'ALL' : 'INFRACAO';
+                } else {
+                    currentStatusFilter = 'ALL'; // Clicar fora reseta
+                }
+                renderizarPainelJornadas();
+            },
+            onHover: (event, elements) => {
+                event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+            },
+            plugins: { 
+                legend: { 
+                    position: 'right', 
+                    labels: { boxWidth: 12, font: { size: 11 } } 
+                }, 
+                datalabels: { 
+                    display: true,
+                    color: '#f8fafc',
+                    font: { weight: 'bold', size: 11 },
+                    textAlign: 'center',
+                    anchor: 'end', // Joga pra fora do anel
+                    align: 'end',  // Alinha na ponta de fora
+                    offset: 5,     // Distância da borda
+                    formatter: (value) => {
+                        if (value === 0) return null;
+                        const perc = totalStatus > 0 ? ((value / totalStatus) * 100).toFixed(1) : 0;
+                        return `${value}\n(${perc}%)`;
+                    }
+                } 
+            } 
+        }
     });
 
     const ctxFaixas = document.getElementById('faixaHorasChart').getContext('2d');
