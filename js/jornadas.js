@@ -65,7 +65,6 @@ function extrairDataParaFiltro(dataStr) {
     return null;
 }
 
-// LOGICA DO INDICADOR VERDINHO/AMARELO
 function verificarStatusAtualizacao(datasArray) {
     const indicador = document.getElementById('indicadorAtualizacao');
     const icone = document.getElementById('iconeAtualizacao');
@@ -126,7 +125,6 @@ function popularFiltroDatas() {
         }
     });
     
-    // Atualiza o Indicador de Atualização Geral do Sistema (antes dos filtros)
     verificarStatusAtualizacao(Array.from(datasSet));
 
     const datasUnicas = Array.from(datasSet).sort((a, b) => {
@@ -144,7 +142,13 @@ function popularFiltroDatas() {
 
 async function carregarPainelJornadas() {
     try {
-        const { data: dadosBrutos, error } = await supabaseClient.from('historico_jornadas').select('*').order('total_trabalho_horas', { ascending: false });
+        // Otimizado: Busca as 10.000 jornadas mais recentes.
+        const { data: dadosBrutos, error } = await supabaseClient
+            .from('historico_jornadas')
+            .select('*')
+            .order('id', { ascending: false })
+            .limit(10000);
+
         if (error) throw error;
         if (dadosBrutos) fullJornadasData = dadosBrutos.filter(d => d.total_trabalho_horas >= 8);
         popularFiltroDatas();

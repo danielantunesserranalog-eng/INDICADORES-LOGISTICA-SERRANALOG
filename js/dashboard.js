@@ -136,8 +136,13 @@ async function loadDashboardData() {
         if(statusLabel) statusLabel.innerText = "Carregando...";
 
         if(fullHistoricoData.length === 0) {
-            // CORRIGIDO O LIMITE DO SUPABASE AQUI (limit(100000))
-            const { data, error } = await supabaseClient.from('historico_viagens').select('*').limit(100000);
+            // Alterado para trazer os 15.000 mais recentes e não travar o Dashboard
+            const { data, error } = await supabaseClient
+                .from('historico_viagens')
+                .select('*')
+                .order('id', { ascending: false })
+                .limit(15000); 
+
             if(error) throw error;
             if(data) fullHistoricoData = data;
         }
@@ -209,7 +214,6 @@ async function loadDashboardData() {
             if(chartCiclo) chartCiclo.destroy();
             if(chartTransp) chartTransp.destroy();
             
-            // Limpar comparativo se vazio
             const tbodyComp = document.getElementById('comparativoBody');
             if (tbodyComp) tbodyComp.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-slate-500">Nenhum dado encontrado para o comparativo.</td></tr>';
             
@@ -221,10 +225,7 @@ async function loadDashboardData() {
         const totalViagens = filteredData.length;
         const totalPesoKg = filteredData.reduce((sum, r) => sum + r.pesoLiquido, 0);
         const totalPesoTon = totalPesoKg / 1000;
-        
         const totalVolume = filteredData.reduce((sum, r) => sum + (r.volumeReal || 0), 0);
-        
-        // CÁLCULO DA MÉDIA DE VOLUME POR VIAGEM (Substituiu a Carga Média)
         const mediaVolumeViagem = totalViagens > 0 ? (totalVolume / totalViagens) : 0;
         
         const mediaAsfalto = totalViagens > 0 ? filteredData.reduce((sum, r) => sum + (r.distanciaAsfalto||0), 0) / totalViagens : 0;
@@ -248,7 +249,6 @@ async function loadDashboardData() {
         document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
         document.getElementById('totalPesoLiq').innerText = totalPesoTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
         
-        // Atualizando o Card da Média de Volume e do Volume Total
         if(document.getElementById('mediaVolumeViagem')) document.getElementById('mediaVolumeViagem').innerText = mediaVolumeViagem.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
         if(document.getElementById('totalVolumeReal')) document.getElementById('totalVolumeReal').innerText = totalVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
         
@@ -307,13 +307,8 @@ async function loadDashboardData() {
             return count > 0 ? parseFloat((transpCicloSum.get(nome) / count).toFixed(1)) : 0;
         });
 
-        // =========================================================
-        // NOVO: GRÁFICO DE DONUT COM A FATIA "OUTRAS" PARA BATER O TOTAL
-        // =========================================================
         const todasTranspOrdenadas = Array.from(transpCount.entries()).sort((a, b) => b[1] - a[1]);
-        
         let topParaDonut = todasTranspOrdenadas.slice(0, 5);
-        
         if (todasTranspOrdenadas.length > 5) {
             const somaResto = todasTranspOrdenadas.slice(5).reduce((acc, curr) => acc + curr[1], 0);
             topParaDonut.push(["Outras", somaResto]);
@@ -350,9 +345,6 @@ async function loadDashboardData() {
             }
         });
 
-        // =========================================================
-        // NOVO: LÓGICA DO COMPARATIVO SERRANALOG VS OUTRAS VS GERAL
-        // =========================================================
         const dataSerrana = filteredData.filter(d => (d.transportadora || "").toUpperCase().includes('SERRANALOG'));
         const dataOutros = filteredData.filter(d => !(d.transportadora || "").toUpperCase().includes('SERRANALOG'));
         const dataGeral = filteredData;
@@ -361,16 +353,12 @@ async function loadDashboardData() {
             const viagens = arr.length;
             const peso = arr.reduce((s, r) => s + (r.pesoLiquido || 0), 0) / 1000;
             const vol = arr.reduce((s, r) => s + (r.volumeReal || 0), 0);
-            
             const validCiclo = arr.filter(d => d.cicloHoras !== null && d.cicloHoras > 0);
             const mCiclo = validCiclo.length > 0 ? validCiclo.reduce((s, d) => s + d.cicloHoras, 0) / validCiclo.length : 0;
-            
             const validFilaC = arr.filter(d => d.filaCampoHoras !== null && d.filaCampoHoras > 0);
             const mFilaC = validFilaC.length > 0 ? validFilaC.reduce((s, d) => s + d.filaCampoHoras, 0) / validFilaC.length : 0;
-            
             const validFilaF = arr.filter(d => d.filaFabricaHoras !== null && d.filaFabricaHoras > 0);
             const mFilaF = validFilaF.length > 0 ? validFilaF.reduce((s, d) => s + d.filaFabricaHoras, 0) / validFilaF.length : 0;
-
             const somaCiclosTotais = validCiclo.reduce((s, d) => s + d.cicloHoras, 0);
             const produtividade = somaCiclosTotais > 0 ? (peso / somaCiclosTotais) : 0;
 
