@@ -10,7 +10,7 @@ Chart.defaults.font.family = "'Inter', sans-serif";
 let fullJornadasData = []; 
 let jornadasGlobalData = [];
 let activeQuickFilterJor = 'ALL';
-let currentStatusFilter = 'ALL'; // Nova variável para o filtro clicável do gráfico
+let currentStatusFilter = 'ALL'; 
 
 let chartStatusFrota = null;
 let chartFaixaHoras = null;
@@ -43,7 +43,7 @@ function configurarFiltros() {
             activeQuickFilterJor = e.currentTarget.getAttribute('data-qf');
             atualizarBotoesFiltro();
             if (activeQuickFilterJor !== 'ALL') { document.getElementById('filterDataSelect').value = 'ALL'; }
-            currentStatusFilter = 'ALL'; // Reseta o filtro do gráfico ao mudar de data
+            currentStatusFilter = 'ALL'; 
             renderizarPainelJornadas();
         });
     });
@@ -138,7 +138,7 @@ function popularFiltroDatas() {
     
     selectData.addEventListener('change', (e) => {
         if(e.target.value !== 'ALL') { activeQuickFilterJor = 'ALL'; atualizarBotoesFiltro(); }
-        currentStatusFilter = 'ALL'; // Reseta o filtro do gráfico ao mudar de data
+        currentStatusFilter = 'ALL'; 
         renderizarPainelJornadas();
     });
 }
@@ -168,14 +168,16 @@ const centerTextPluginJornadas = {
         const centerY = (chartArea.top + chartArea.bottom) / 2;
         const total = chart.config.data.datasets[0].data.reduce((a, b) => a + b, 0);
         ctx.restore();
-        ctx.font = "bold 24px 'Inter', sans-serif";
+        
+        ctx.font = "bold 28px 'Inter', sans-serif";
         ctx.textBaseline = "middle";
         ctx.fillStyle = "#f8fafc"; 
         const text = total;
-        ctx.fillText(text, centerX - (ctx.measureText(text).width / 2), centerY - 5);
-        ctx.font = "bold 10px 'Inter', sans-serif";
+        ctx.fillText(text, centerX - (ctx.measureText(text).width / 2), centerY - 6);
+        
+        ctx.font = "bold 12px 'Inter', sans-serif";
         ctx.fillStyle = "#94a3b8"; 
-        ctx.fillText("REGISTROS", centerX - (ctx.measureText("REGISTROS").width / 2), centerY + 15);
+        ctx.fillText("REGISTROS", centerX - (ctx.measureText("REGISTROS").width / 2), centerY + 18);
         ctx.save();
     }
 };
@@ -184,7 +186,6 @@ function renderizarPainelJornadas() {
     let dados = fullJornadasData;
     const dataEspec = document.getElementById('filterDataSelect').value;
 
-    // 1. Filtra por Data e Filtros Rápidos (D-1, etc)
     dados = dados.filter(d => {
         let dataParsedStr = '-';
         const matchDate = d.inicio ? d.inicio.match(regexDate) : null;
@@ -224,13 +225,11 @@ function renderizarPainelJornadas() {
         return; 
     }
 
-    // 2. Calcula total do gráfico ANTES de aplicar o filtro do clique
     let qtdOk = 0, qtdEstouros = 0;
     dados.forEach(linha => {
         if ((linha.total_trabalho_horas || 0) > 12) qtdEstouros++; else qtdOk++;
     });
 
-    // 3. Aplica o filtro de clique no gráfico para renderizar os dados abaixo
     let dadosFiltrados = dados.filter(d => {
         const isEstouro = (d.total_trabalho_horas || 0) > 12;
         if (currentStatusFilter === 'OK' && isEstouro) return false;
@@ -248,7 +247,6 @@ function renderizarPainelJornadas() {
     
     const agregacaoMotoristas = new Map();
 
-    // 4. Popula tabelas com dadosFiltrados
     dadosFiltrados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
         const isEstouro = horas > 12;
@@ -336,7 +334,6 @@ function renderizarPainelJornadas() {
 
     const totalStatus = qtdOk + qtdEstouros;
     
-    // Deixa transparente a fatia que não está filtrada
     const bgColors = ['#10b981', '#f43f5e'];
     if (currentStatusFilter === 'OK') bgColors[1] = '#f43f5e33'; 
     if (currentStatusFilter === 'INFRACAO') bgColors[0] = '#10b98133';
@@ -357,9 +354,9 @@ function renderizarPainelJornadas() {
         options: { 
             responsive: true, 
             maintainAspectRatio: false, 
-            cutout: '65%', // Reduzido para dar espaço as labels por fora
+            cutout: '60%', 
             layout: {
-                padding: { top: 20, bottom: 20, left: 30, right: 30 } // Espaço para as labels
+                padding: { top: 40, bottom: 40, left: 20, right: 20 } 
             },
             onClick: (event, elements) => {
                 if (elements.length > 0) {
@@ -367,7 +364,7 @@ function renderizarPainelJornadas() {
                     if (index === 0) currentStatusFilter = currentStatusFilter === 'OK' ? 'ALL' : 'OK';
                     else currentStatusFilter = currentStatusFilter === 'INFRACAO' ? 'ALL' : 'INFRACAO';
                 } else {
-                    currentStatusFilter = 'ALL'; // Clicar fora reseta
+                    currentStatusFilter = 'ALL';
                 }
                 renderizarPainelJornadas();
             },
@@ -377,16 +374,16 @@ function renderizarPainelJornadas() {
             plugins: { 
                 legend: { 
                     position: 'right', 
-                    labels: { boxWidth: 12, font: { size: 11 } } 
+                    labels: { boxWidth: 12, font: { size: 12 } } 
                 }, 
                 datalabels: { 
                     display: true,
                     color: '#f8fafc',
-                    font: { weight: 'bold', size: 11 },
+                    font: { weight: 'bold', size: 14 }, 
                     textAlign: 'center',
-                    anchor: 'end', // Joga pra fora do anel
-                    align: 'end',  // Alinha na ponta de fora
-                    offset: 5,     // Distância da borda
+                    anchor: 'end',
+                    align: 'end',
+                    offset: 8, 
                     formatter: (value) => {
                         if (value === 0) return null;
                         const perc = totalStatus > 0 ? ((value / totalStatus) * 100).toFixed(1) : 0;
@@ -403,8 +400,43 @@ function renderizarPainelJornadas() {
 
     chartFaixaHoras = new Chart(ctxFaixas, {
         type: 'bar',
-        data: { labels: ['8h a 10h', '10h a 12h', '12h a 14h', '> 14h'], datasets: [{ label: 'Qtd de Jornadas', data: [fx8_10, fx10_12, fx12_14, fx14mais], backgroundColor: [gradientBar, gradientBar, '#f43f5e', '#9f1239'], borderRadius: 4, barPercentage: 0.6 }] },
-        options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 20 } }, plugins: { legend: { display: false }, datalabels: { color: '#fff', anchor: 'end', align: 'top', font: { weight: 'bold' } } }, scales: { y: { display: false }, x: { grid: { display: false }, ticks: { font: { size: 11 } } } } }
+        data: { 
+            labels: ['8h a 10h', '10h a 12h', '12h a 14h', '> 14h'], 
+            datasets: [{ 
+                label: 'Qtd de Jornadas', 
+                data: [fx8_10, fx10_12, fx12_14, fx14mais], 
+                backgroundColor: [gradientBar, gradientBar, '#f43f5e', '#9f1239'], 
+                borderRadius: 4, 
+                barPercentage: 0.6 
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            layout: { 
+                padding: { top: 25, bottom: 10 } // Adicionado espaço inferior
+            }, 
+            plugins: { 
+                legend: { display: false }, 
+                datalabels: { 
+                    color: '#fff', 
+                    anchor: 'end', 
+                    align: 'top', 
+                    font: { weight: 'bold', size: 13 } 
+                } 
+            }, 
+            scales: { 
+                y: { display: false }, 
+                x: { 
+                    grid: { display: false }, 
+                    border: { display: false },
+                    ticks: { 
+                        color: '#cbd5e1', // Cor mais clara para o texto
+                        font: { size: 13, weight: '600' } // Fonte um pouco maior e negrito
+                    } 
+                } 
+            } 
+        }
     });
 }
 
