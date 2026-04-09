@@ -11,13 +11,13 @@ if(typeof Chart !== 'undefined') {
 }
 
 let fullHistoricoDataOp = [];
-let fullHistoricoManutencao = []; // Array para os dados de manutenção
+let fullHistoricoManutencao = []; 
 let metasGlobais = {};
 let activeQuickFilterOp = 'ALL';
 
 let chartEvolucao = null;
 let chartProjecao = null; 
-let chartManutencao = null; // Gráfico de Manutenção
+let chartManutencao = null; 
 
 document.addEventListener('DOMContentLoaded', () => {
     setupOperacionalFilters();
@@ -257,9 +257,11 @@ function atualizarPainelOperacional() {
     // Gráficos
     renderEvolucaoChart(filteredGlobal);
     renderProjecaoChart(filteredGlobal); 
-    renderManutencaoChart(filteredManutencao); // Gráfico novo
+    renderManutencaoChart(filteredManutencao); 
 
+    // Renderiza Tabelas
     renderLeaderboards(filteredSerrana);
+    renderManutencaoTables(filteredManutencao); // CHAMADA DAS NOVAS TABELAS DE MANUTENÇÃO
     renderDashboardsGerenciais(filteredGlobal);
 }
 
@@ -438,7 +440,7 @@ function renderManutencaoChart(data) {
         if (!dateStr) return;
 
         const dtObj = new Date(dateStr);
-        const dtKey = dtObj.toISOString().split('T')[0]; // Formato YYYY-MM-DD para fácil ordenação
+        const dtKey = dtObj.toISOString().split('T')[0]; 
         
         dailyMap.set(dtKey, (dailyMap.get(dtKey) || 0) + 1);
     });
@@ -447,7 +449,6 @@ function renderManutencaoChart(data) {
     const displayDates = sortedDates.slice(-30);
     const displayCounts = displayDates.map(dt => dailyMap.get(dt));
     
-    // Converte de YYYY-MM-DD para DD/MM
     const displayLabels = displayDates.map(dt => {
         const parts = dt.split('-');
         return `${parts[2]}/${parts[1]}`;
@@ -525,6 +526,70 @@ function renderLeaderboards(data) {
             const tr = `<tr><td class="px-4 py-3 text-center"><div class="w-6 h-6 rounded-full ${i<3?'bg-sky-500 text-white shadow-[0_0_10px_rgba(14,165,233,0.5)]':'bg-slate-800 text-slate-400'} flex items-center justify-center text-xs font-bold">${i+1}</div></td><td class="px-4 py-3 font-bold text-white">${x.p}</td><td class="px-4 py-3 text-slate-400 truncate max-w-[100px]">${x.t}</td><td class="px-4 py-3 text-center text-slate-300">${x.v}</td><td class="px-4 py-3 text-right font-mono text-sky-400">${formatarHorasMinutos(x.cMedio)}</td></tr>`;
             bCiclo.insertAdjacentHTML('beforeend', tr);
         });
+    }
+}
+
+// NOVA FUNÇÃO: RENDERIZA TABELAS DE MANUTENÇÃO (Top Caminhões e Tipo Serviço)
+function renderManutencaoTables(data) {
+    const placaMap = new Map();
+    const tipoMap = new Map();
+    let totalOS = data.length;
+
+    data.forEach(d => {
+        const pl = d.placa ? d.placa.trim().toUpperCase() : 'N/A';
+        const tp = d.tipo ? d.tipo.trim().toUpperCase() : 'NÃO INFORMADO';
+
+        placaMap.set(pl, (placaMap.get(pl) || 0) + 1);
+        tipoMap.set(tp, (tipoMap.get(tp) || 0) + 1);
+    });
+
+    const topPlacas = Array.from(placaMap.entries())
+        .map(([placa, qtd]) => ({ placa, qtd }))
+        .sort((a, b) => b.qtd - a.qtd)
+        .slice(0, 5); // TOP 5
+
+    const topTipos = Array.from(tipoMap.entries())
+        .map(([tipo, qtd]) => ({ tipo, qtd }))
+        .sort((a, b) => b.qtd - a.qtd); // Lista os tipos mais recorrentes
+
+    const bCaminhoes = document.getElementById('leaderboardCaminhoesQuebram');
+    if (bCaminhoes) {
+        bCaminhoes.innerHTML = '';
+        topPlacas.forEach((x, i) => {
+            const tr = `<tr>
+                <td class="px-4 py-3 text-center"><div class="w-6 h-6 rounded-full ${i<3?'bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.5)]':'bg-slate-800 text-slate-400'} flex items-center justify-center text-xs font-bold">${i+1}</div></td>
+                <td class="px-4 py-3 font-bold text-white">${x.placa}</td>
+                <td class="px-4 py-3 text-right font-mono text-rose-400 font-bold">${x.qtd}</td>
+            </tr>`;
+            bCaminhoes.insertAdjacentHTML('beforeend', tr);
+        });
+        if (topPlacas.length === 0) {
+            bCaminhoes.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-slate-500">Nenhuma ocorrência no período</td></tr>';
+        }
+    }
+
+    const bTipos = document.getElementById('leaderboardTiposServico');
+    if (bTipos) {
+        bTipos.innerHTML = '';
+        topTipos.forEach((x) => {
+            const perc = totalOS > 0 ? (x.qtd / totalOS) * 100 : 0;
+            const tr = `<tr>
+                <td class="px-4 py-3 font-bold text-white max-w-[150px] truncate" title="${x.tipo}">${x.tipo}</td>
+                <td class="px-4 py-3 text-right font-mono text-amber-400 font-bold">${x.qtd}</td>
+                <td class="px-4 py-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] text-slate-400 w-8 text-right">${perc.toFixed(0)}%</span>
+                        <div class="w-full bg-slate-800 rounded-full h-1.5 shadow-inner">
+                            <div class="bg-amber-500 h-1.5 rounded-full transition-all duration-500" style="width: ${perc}%"></div>
+                        </div>
+                    </div>
+                </td>
+            </tr>`;
+            bTipos.insertAdjacentHTML('beforeend', tr);
+        });
+        if (topTipos.length === 0) {
+            bTipos.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-slate-500">Nenhuma ocorrência no período</td></tr>';
+        }
     }
 }
 
