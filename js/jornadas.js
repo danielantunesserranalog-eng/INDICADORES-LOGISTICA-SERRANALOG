@@ -246,6 +246,7 @@ function renderizarPainelJornadas() {
     const tbodyEstouro = document.getElementById('jorTopEstourosBody'); tbodyEstouro.innerHTML = '';
     
     const agregacaoMotoristas = new Map();
+    let infracoesList = []; // Lista para agrupar infrações e ordenar depois
 
     dadosFiltrados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
@@ -285,7 +286,7 @@ function renderizarPainelJornadas() {
         if(isEstouro) {
             corLinha = 'text-rose-500 font-bold';
             badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold animate-pulse">INFRAÇÃO</span>`;
-            tbodyEstouro.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${motNome}</td><td class="px-3 py-2 text-right font-black text-rose-500">${formatarHorasMinutos(horas)}</td></tr>`);
+            infracoesList.push({ nome: motNome, horas: horas }); // Adiciona à lista de infrações
         }
 
         tbodyAnalitica.insertAdjacentHTML('beforeend', `
@@ -302,6 +303,16 @@ function renderizarPainelJornadas() {
             </tr>
         `);
     });
+
+    // === ORDENA E RENDERIZA AS MAIORES INFRAÇÕES (DECRESCENTE) ===
+    const topInfracoes = infracoesList.sort((a, b) => b.horas - a.horas).slice(0, 5);
+    if(topInfracoes.length === 0) {
+        tbodyEstouro.innerHTML = '<tr><td colspan="2" class="p-2 text-center text-slate-500 text-xs">Sem infrações registradas.</td></tr>';
+    } else {
+        topInfracoes.forEach(m => {
+            tbodyEstouro.insertAdjacentHTML('beforeend', `<tr><td class="px-3 py-2 text-slate-300 truncate max-w-[120px]">${m.nome}</td><td class="px-3 py-2 text-right font-black text-rose-500">${formatarHorasMinutos(m.horas)}</td></tr>`);
+        });
+    }
 
     const arrMot = Array.from(agregacaoMotoristas.values());
 
@@ -414,7 +425,7 @@ function renderizarPainelJornadas() {
             responsive: true, 
             maintainAspectRatio: false, 
             layout: { 
-                padding: { top: 25, bottom: 10 } // Adicionado espaço inferior
+                padding: { top: 25, bottom: 10 }
             }, 
             plugins: { 
                 legend: { display: false }, 
@@ -431,8 +442,8 @@ function renderizarPainelJornadas() {
                     grid: { display: false }, 
                     border: { display: false },
                     ticks: { 
-                        color: '#cbd5e1', // Cor mais clara para o texto
-                        font: { size: 13, weight: '600' } // Fonte um pouco maior e negrito
+                        color: '#cbd5e1',
+                        font: { size: 13, weight: '600' }
                     } 
                 } 
             } 
