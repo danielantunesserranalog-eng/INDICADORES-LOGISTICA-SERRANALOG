@@ -476,3 +476,89 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
     const wb = XLSX.utils.book_new(); XLSX.book_append_sheet(wb, ws, "Jornadas");
     XLSX.writeFile(wb, `SerranaLog_Jornadas_${new Date().toISOString().slice(0,10)}.xlsx`);
 });
+
+// ==========================================
+// EXPORTAÇÃO PARA PDF
+// ==========================================
+document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () => {
+    if (jornadasGlobalData.length === 0) return alert("Nenhum dado para exportar.");
+
+    // Inicializa o jsPDF (formato 'landscape' / paisagem para caber mais colunas)
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape');
+
+    // Configura as colunas da tabela
+    const colunas = [
+        "Motorista", "Placa", "Data/Hora Início", "Data/Hora Fim", 
+        "H. Noturnas", "H. Extras", "T. Trabalho", "T. Direção", "Status"
+    ];
+    
+    const linhas = [];
+
+    // Prepara os dados pegando a lista global já filtrada
+    jornadasGlobalData.forEach(d => {
+        let dI = '-', hI = '-', dF = '-', hF = '-';
+        
+        // Formatação de Datas e Horas (idêntica ao Excel)
+        if (d.inicio) {
+            const mD = d.inicio.match(regexDate); const mT = d.inicio.match(regexTime);
+            if (mD) { dI = mD[0]; if (dI.length <= 5) dI += '/' + new Date().getFullYear(); }
+            if (mT) hI = mT[0]; if (!mD && !mT) hI = d.inicio;
+        }
+        if (d.fim) {
+            const mDF = d.fim.match(regexDate); const mTF = d.fim.match(regexTime);
+            if (mDF) { dF = mDF[0]; if (dF.length <= 5) dF += '/' + new Date().getFullYear(); } else dF = dI;
+            if (mTF) hF = mTF[0]; else hF = d.fim.replace(regexDate, '').replace('-', '').trim() || d.fim;
+        }
+
+        const isEstouro = (d.total_trabalho_horas || 0) > 12;
+        const statusTexto = isEstouro ? 'INFRAÇÃO' : 'OK';
+
+        linhas.push([
+            d.motorista || '-',
+            d.placa || '-',
+            `${dI} às ${hI}`,
+            `${dF} às ${hF}`,
+            formatarHorasMinutos(d.horas_noturnas || 0),
+            formatarHorasMinutos(d.horas_extras || 0),
+            formatarHorasMinutos(d.total_trabalho_horas || 0),
+            formatarHorasMinutos(d.direcao_horas || 0),
+            statusTexto
+        ]);
+    });
+
+    // Adiciona Cabeçalho e Título ao PDF
+    const filtroAtual = document.getElementById('jorDataReferencia').textContent;
+    doc.setFontSize(16);
+    doc.text("Relatório Analítico de Jornadas", 14, 15);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(filtroAtual, 14, 22);
+
+    // Gera a tabela usando AutoTable
+    doc.autoTable({
+        head: [colunas],
+        body: linhas,
+        startY: 28, // Posição Y onde a tabela começa
+        theme: 'striped',
+        headStyles: { fillColor: [15, 23, 42] }, // Cor azul escuro padrão tailwind slate-900
+        styles: { fontSize: 8, cellPadding: 2 },
+        didParseCell: function(data) {
+            // Regra para colorir o texto da coluna de Status (índice 8)
+            if (data.section === 'body' && data.column.index === 8) {
+                if (data.cell.raw === 'INFRAÇÃO') {
+                    data.cell.styles.textColor = [220, 38, 38]; // Vermelho
+                    data.cell.styles.fontStyle = 'bold';
+                } else {
+                    data.cell.styles.textColor = [16, 185, 129]; // Verde
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            }
+        }
+    });
+
+    // Salva o arquivo com a data de hoje no nome
+    const dataHoje = new Date().toISOString().slice(0,10);
+    doc.save(`SerranaLog_Jornadas_${dataHoje}.pdf`);
+});
