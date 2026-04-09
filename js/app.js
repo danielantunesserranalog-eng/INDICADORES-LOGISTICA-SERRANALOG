@@ -256,6 +256,10 @@ function parseSheetToData(sheet) {
     
     const cicloProntoKey = findKey(['ciclo', 'tempo de ciclo', 'ciclo horas', 'horas ciclo', 'tempo ciclo']);
 
+    // ADICIONADOS: CHAVES FALTANTES PARA GRUA E TURNO
+    const carregadorKey = findKey(['carregador florestal', 'carregador_florestal', 'carregador']);
+    const turnoKey = findKey(['turno']);
+
     const today = new Date().toLocaleDateString('pt-PT');
 
     const mappedData = rawData.map((row, idx) => {
@@ -307,11 +311,14 @@ function parseSheetToData(sheet) {
             cicloHoras: ciclo,
             
             filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), false),
-            
             tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
-            
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
             
+            // ADICIONADOS: SALVANDO GRUA, TURNO E HORA SAÍDA PARA O CÁLCULO
+            carregadorFlorestal: getValue(carregadorKey) ? String(getValue(carregadorKey)).trim() : null,
+            turno: getValue(turnoKey) ? String(getValue(turnoKey)).trim() : null,
+            horaSaidaFabrica: rawHrSaida ? String(rawHrSaida).trim() : null,
+
             _timestamp: timestampSaida
         };
     });
