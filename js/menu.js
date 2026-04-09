@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
         { href: 'index.html', icon: 'fas fa-chart-line', text: 'Visão Geral' },
         { href: 'operacional.html', icon: 'fas fa-bullseye', text: 'Metas Operacionais' },
         { href: 'jornadas.html', icon: 'fas fa-user-clock', text: 'Monitor de Jornadas' },
-        { href: 'eventos.html', icon: 'fas fa-exclamation-triangle', text: 'Central de Eventos' },
         { href: 'historico.html', icon: 'fas fa-truck', text: 'Histórico de Produção' },
         { href: 'historico-jornadas.html', icon: 'fas fa-history', text: 'Histórico de Jornadas' },
         { separator: true },
