@@ -11,11 +11,13 @@ if(typeof Chart !== 'undefined') {
 }
 
 let fullHistoricoDataOp = [];
+let fullHistoricoManutencao = []; // Array para os dados de manutenção
 let metasGlobais = {};
 let activeQuickFilterOp = 'ALL';
 
 let chartEvolucao = null;
-let chartProjecao = null; // Variável para o gráfico de projeção
+let chartProjecao = null; 
+let chartManutencao = null; // Gráfico de Manutenção
 
 document.addEventListener('DOMContentLoaded', () => {
     setupOperacionalFilters();
@@ -121,6 +123,22 @@ async function loadOperacionalData() {
 
         if(historico) {
             fullHistoricoDataOp = historico.reverse();
+        }
+
+        // Buscar Manutenções do banco secundário
+        try {
+            const { data: manutencoes } = await supabaseManutencao
+                .from('ordens_servico')
+                .select('*')
+                .limit(5000);
+            if(manutencoes) {
+                fullHistoricoManutencao = manutencoes;
+            }
+        } catch(errManutencao) {
+            console.error("Erro ao carregar manutenções do banco:", errManutencao);
+        }
+
+        if(historico) {
             const allDates = [...new Set(fullHistoricoDataOp.map(d => d.dataDaBaseExcel))].filter(d => d && d !== 'Desconhecida');
             verificarStatusAtualizacao(allDates);
             atualizarPainelOperacional();
@@ -132,6 +150,7 @@ function atualizarPainelOperacional() {
     const dataRef = document.getElementById('opDatePicker') ? document.getElementById('opDatePicker').value : null;
     let diasConsiderados = 1;
 
+    // Filtro de Viagens
     const filteredGlobal = fullHistoricoDataOp.filter(d => {
         if(activeQuickFilterOp === 'ALL') return true;
         
@@ -147,6 +166,30 @@ function atualizarPainelOperacional() {
             return parsed.getTime() === dr.getTime();
         }
         
+        const diff = Math.round((hj - parsed)/86400000);
+        if (activeQuickFilterOp === 'D-1') return diff === 1;
+        if (activeQuickFilterOp === 'D-2') return diff === 2;
+        if (activeQuickFilterOp === 'D-7') return diff >= 0 && diff <= 7;
+        if (activeQuickFilterOp === 'D-30') return diff >= 0 && diff <= 30;
+        return false;
+    });
+
+    // Filtro de Manutenções
+    const filteredManutencao = fullHistoricoManutencao.filter(d => {
+        if(activeQuickFilterOp === 'ALL') return true;
+
+        const dateStr = d.data_abertura || d.created_at;
+        if(!dateStr) return false;
+
+        const parsed = new Date(dateStr);
+        parsed.setHours(0,0,0,0); 
+        const hj = new Date(); hj.setHours(0,0,0,0);
+
+        if (activeQuickFilterOp === 'DATE' && dataRef) {
+            const dr = new Date(dataRef + "T00:00:00");
+            return parsed.getTime() === dr.getTime();
+        }
+
         const diff = Math.round((hj - parsed)/86400000);
         if (activeQuickFilterOp === 'D-1') return diff === 1;
         if (activeQuickFilterOp === 'D-2') return diff === 2;
@@ -211,9 +254,10 @@ function atualizarPainelOperacional() {
     document.getElementById('disp_pbtc_real').innerText = mediaPbtc.toLocaleString('pt-PT', {maximumFractionDigits:2});
     atualizarBarra('bar_pbtc_perc', 'disp_pbtc_perc', mediaPbtc, metaPbtc);
 
-    // Gráficos lado a lado
+    // Gráficos
     renderEvolucaoChart(filteredGlobal);
-    renderProjecaoChart(filteredGlobal); // NOVO GRÁFICO
+    renderProjecaoChart(filteredGlobal); 
+    renderManutencaoChart(filteredManutencao); // Gráfico novo
 
     renderLeaderboards(filteredSerrana);
     renderDashboardsGerenciais(filteredGlobal);
@@ -299,7 +343,6 @@ function renderEvolucaoChart(data) {
     });
 }
 
-// NOVO: Função que renderiza a projeção
 function renderProjecaoChart(data) {
     const ctxProj = document.getElementById('projecaoDiariaChart');
     if(!ctxProj) return;
@@ -320,13 +363,11 @@ function renderProjecaoChart(data) {
 
     if (sortedDates.length === 0) return;
 
-    // Pega os últimos 7 dias para fazer a média
     const last7 = sortedDates.slice(-7);
     let sum7 = 0;
     last7.forEach(dt => sum7 += dailyMap.get(dt));
     const avgVol = last7.length > 0 ? sum7 / last7.length : 0;
 
-    // Descobre qual foi o último dia real no banco de dados
     const lastDateStr = sortedDates[sortedDates.length - 1];
     const pL = lastDateStr.split('/');
     let lastDateObj = new Date(parseInt(pL[2]) < 100 ? parseInt(pL[2])+2000 : parseInt(pL[2]), parseInt(pL[1])-1, parseInt(pL[0]));
@@ -334,7 +375,6 @@ function renderProjecaoChart(data) {
     const projLabels = [];
     const projData = [];
 
-    // Gera os próximos 5 dias
     for(let i=1; i<=5; i++) {
         const nextD = new Date(lastDateObj);
         nextD.setDate(nextD.getDate() + i);
@@ -342,7 +382,6 @@ function renderProjecaoChart(data) {
         const m = String(nextD.getMonth() + 1).padStart(2, '0');
         projLabels.push(`${d}/${m}`);
         
-        // Adiciona uma variação minúscula (-2% a +2%) para a barra não ficar 100% reta artificial
         const variacao = avgVol * (1 + ((Math.random() - 0.5) * 0.04));
         projData.push(variacao);
     }
@@ -351,8 +390,8 @@ function renderProjecaoChart(data) {
     
     const ctx = ctxProj.getContext('2d');
     let gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, '#38bdf8'); // sky-400
-    gradient.addColorStop(1, '#0369a1'); // sky-700
+    gradient.addColorStop(0, '#38bdf8'); 
+    gradient.addColorStop(1, '#0369a1'); 
 
     chartProjecao = new Chart(ctx, {
         type: 'bar',
@@ -381,6 +420,73 @@ function renderProjecaoChart(data) {
             },
             scales: {
                 y: { display: false, beginAtZero: true, suggestedMax: avgVol * 1.3 }, 
+                x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11, weight: 'bold' }, color: '#cbd5e1' } }
+            },
+            layout: { padding: { top: 25 } }
+        }
+    });
+}
+
+function renderManutencaoChart(data) {
+    const ctxMan = document.getElementById('evolucaoManutencaoChart');
+    if(!ctxMan) return;
+
+    const dailyMap = new Map();
+
+    data.forEach(d => {
+        const dateStr = d.data_abertura || d.created_at;
+        if (!dateStr) return;
+
+        const dtObj = new Date(dateStr);
+        const dtKey = dtObj.toISOString().split('T')[0]; // Formato YYYY-MM-DD para fácil ordenação
+        
+        dailyMap.set(dtKey, (dailyMap.get(dtKey) || 0) + 1);
+    });
+
+    const sortedDates = Array.from(dailyMap.keys()).sort();
+    const displayDates = sortedDates.slice(-30);
+    const displayCounts = displayDates.map(dt => dailyMap.get(dt));
+    
+    // Converte de YYYY-MM-DD para DD/MM
+    const displayLabels = displayDates.map(dt => {
+        const parts = dt.split('-');
+        return `${parts[2]}/${parts[1]}`;
+    });
+
+    if (chartManutencao) chartManutencao.destroy();
+    
+    const ctx = ctxMan.getContext('2d');
+    let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, '#f43f5e'); // rose-500
+    gradient.addColorStop(1, '#be123c'); // rose-700
+
+    chartManutencao = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: displayLabels,
+            datasets: [{
+                label: 'OS Abertas',
+                data: displayCounts,
+                backgroundColor: gradient,
+                borderRadius: 4,
+                barPercentage: 0.6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    color: '#fff',
+                    anchor: 'end',
+                    align: 'top',
+                    font: { size: 11, weight: 'bold' },
+                    formatter: (v) => v > 0 ? v : ''
+                }
+            },
+            scales: {
+                y: { display: false, beginAtZero: true, suggestedMax: Math.max(...displayCounts, 1) * 1.3 }, 
                 x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11, weight: 'bold' }, color: '#cbd5e1' } }
             },
             layout: { padding: { top: 25 } }
