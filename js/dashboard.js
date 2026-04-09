@@ -156,7 +156,7 @@ function calcStats(dataArr) {
     const validFilaFab = dataArr.filter(d => d.filaFabricaHoras > 0);
     const medFilaFab = validFilaFab.length > 0 ? validFilaFab.reduce((s,d) => s + d.filaFabricaHoras, 0) / validFilaFab.length : 0;
 
-    return { medVol, medCiclo, prod, medFilaCpo, medCarreg, medFilaFab };
+    return { volTotal: vol, medVol, medCiclo, prod, medFilaCpo, medCarreg, medFilaFab };
 }
 
 function loadDashboardData() {
@@ -302,10 +302,10 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-sky-400 text-right font-bold">${stGlobal.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
-                <td class="px-6 py-4 font-bold text-white"><i class="fas fa-tachometer-alt text-cyan-400 w-5"></i> Produtividade (m³/hora)</td>
-                <td class="px-6 py-4 font-mono text-emerald-400 text-right font-bold">${stSerrana.prod.toLocaleString('pt-PT',{maximumFractionDigits:2})} m³/h</td>
-                <td class="px-6 py-4 font-mono text-amber-400 text-right font-bold">${stOutras.prod.toLocaleString('pt-PT',{maximumFractionDigits:2})} m³/h</td>
-                <td class="px-6 py-4 font-mono text-sky-400 text-right font-bold">${stGlobal.prod.toLocaleString('pt-PT',{maximumFractionDigits:2})} m³/h</td>
+                <td class="px-6 py-4 font-bold text-white"><i class="fas fa-cubes text-cyan-400 w-5"></i> Volume Total</td>
+                <td class="px-6 py-4 font-mono text-emerald-400 text-right font-bold">${stSerrana.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-amber-400 text-right font-bold">${stOutras.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-sky-400 text-right font-bold">${stGlobal.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
                 <td class="px-6 py-4 font-bold text-white"><i class="fas fa-stopwatch text-blue-400 w-5"></i> Ciclo Médio Total</td>
