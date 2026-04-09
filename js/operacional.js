@@ -203,7 +203,7 @@ function atualizarPainelOperacional() {
     // Renderiza Rankings Principais apenas com a frota da Serranalog
     renderLeaderboards(filteredSerrana);
     
-    // Renderiza novos painéis gerenciais considerando o Global
+    // Renderiza novos painéis gerenciais considerando o Global (mas a Caixa Média filtra lá dentro)
     renderDashboardsGerenciais(filteredGlobal);
 }
 
@@ -260,8 +260,8 @@ function renderLeaderboards(data) {
 }
 
 function renderDashboardsGerenciais(data) {
-    // 1. DADOS PARA CAIXA MÉDIA POR TRANSPORTADORA
-    const transpMap = new Map();
+    // 1. DADOS PARA CAIXA MÉDIA POR PLACA (APENAS SERRANALOG)
+    const placaMap = new Map();
     
     // 2. DADOS PARA GARGALOS DE TEMPO
     let somaFilaCpo = 0, countFilaCpo = 0;
@@ -272,14 +272,17 @@ function renderDashboardsGerenciais(data) {
     const viagensComCiclo = [];
 
     data.forEach(d => {
-        // --- Processa Caixa Média ---
-        const t = d.transportadora || 'N/A';
-        const vol = parseFloat(String(d.volumeReal).replace(',', '.')) || 0;
-        
-        if(!transpMap.has(t)) transpMap.set(t, { nome: t, volTotal: 0, viagens: 0 });
-        const objT = transpMap.get(t);
-        objT.volTotal += vol;
-        objT.viagens++;
+        // --- Processa Caixa Média (APENAS SERRANALOG, AGRUPADO POR PLACA) ---
+        const transpNome = String(d.transportadora || "").toUpperCase();
+        if (transpNome.includes('SERRANALOG')) {
+            const pl = d.placa || 'N/A';
+            const vol = parseFloat(String(d.volumeReal).replace(',', '.')) || 0;
+            
+            if(!placaMap.has(pl)) placaMap.set(pl, { nome: pl, volTotal: 0, viagens: 0 });
+            const objP = placaMap.get(pl);
+            objP.volTotal += vol;
+            objP.viagens++;
+        }
 
         // --- Processa Gargalos de Tempo ---
         if (d.filaCampoHoras > 0) { somaFilaCpo += d.filaCampoHoras; countFilaCpo++; }
@@ -297,9 +300,9 @@ function renderDashboardsGerenciais(data) {
     });
 
     // ==========================================
-    // RENDER: 1. Caixa Média
+    // RENDER: 1. Caixa Média (Placas Serranalog)
     // ==========================================
-    const topCaixaMedia = Array.from(transpMap.values())
+    const topCaixaMedia = Array.from(placaMap.values())
         .map(x => ({ ...x, media: x.volTotal / (x.viagens || 1) }))
         .sort((a,b) => b.media - a.media); // Ordena da melhor média para a pior
 
