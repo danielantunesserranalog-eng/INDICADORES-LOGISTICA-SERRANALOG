@@ -237,6 +237,8 @@ function renderizarPainelJornadas() {
         return true;
     });
 
+    dadosFiltrados.sort((a, b) => (b.total_trabalho_horas || 0) - (a.total_trabalho_horas || 0));
+
     document.getElementById('jorFilterStatus').innerText = `${dadosFiltrados.length} Registros`;
 
     let totalMinutosDirecao = 0; let qtdDirecao = 0;
@@ -246,7 +248,7 @@ function renderizarPainelJornadas() {
     const tbodyEstouro = document.getElementById('jorTopEstourosBody'); tbodyEstouro.innerHTML = '';
     
     const agregacaoMotoristas = new Map();
-    let infracoesList = []; // Lista para agrupar infrações e ordenar depois
+    let infracoesList = [];
 
     dadosFiltrados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
@@ -286,7 +288,7 @@ function renderizarPainelJornadas() {
         if(isEstouro) {
             corLinha = 'text-rose-500 font-bold';
             badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold animate-pulse">INFRAÇÃO</span>`;
-            infracoesList.push({ nome: motNome, horas: horas }); // Adiciona à lista de infrações
+            infracoesList.push({ nome: motNome, horas: horas }); 
         }
 
         tbodyAnalitica.insertAdjacentHTML('beforeend', `
@@ -304,7 +306,6 @@ function renderizarPainelJornadas() {
         `);
     });
 
-    // === ORDENA E RENDERIZA AS MAIORES INFRAÇÕES (DECRESCENTE) ===
     const topInfracoes = infracoesList.sort((a, b) => b.horas - a.horas).slice(0, 5);
     if(topInfracoes.length === 0) {
         tbodyEstouro.innerHTML = '<tr><td colspan="2" class="p-2 text-center text-slate-500 text-xs">Sem infrações registradas.</td></tr>';
