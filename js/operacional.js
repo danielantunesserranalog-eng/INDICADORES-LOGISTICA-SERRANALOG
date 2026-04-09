@@ -313,7 +313,7 @@ function renderDashboardsGerenciais(data) {
             const tr = `<tr>
                 <td class="px-4 py-3 font-bold text-white truncate max-w-[150px]"><span class="text-slate-500 mr-1">${i+1}.</span> ${x.nome}</td>
                 <td class="px-4 py-3 text-center text-slate-300">${x.viagens}</td>
-                <td class="px-4 py-3 text-right font-mono text-indigo-400">${x.media.toLocaleString('pt-PT',{maximumFractionDigits:2})}</td>
+                <td class="px-4 py-3 text-right font-mono text-white text-sm font-bold">${x.media.toLocaleString('pt-PT',{maximumFractionDigits:2})}</td>
             </tr>`;
             bodyCaixa.insertAdjacentHTML('beforeend', tr);
         });
@@ -323,9 +323,9 @@ function renderDashboardsGerenciais(data) {
     // RENDER: 2. Mapa de Gargalos
     // ==========================================
     const gargalos = [
-        { nome: '1. Fila no Campo', media: countFilaCpo > 0 ? (somaFilaCpo/countFilaCpo) : 0, amostras: countFilaCpo, cor: 'text-amber-400' },
-        { nome: '2. Carregamento', media: countCarreg > 0 ? (somaCarreg/countCarreg) : 0, amostras: countCarreg, cor: 'text-sky-400' },
-        { nome: '3. Fila na Fábrica/Balança', media: countFilaFab > 0 ? (somaFilaFab/countFilaFab) : 0, amostras: countFilaFab, cor: 'text-rose-400' }
+        { nome: '1. Fila no Campo', media: countFilaCpo > 0 ? (somaFilaCpo/countFilaCpo) : 0, amostras: countFilaCpo },
+        { nome: '2. Carregamento', media: countCarreg > 0 ? (somaCarreg/countCarreg) : 0, amostras: countCarreg },
+        { nome: '3. Fila na Fábrica/Balança', media: countFilaFab > 0 ? (somaFilaFab/countFilaFab) : 0, amostras: countFilaFab }
     ];
 
     const bodyGargalos = document.getElementById('leaderboardGargalos');
@@ -335,7 +335,7 @@ function renderDashboardsGerenciais(data) {
             const tr = `<tr>
                 <td class="px-4 py-3 font-bold text-white truncate max-w-[150px]">${x.nome}</td>
                 <td class="px-4 py-3 text-center text-slate-300">${x.amostras}</td>
-                <td class="px-4 py-3 text-right font-mono ${x.cor}">${formatarHorasMinutos(x.media)}</td>
+                <td class="px-4 py-3 text-right font-mono text-white text-sm font-bold">${formatarHorasMinutos(x.media)}</td>
             </tr>`;
             bodyGargalos.insertAdjacentHTML('beforeend', tr);
         });
@@ -354,7 +354,7 @@ function renderDashboardsGerenciais(data) {
             const tr = `<tr>
                 <td class="px-4 py-3 font-bold text-white"><span class="text-slate-500 mr-1">${i+1}.</span> ${x.placa}</td>
                 <td class="px-4 py-3 text-slate-400 truncate max-w-[100px]">${x.transp}</td>
-                <td class="px-4 py-3 text-right font-mono text-rose-400">${formatarHorasMinutos(x.ciclo)}</td>
+                <td class="px-4 py-3 text-right font-mono text-white text-sm font-bold">${formatarHorasMinutos(x.ciclo)}</td>
             </tr>`;
             bodyPiores.insertAdjacentHTML('beforeend', tr);
         });
