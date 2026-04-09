@@ -31,7 +31,12 @@
                         <span id="textoAtualizacao">Verificando...</span>
                     </div>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <select id="exportStatusFilter" class="bg-slate-900 text-slate-200 text-sm font-bold rounded-lg border border-slate-600 px-3 py-2 cursor-pointer shadow-inner focus:border-sky-500 outline-none transition-colors">
+                        <option value="ALL">Status: Todos</option>
+                        <option value="INFRACAO">Apenas Infrações</option>
+                        <option value="OK">Apenas OK</option>
+                    </select>
                     <button id="btnExportarJornada" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-colors text-sm flex items-center gap-2"><i class="fas fa-file-excel"></i> Exportar CSV</button>
                     <button id="btnExportarPDFJornada" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-colors text-sm flex items-center gap-2"><i class="fas fa-file-pdf"></i> Exportar PDF</button>
                 </div>

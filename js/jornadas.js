@@ -452,9 +452,26 @@ function renderizarPainelJornadas() {
     });
 }
 
+// ==========================================
+// EXPORTAÇÃO PARA EXCEL
+// ==========================================
 document.getElementById('btnExportarJornada').addEventListener('click', () => {
-    if (jornadasGlobalData.length === 0) return alert("Nenhum dado para exportar.");
-    const ws = XLSX.utils.json_to_sheet(jornadasGlobalData.map(d => {
+    const filtroStatus = document.getElementById('exportStatusFilter').value;
+    
+    // Filtra os dados de acordo com a seleção no dropdown
+    let dadosExportar = jornadasGlobalData.filter(d => {
+        const isEstouro = (d.total_trabalho_horas || 0) > 12;
+        if (filtroStatus === 'OK' && isEstouro) return false;
+        if (filtroStatus === 'INFRACAO' && !isEstouro) return false;
+        return true;
+    });
+
+    if (dadosExportar.length === 0) return alert("Nenhum dado para exportar com este filtro de status.");
+
+    // Ordena do maior para o menor antes de exportar
+    dadosExportar.sort((a, b) => (b.total_trabalho_horas || 0) - (a.total_trabalho_horas || 0));
+
+    const ws = XLSX.utils.json_to_sheet(dadosExportar.map(d => {
         let dI = '-', hI = '-', dF = '-', hF = '-';
         if (d.inicio) {
             const mD = d.inicio.match(regexDate); const mT = d.inicio.match(regexTime);
@@ -481,13 +498,25 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
 // EXPORTAÇÃO PARA PDF
 // ==========================================
 document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () => {
-    if (jornadasGlobalData.length === 0) return alert("Nenhum dado para exportar.");
+    const filtroStatus = document.getElementById('exportStatusFilter').value;
+    
+    // Filtra os dados de acordo com a seleção no dropdown
+    let dadosExportar = jornadasGlobalData.filter(d => {
+        const isEstouro = (d.total_trabalho_horas || 0) > 12;
+        if (filtroStatus === 'OK' && isEstouro) return false;
+        if (filtroStatus === 'INFRACAO' && !isEstouro) return false;
+        return true;
+    });
 
-    // Inicializa o jsPDF (formato 'landscape' / paisagem para caber mais colunas)
+    if (dadosExportar.length === 0) return alert("Nenhum dado para exportar com este filtro de status.");
+
+    // Ordena do maior para o menor antes de exportar
+    dadosExportar.sort((a, b) => (b.total_trabalho_horas || 0) - (a.total_trabalho_horas || 0));
+
+    // Inicializa o jsPDF (formato 'landscape' / paisagem)
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('landscape');
 
-    // Configura as colunas da tabela
     const colunas = [
         "Motorista", "Placa", "Data/Hora Início", "Data/Hora Fim", 
         "H. Noturnas", "H. Extras", "T. Trabalho", "T. Direção", "Status"
@@ -495,11 +524,9 @@ document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () =
     
     const linhas = [];
 
-    // Prepara os dados pegando a lista global já filtrada
-    jornadasGlobalData.forEach(d => {
+    dadosExportar.forEach(d => {
         let dI = '-', hI = '-', dF = '-', hF = '-';
         
-        // Formatação de Datas e Horas (idêntica ao Excel)
         if (d.inicio) {
             const mD = d.inicio.match(regexDate); const mT = d.inicio.match(regexTime);
             if (mD) { dI = mD[0]; if (dI.length <= 5) dI += '/' + new Date().getFullYear(); }
@@ -527,38 +554,39 @@ document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () =
         ]);
     });
 
-    // Adiciona Cabeçalho e Título ao PDF
-    const filtroAtual = document.getElementById('jorDataReferencia').textContent;
+    // Definir texto do subtítulo baseado no filtro
+    let dataReferencia = document.getElementById('jorDataReferencia').textContent;
+    let textoFiltro = "Todos os Status";
+    if (filtroStatus === 'OK') textoFiltro = "Apenas registros OK (<= 12h)";
+    if (filtroStatus === 'INFRACAO') textoFiltro = "Apenas Infrações (> 12h)";
+
     doc.setFontSize(16);
     doc.text("Relatório Analítico de Jornadas", 14, 15);
     
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(filtroAtual, 14, 22);
+    doc.text(`${dataReferencia} | Exibindo: ${textoFiltro}`, 14, 22);
 
-    // Gera a tabela usando AutoTable
     doc.autoTable({
         head: [colunas],
         body: linhas,
-        startY: 28, // Posição Y onde a tabela começa
+        startY: 28, 
         theme: 'striped',
-        headStyles: { fillColor: [15, 23, 42] }, // Cor azul escuro padrão tailwind slate-900
+        headStyles: { fillColor: [15, 23, 42] }, 
         styles: { fontSize: 8, cellPadding: 2 },
         didParseCell: function(data) {
-            // Regra para colorir o texto da coluna de Status (índice 8)
             if (data.section === 'body' && data.column.index === 8) {
                 if (data.cell.raw === 'INFRAÇÃO') {
-                    data.cell.styles.textColor = [220, 38, 38]; // Vermelho
+                    data.cell.styles.textColor = [220, 38, 38]; 
                     data.cell.styles.fontStyle = 'bold';
                 } else {
-                    data.cell.styles.textColor = [16, 185, 129]; // Verde
+                    data.cell.styles.textColor = [16, 185, 129]; 
                     data.cell.styles.fontStyle = 'bold';
                 }
             }
         }
     });
 
-    // Salva o arquivo com a data de hoje no nome
     const dataHoje = new Date().toISOString().slice(0,10);
-    doc.save(`SerranaLog_Jornadas_${dataHoje}.pdf`);
+    doc.save(`SerranaLog_Jornadas_${filtroStatus}_${dataHoje}.pdf`);
 });
