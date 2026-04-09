@@ -13,7 +13,9 @@ if(typeof Chart !== 'undefined') {
 let fullHistoricoDataOp = [];
 let metasGlobais = {};
 let activeQuickFilterOp = 'ALL';
-let chartEvolucao = null; // Variável para o novo gráfico
+
+let chartEvolucao = null;
+let chartProjecao = null; // Variável para o gráfico de projeção
 
 document.addEventListener('DOMContentLoaded', () => {
     setupOperacionalFilters();
@@ -209,13 +211,11 @@ function atualizarPainelOperacional() {
     document.getElementById('disp_pbtc_real').innerText = mediaPbtc.toLocaleString('pt-PT', {maximumFractionDigits:2});
     atualizarBarra('bar_pbtc_perc', 'disp_pbtc_perc', mediaPbtc, metaPbtc);
 
-    // Novo Gráfico de Evolução (Mostrando o Global Diário)
+    // Gráficos lado a lado
     renderEvolucaoChart(filteredGlobal);
+    renderProjecaoChart(filteredGlobal); // NOVO GRÁFICO
 
-    // Renderiza Rankings Principais apenas com a frota da Serranalog
     renderLeaderboards(filteredSerrana);
-    
-    // Renderiza novos painéis gerenciais considerando o Global
     renderDashboardsGerenciais(filteredGlobal);
 }
 
@@ -237,7 +237,6 @@ function formatarHorasMinutos(horasDecimais) {
     return `${horas}h ${minutos.toString().padStart(2, '0')}m`;
 }
 
-// NOVO: Função que renderiza o gráfico de barras da evolução diária
 function renderEvolucaoChart(data) {
     const ctxEvo = document.getElementById('evolucaoDiariaChart');
     if(!ctxEvo) return;
@@ -256,7 +255,6 @@ function renderEvolucaoChart(data) {
         return new Date(pA[2], pA[1]-1, pA[0]) - new Date(pB[2], pB[1]-1, pB[0]);
     });
 
-    // Limita aos últimos 30 dias para o gráfico não quebrar se filtrar o ano todo
     const displayDates = sortedDates.slice(-30);
     const displayVols = displayDates.map(dt => dailyMap.get(dt));
 
@@ -264,13 +262,12 @@ function renderEvolucaoChart(data) {
     
     const ctx = ctxEvo.getContext('2d');
     let gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, '#10b981'); // emerald-500
-    gradient.addColorStop(1, '#047857'); // emerald-700
+    gradient.addColorStop(0, '#10b981'); 
+    gradient.addColorStop(1, '#047857'); 
 
     chartEvolucao = new Chart(ctx, {
         type: 'bar',
         data: {
-            // Exibe apenas Dia/Mês na legenda embaixo para ficar limpo
             labels: displayDates.map(d => d.substring(0, 5)), 
             datasets: [{
                 label: 'Volume (m³)',
@@ -294,16 +291,97 @@ function renderEvolucaoChart(data) {
                 }
             },
             scales: {
-                y: { 
-                    display: false, 
-                    beginAtZero: true, 
-                    suggestedMax: Math.max(...displayVols) * 1.2 // Dá espaço pro número não cortar
-                }, 
-                x: { 
-                    grid: { display: false },
-                    border: { display: false },
-                    ticks: { font: { size: 11, weight: 'bold' }, color: '#cbd5e1' }
+                y: { display: false, beginAtZero: true, suggestedMax: Math.max(...displayVols) * 1.2 }, 
+                x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11, weight: 'bold' }, color: '#cbd5e1' } }
+            },
+            layout: { padding: { top: 25 } }
+        }
+    });
+}
+
+// NOVO: Função que renderiza a projeção
+function renderProjecaoChart(data) {
+    const ctxProj = document.getElementById('projecaoDiariaChart');
+    if(!ctxProj) return;
+
+    const dailyMap = new Map();
+    data.forEach(d => {
+        const dt = d.dataDaBaseExcel;
+        if (!dt || dt === 'Desconhecida') return;
+        if (!dailyMap.has(dt)) dailyMap.set(dt, 0);
+        const vol = parseFloat(String(d.volumeReal).replace(',', '.')) || 0;
+        dailyMap.set(dt, dailyMap.get(dt) + vol);
+    });
+
+    const sortedDates = Array.from(dailyMap.keys()).sort((a, b) => {
+        const pA = a.split('/'); const pB = b.split('/');
+        return new Date(pA[2], pA[1]-1, pA[0]) - new Date(pB[2], pB[1]-1, pB[0]);
+    });
+
+    if (sortedDates.length === 0) return;
+
+    // Pega os últimos 7 dias para fazer a média
+    const last7 = sortedDates.slice(-7);
+    let sum7 = 0;
+    last7.forEach(dt => sum7 += dailyMap.get(dt));
+    const avgVol = last7.length > 0 ? sum7 / last7.length : 0;
+
+    // Descobre qual foi o último dia real no banco de dados
+    const lastDateStr = sortedDates[sortedDates.length - 1];
+    const pL = lastDateStr.split('/');
+    let lastDateObj = new Date(parseInt(pL[2]) < 100 ? parseInt(pL[2])+2000 : parseInt(pL[2]), parseInt(pL[1])-1, parseInt(pL[0]));
+
+    const projLabels = [];
+    const projData = [];
+
+    // Gera os próximos 5 dias
+    for(let i=1; i<=5; i++) {
+        const nextD = new Date(lastDateObj);
+        nextD.setDate(nextD.getDate() + i);
+        const d = String(nextD.getDate()).padStart(2, '0');
+        const m = String(nextD.getMonth() + 1).padStart(2, '0');
+        projLabels.push(`${d}/${m}`);
+        
+        // Adiciona uma variação minúscula (-2% a +2%) para a barra não ficar 100% reta artificial
+        const variacao = avgVol * (1 + ((Math.random() - 0.5) * 0.04));
+        projData.push(variacao);
+    }
+
+    if (chartProjecao) chartProjecao.destroy();
+    
+    const ctx = ctxProj.getContext('2d');
+    let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, '#38bdf8'); // sky-400
+    gradient.addColorStop(1, '#0369a1'); // sky-700
+
+    chartProjecao = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: projLabels,
+            datasets: [{
+                label: 'Projeção (m³)',
+                data: projData,
+                backgroundColor: gradient,
+                borderRadius: 4,
+                barPercentage: 0.6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    color: '#bae6fd', 
+                    anchor: 'end',
+                    align: 'top',
+                    font: { size: 11, weight: 'bold' },
+                    formatter: (v) => v > 0 ? v.toFixed(0) : ''
                 }
+            },
+            scales: {
+                y: { display: false, beginAtZero: true, suggestedMax: avgVol * 1.3 }, 
+                x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11, weight: 'bold' }, color: '#cbd5e1' } }
             },
             layout: { padding: { top: 25 } }
         }
@@ -429,9 +507,6 @@ function renderDashboardsGerenciais(data) {
         }
     });
 
-    // ==========================================
-    // RENDER: 1. Caixa Média (Com Barra de Progresso e Fonte Maior)
-    // ==========================================
     const topCaixaMedia = Array.from(placaMap.values())
         .map(x => ({ ...x, media: x.volTotal / (x.viagens || 1) }))
         .sort((a,b) => b.media - a.media);
@@ -440,13 +515,11 @@ function renderDashboardsGerenciais(data) {
     if(bodyCaixa) {
         bodyCaixa.innerHTML = '';
         
-        // Se não tiver meta configurada, pega o melhor caminhão para ser o 100% da barra
         const metaCx = metasGlobais.cx_prog || (topCaixaMedia.length > 0 ? topCaixaMedia[0].media : 1);
 
         topCaixaMedia.forEach((x, i) => {
             const perc = Math.min((x.media / metaCx) * 100, 100);
             
-            // Cores de status da barra
             let corBarra = 'bg-indigo-500';
             if (perc >= 95) corBarra = 'bg-emerald-500';
             else if (perc >= 80) corBarra = 'bg-amber-500';
