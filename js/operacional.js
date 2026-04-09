@@ -2,9 +2,18 @@
 // js/operacional.js - LÓGICA DO PAINEL DE METAS
 // ==========================================
 
+// Configuração padrão do Chart.js
+if(typeof Chart !== 'undefined') {
+    Chart.register(ChartDataLabels);
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+}
+
 let fullHistoricoDataOp = [];
 let metasGlobais = {};
 let activeQuickFilterOp = 'ALL';
+let chartEvolucao = null; // Variável para o novo gráfico
 
 document.addEventListener('DOMContentLoaded', () => {
     setupOperacionalFilters();
@@ -200,10 +209,13 @@ function atualizarPainelOperacional() {
     document.getElementById('disp_pbtc_real').innerText = mediaPbtc.toLocaleString('pt-PT', {maximumFractionDigits:2});
     atualizarBarra('bar_pbtc_perc', 'disp_pbtc_perc', mediaPbtc, metaPbtc);
 
+    // Novo Gráfico de Evolução (Mostrando o Global Diário)
+    renderEvolucaoChart(filteredGlobal);
+
     // Renderiza Rankings Principais apenas com a frota da Serranalog
     renderLeaderboards(filteredSerrana);
     
-    // Renderiza novos painéis gerenciais considerando o Global (mas a Caixa Média filtra lá dentro)
+    // Renderiza novos painéis gerenciais considerando o Global
     renderDashboardsGerenciais(filteredGlobal);
 }
 
@@ -223,6 +235,79 @@ function formatarHorasMinutos(horasDecimais) {
     if (horas === 0) return `${minutos}m`;
     if (minutos === 0) return `${horas}h`;
     return `${horas}h ${minutos.toString().padStart(2, '0')}m`;
+}
+
+// NOVO: Função que renderiza o gráfico de barras da evolução diária
+function renderEvolucaoChart(data) {
+    const ctxEvo = document.getElementById('evolucaoDiariaChart');
+    if(!ctxEvo) return;
+
+    const dailyMap = new Map();
+    data.forEach(d => {
+        const dt = d.dataDaBaseExcel;
+        if (!dt || dt === 'Desconhecida') return;
+        if (!dailyMap.has(dt)) dailyMap.set(dt, 0);
+        const vol = parseFloat(String(d.volumeReal).replace(',', '.')) || 0;
+        dailyMap.set(dt, dailyMap.get(dt) + vol);
+    });
+
+    const sortedDates = Array.from(dailyMap.keys()).sort((a, b) => {
+        const pA = a.split('/'); const pB = b.split('/');
+        return new Date(pA[2], pA[1]-1, pA[0]) - new Date(pB[2], pB[1]-1, pB[0]);
+    });
+
+    // Limita aos últimos 30 dias para o gráfico não quebrar se filtrar o ano todo
+    const displayDates = sortedDates.slice(-30);
+    const displayVols = displayDates.map(dt => dailyMap.get(dt));
+
+    if (chartEvolucao) chartEvolucao.destroy();
+    
+    const ctx = ctxEvo.getContext('2d');
+    let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, '#10b981'); // emerald-500
+    gradient.addColorStop(1, '#047857'); // emerald-700
+
+    chartEvolucao = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            // Exibe apenas Dia/Mês na legenda embaixo para ficar limpo
+            labels: displayDates.map(d => d.substring(0, 5)), 
+            datasets: [{
+                label: 'Volume (m³)',
+                data: displayVols,
+                backgroundColor: gradient,
+                borderRadius: 4,
+                barPercentage: 0.6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                datalabels: {
+                    color: '#fff',
+                    anchor: 'end',
+                    align: 'top',
+                    font: { size: 11, weight: 'bold' },
+                    formatter: (v) => v > 0 ? v.toFixed(0) : ''
+                }
+            },
+            scales: {
+                y: { 
+                    display: false, 
+                    beginAtZero: true, 
+                    suggestedMax: Math.max(...displayVols) * 1.2 // Dá espaço pro número não cortar
+                }, 
+                x: { 
+                    grid: { display: false },
+                    border: { display: false },
+                    ticks: { font: { size: 11, weight: 'bold' }, color: '#cbd5e1' }
+                }
+            },
+            layout: { padding: { top: 25 } }
+        }
+    });
 }
 
 function renderLeaderboards(data) {
@@ -260,19 +345,61 @@ function renderLeaderboards(data) {
 }
 
 function renderDashboardsGerenciais(data) {
-    // 1. DADOS PARA CAIXA MÉDIA POR PLACA (APENAS SERRANALOG)
     const placaMap = new Map();
-    
-    // 2. DADOS PARA GARGALOS DE TEMPO
     let somaFilaCpo = 0, countFilaCpo = 0;
     let somaCarreg = 0, countCarreg = 0;
     let somaFilaFab = 0, countFilaFab = 0;
-
-    // 3. DADOS PARA PIORES CICLOS
     const viagensComCiclo = [];
 
+    const calcularInicioFim = (d, ciclo) => {
+        let dtIn = d.dataDaBaseExcel || '-';
+        let hrIn = '--:--';
+        let dtOut = '-';
+        let hrOut = '--:--';
+
+        let possibleTime = d.horaSaidaFabrica || d.hora_saida_fabrica || d.horaSaida || null;
+
+        if (!possibleTime) {
+            for (let key in d) {
+                if (typeof d[key] === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(d[key].trim())) {
+                    possibleTime = d[key].trim();
+                    break;
+                }
+            }
+        }
+
+        if (possibleTime && possibleTime.includes(':')) {
+            hrIn = possibleTime.substring(0, 5); 
+
+            if (dtIn !== '-' && ciclo > 0) {
+                const p = dtIn.split('/');
+                if (p.length === 3) {
+                    let y = parseInt(p[2], 10); if (y < 100) y += 2000;
+                    let m = parseInt(p[1], 10) - 1;
+                    let day = parseInt(p[0], 10);
+                    let base = new Date(y, m, day);
+                    
+                    const t = possibleTime.split(':');
+                    base.setHours(parseInt(t[0], 10) || 0, parseInt(t[1], 10) || 0, 0, 0);
+
+                    base.setTime(base.getTime() + (ciclo * 3600 * 1000));
+                    
+                    const fD = String(base.getDate()).padStart(2, '0');
+                    const fM = String(base.getMonth() + 1).padStart(2, '0');
+                    const fY = base.getFullYear();
+                    const fH = String(base.getHours()).padStart(2, '0');
+                    const fMin = String(base.getMinutes()).padStart(2, '0');
+                    
+                    dtOut = `${fD}/${fM}/${fY}`;
+                    hrOut = `${fH}:${fMin}`;
+                }
+            }
+        }
+
+        return { dtIn, hrIn, dtOut, hrOut };
+    };
+
     data.forEach(d => {
-        // --- Processa Caixa Média (APENAS SERRANALOG, AGRUPADO POR PLACA) ---
         const transpNome = String(d.transportadora || "").toUpperCase();
         if (transpNome.includes('SERRANALOG')) {
             const pl = d.placa || 'N/A';
@@ -284,27 +411,27 @@ function renderDashboardsGerenciais(data) {
             objP.viagens++;
         }
 
-        // --- Processa Gargalos de Tempo ---
         if (d.filaCampoHoras > 0) { somaFilaCpo += d.filaCampoHoras; countFilaCpo++; }
         if (d.tempoCarregamentoHoras > 0) { somaCarreg += d.tempoCarregamentoHoras; countCarreg++; }
         if (d.filaFabricaHoras > 0) { somaFilaFab += d.filaFabricaHoras; countFilaFab++; }
 
-        // --- Processa Piores Ciclos ---
         if (d.cicloHoras > 0) {
+            const temp = calcularInicioFim(d, d.cicloHoras);
             viagensComCiclo.push({
                 placa: d.placa || '-',
                 transp: d.transportadora || '-',
-                ciclo: d.cicloHoras
+                ciclo: d.cicloHoras,
+                dtIn: temp.dtIn,
+                hrIn: temp.hrIn,
+                dtOut: temp.dtOut,
+                hrOut: temp.hrOut
             });
         }
     });
 
-    // ==========================================
-    // RENDER: 1. Caixa Média (Placas Serranalog)
-    // ==========================================
     const topCaixaMedia = Array.from(placaMap.values())
         .map(x => ({ ...x, media: x.volTotal / (x.viagens || 1) }))
-        .sort((a,b) => b.media - a.media); // Ordena da melhor média para a pior
+        .sort((a,b) => b.media - a.media);
 
     const bodyCaixa = document.getElementById('leaderboardCaixaMedia');
     if(bodyCaixa) {
@@ -319,9 +446,6 @@ function renderDashboardsGerenciais(data) {
         });
     }
 
-    // ==========================================
-    // RENDER: 2. Mapa de Gargalos
-    // ==========================================
     const gargalos = [
         { nome: '1. Fila no Campo', media: countFilaCpo > 0 ? (somaFilaCpo/countFilaCpo) : 0, amostras: countFilaCpo },
         { nome: '2. Carregamento', media: countCarreg > 0 ? (somaCarreg/countCarreg) : 0, amostras: countCarreg },
@@ -341,20 +465,30 @@ function renderDashboardsGerenciais(data) {
         });
     }
 
-    // ==========================================
-    // RENDER: 3. Piores Ciclos
-    // ==========================================
-    // Ordena do maior tempo para o menor
     const topPioresCiclos = viagensComCiclo.sort((a,b) => b.ciclo - a.ciclo).slice(0, 10);
 
     const bodyPiores = document.getElementById('leaderboardPioresCiclos');
     if(bodyPiores) {
         bodyPiores.innerHTML = '';
         topPioresCiclos.forEach((x, i) => {
+            let transpShort = x.transp.length > 15 ? x.transp.substring(0,12) + '...' : x.transp;
+
             const tr = `<tr>
-                <td class="px-4 py-3 font-bold text-white"><span class="text-slate-500 mr-1">${i+1}.</span> ${x.placa}</td>
-                <td class="px-4 py-3 text-slate-400 truncate max-w-[100px]">${x.transp}</td>
-                <td class="px-4 py-3 text-right font-mono text-white text-sm font-bold">${formatarHorasMinutos(x.ciclo)}</td>
+                <td class="px-4 py-2">
+                    <div class="font-bold text-white text-sm"><span class="text-slate-500 text-xs mr-1">${i+1}.</span>${x.placa}</div>
+                    <div class="text-[10px] text-slate-400 truncate max-w-[100px]" title="${x.transp}">${transpShort}</div>
+                </td>
+                <td class="px-4 py-2">
+                    <div class="font-bold text-white text-sm">${x.dtIn}</div>
+                    <div class="text-xs text-slate-400 font-mono">${x.hrIn}</div>
+                </td>
+                <td class="px-4 py-2">
+                    <div class="font-bold text-white text-sm">${x.dtOut}</div>
+                    <div class="text-xs text-slate-400 font-mono">${x.hrOut}</div>
+                </td>
+                <td class="px-4 py-2 text-right">
+                    <div class="font-mono text-white text-sm font-bold">${formatarHorasMinutos(x.ciclo)}</div>
+                </td>
             </tr>`;
             bodyPiores.insertAdjacentHTML('beforeend', tr);
         });
