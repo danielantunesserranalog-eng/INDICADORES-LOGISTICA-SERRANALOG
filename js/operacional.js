@@ -556,10 +556,11 @@ function renderManutencaoTables(data) {
     if (bCaminhoes) {
         bCaminhoes.innerHTML = '';
         topPlacas.forEach((x, i) => {
+            // Alterado para text-white e text-base/text-lg
             const tr = `<tr>
                 <td class="px-4 py-3 text-center"><div class="w-6 h-6 rounded-full ${i<3?'bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.5)]':'bg-slate-800 text-slate-400'} flex items-center justify-center text-xs font-bold">${i+1}</div></td>
-                <td class="px-4 py-3 font-bold text-white">${x.placa}</td>
-                <td class="px-4 py-3 text-right font-mono text-rose-400 font-bold">${x.qtd}</td>
+                <td class="px-4 py-3 font-bold text-white text-base">${x.placa}</td>
+                <td class="px-4 py-3 text-right font-mono text-white text-lg font-bold">${x.qtd}</td>
             </tr>`;
             bCaminhoes.insertAdjacentHTML('beforeend', tr);
         });
@@ -573,14 +574,15 @@ function renderManutencaoTables(data) {
         bTipos.innerHTML = '';
         topTipos.forEach((x) => {
             const perc = totalOS > 0 ? (x.qtd / totalOS) * 100 : 0;
+            // Alterado para text-white e text-base/text-lg
             const tr = `<tr>
-                <td class="px-4 py-3 font-bold text-white max-w-[150px] truncate" title="${x.tipo}">${x.tipo}</td>
-                <td class="px-4 py-3 text-right font-mono text-amber-400 font-bold">${x.qtd}</td>
+                <td class="px-4 py-3 font-bold text-white text-base max-w-[150px] truncate" title="${x.tipo}">${x.tipo}</td>
+                <td class="px-4 py-3 text-right font-mono text-white text-lg font-bold">${x.qtd}</td>
                 <td class="px-4 py-3">
                     <div class="flex items-center gap-2">
-                        <span class="text-[10px] text-slate-400 w-8 text-right">${perc.toFixed(0)}%</span>
-                        <div class="w-full bg-slate-800 rounded-full h-1.5 shadow-inner">
-                            <div class="bg-amber-500 h-1.5 rounded-full transition-all duration-500" style="width: ${perc}%"></div>
+                        <span class="text-xs font-bold text-white w-8 text-right">${perc.toFixed(0)}%</span>
+                        <div class="w-full bg-slate-800 rounded-full h-2 shadow-inner">
+                            <div class="bg-amber-500 h-2 rounded-full transition-all duration-500" style="width: ${perc}%"></div>
                         </div>
                     </div>
                 </td>
