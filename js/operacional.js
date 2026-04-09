@@ -429,6 +429,9 @@ function renderDashboardsGerenciais(data) {
         }
     });
 
+    // ==========================================
+    // RENDER: 1. Caixa Média (Com Barra de Progresso e Fonte Maior)
+    // ==========================================
     const topCaixaMedia = Array.from(placaMap.values())
         .map(x => ({ ...x, media: x.volTotal / (x.viagens || 1) }))
         .sort((a,b) => b.media - a.media);
@@ -436,11 +439,30 @@ function renderDashboardsGerenciais(data) {
     const bodyCaixa = document.getElementById('leaderboardCaixaMedia');
     if(bodyCaixa) {
         bodyCaixa.innerHTML = '';
+        
+        // Se não tiver meta configurada, pega o melhor caminhão para ser o 100% da barra
+        const metaCx = metasGlobais.cx_prog || (topCaixaMedia.length > 0 ? topCaixaMedia[0].media : 1);
+
         topCaixaMedia.forEach((x, i) => {
+            const perc = Math.min((x.media / metaCx) * 100, 100);
+            
+            // Cores de status da barra
+            let corBarra = 'bg-indigo-500';
+            if (perc >= 95) corBarra = 'bg-emerald-500';
+            else if (perc >= 80) corBarra = 'bg-amber-500';
+            else corBarra = 'bg-rose-500';
+
             const tr = `<tr>
                 <td class="px-4 py-3 font-bold text-white truncate max-w-[150px]"><span class="text-slate-500 mr-1">${i+1}.</span> ${x.nome}</td>
                 <td class="px-4 py-3 text-center text-slate-300">${x.viagens}</td>
-                <td class="px-4 py-3 text-right font-mono text-white text-sm font-bold">${x.media.toLocaleString('pt-PT',{maximumFractionDigits:2})}</td>
+                <td class="px-4 py-3 text-right">
+                    <div class="flex flex-col items-end justify-center gap-1.5">
+                        <span class="font-mono text-white text-[15px] sm:text-base font-black">${x.media.toLocaleString('pt-PT',{maximumFractionDigits:2})}</span>
+                        <div class="w-full max-w-[90px] bg-slate-800 rounded-full h-1.5 shadow-inner overflow-hidden" title="${perc.toFixed(1)}% da Meta">
+                            <div class="${corBarra} h-1.5 rounded-full transition-all duration-500 shadow-[0_0_8px_currentColor]" style="width: ${perc}%"></div>
+                        </div>
+                    </div>
+                </td>
             </tr>`;
             bodyCaixa.insertAdjacentHTML('beforeend', tr);
         });
