@@ -294,42 +294,43 @@ function loadDashboardData() {
         const stOutras = calcStats(dataOutras);
         const stGlobal = calcStats(filteredData);
 
+        // AQUI ESTÃO AS ALTERAÇÕES PARA TEXTO BRANCO (text-white), MAIOR (text-lg) E NEGRITO (font-bold)
         tbodyComp.innerHTML = `
             <tr class="hover:bg-slate-800/30 transition-colors">
                 <td class="px-6 py-4 font-bold text-white"><i class="fas fa-box-open text-indigo-400 w-5"></i> Volume Médio / Viagem</td>
-                <td class="px-6 py-4 font-mono text-emerald-400 text-right font-bold">${stSerrana.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
-                <td class="px-6 py-4 font-mono text-amber-400 text-right font-bold">${stOutras.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
-                <td class="px-6 py-4 font-mono text-sky-400 text-right font-bold">${stGlobal.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stSerrana.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stOutras.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stGlobal.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
                 <td class="px-6 py-4 font-bold text-white"><i class="fas fa-cubes text-cyan-400 w-5"></i> Volume Total</td>
-                <td class="px-6 py-4 font-mono text-emerald-400 text-right font-bold">${stSerrana.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
-                <td class="px-6 py-4 font-mono text-amber-400 text-right font-bold">${stOutras.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
-                <td class="px-6 py-4 font-mono text-sky-400 text-right font-bold">${stGlobal.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stSerrana.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stOutras.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stGlobal.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
                 <td class="px-6 py-4 font-bold text-white"><i class="fas fa-stopwatch text-blue-400 w-5"></i> Ciclo Médio Total</td>
-                <td class="px-6 py-4 font-mono text-emerald-400 text-right font-bold">${formatarHorasMinutos(stSerrana.medCiclo)}</td>
-                <td class="px-6 py-4 font-mono text-amber-400 text-right font-bold">${formatarHorasMinutos(stOutras.medCiclo)}</td>
-                <td class="px-6 py-4 font-mono text-sky-400 text-right font-bold">${formatarHorasMinutos(stGlobal.medCiclo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stSerrana.medCiclo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stOutras.medCiclo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stGlobal.medCiclo)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-700/50">
                 <td class="px-6 py-4 font-bold text-slate-300 text-[11px] uppercase tracking-wider"><i class="fas fa-hourglass-half text-amber-500 w-5"></i> Espera Média no Campo</td>
-                <td class="px-6 py-4 font-mono text-emerald-400 text-right">${formatarHorasMinutos(stSerrana.medFilaCpo)}</td>
-                <td class="px-6 py-4 font-mono text-amber-400 text-right">${formatarHorasMinutos(stOutras.medFilaCpo)}</td>
-                <td class="px-6 py-4 font-mono text-sky-400 text-right">${formatarHorasMinutos(stGlobal.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stSerrana.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stOutras.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stGlobal.medFilaCpo)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
                 <td class="px-6 py-4 font-bold text-slate-300 text-[11px] uppercase tracking-wider"><i class="fas fa-truck-loading text-emerald-500 w-5"></i> Tempo Médio Carregamento</td>
-                <td class="px-6 py-4 font-mono text-emerald-400 text-right">${formatarHorasMinutos(stSerrana.medCarreg)}</td>
-                <td class="px-6 py-4 font-mono text-amber-400 text-right">${formatarHorasMinutos(stOutras.medCarreg)}</td>
-                <td class="px-6 py-4 font-mono text-sky-400 text-right">${formatarHorasMinutos(stGlobal.medCarreg)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stSerrana.medCarreg)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stOutras.medCarreg)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stGlobal.medCarreg)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
                 <td class="px-6 py-4 font-bold text-slate-300 text-[11px] uppercase tracking-wider"><i class="fas fa-industry text-rose-500 w-5"></i> Espera Média na Fábrica</td>
-                <td class="px-6 py-4 font-mono text-emerald-400 text-right">${formatarHorasMinutos(stSerrana.medFilaFab)}</td>
-                <td class="px-6 py-4 font-mono text-amber-400 text-right">${formatarHorasMinutos(stOutras.medFilaFab)}</td>
-                <td class="px-6 py-4 font-mono text-sky-400 text-right">${formatarHorasMinutos(stGlobal.medFilaFab)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stSerrana.medFilaFab)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stOutras.medFilaFab)}</td>
+                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stGlobal.medFilaFab)}</td>
             </tr>
         `;
     }
