@@ -137,6 +137,28 @@ async function loadDashboardDataInit() {
     }
 }
 
+function calcStats(dataArr) {
+    const viagens = dataArr.length;
+    const vol = dataArr.reduce((s,d) => s + (parseFloat(String(d.volumeReal).replace(',','.'))||0), 0);
+    const medVol = viagens > 0 ? vol / viagens : 0;
+
+    const validCiclos = dataArr.filter(d => d.cicloHoras > 0);
+    const somaCiclos = validCiclos.reduce((s,d) => s + d.cicloHoras, 0);
+    const medCiclo = validCiclos.length > 0 ? somaCiclos / validCiclos.length : 0;
+    const prod = somaCiclos > 0 ? vol / somaCiclos : 0;
+
+    const validFilaCpo = dataArr.filter(d => d.filaCampoHoras > 0);
+    const medFilaCpo = validFilaCpo.length > 0 ? validFilaCpo.reduce((s,d) => s + d.filaCampoHoras, 0) / validFilaCpo.length : 0;
+
+    const validCarreg = dataArr.filter(d => d.tempoCarregamentoHoras > 0);
+    const medCarreg = validCarreg.length > 0 ? validCarreg.reduce((s,d) => s + d.tempoCarregamentoHoras, 0) / validCarreg.length : 0;
+
+    const validFilaFab = dataArr.filter(d => d.filaFabricaHoras > 0);
+    const medFilaFab = validFilaFab.length > 0 ? validFilaFab.reduce((s,d) => s + d.filaFabricaHoras, 0) / validFilaFab.length : 0;
+
+    return { medVol, medCiclo, prod, medFilaCpo, medCarreg, medFilaFab };
+}
+
 function loadDashboardData() {
     const storedData = fullHistoricoData;
     if(!storedData.length) return;
@@ -186,6 +208,8 @@ function loadDashboardData() {
         if(document.getElementById('tempoCarregamento')) document.getElementById('tempoCarregamento').innerText = '0 h';
         if(chartCiclo) chartCiclo.destroy();
         if(chartTransp) chartTransp.destroy();
+        const tbodyComp = document.getElementById('comparativoBody');
+        if (tbodyComp) tbodyComp.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-slate-500">Sem dados para comparar</td></tr>';
         return;
     }
 
@@ -215,7 +239,7 @@ function loadDashboardData() {
     const validFilaFabrica = filteredData.filter(d => d.filaFabricaHoras !== null && d.filaFabricaHoras > 0);
     const mediaFilaFabrica = validFilaFabrica.length > 0 ? validFilaFabrica.reduce((s, d) => s + d.filaFabricaHoras, 0) / validFilaFabrica.length : 0;
 
-    // --- PRODUTIVIDADE GLOBAL AGORA USA m³/h ---
+    // --- PRODUTIVIDADE GLOBAL EM m³/h ---
     const produtividadeGlobalM3 = somaCiclosTotais > 0 ? (totalVolumeReal / somaCiclosTotais) : 0;
 
     document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
@@ -260,7 +284,57 @@ function loadDashboardData() {
     document.getElementById('bestPlacaValue').innerText = melhorPlacaProdutividade > 0 ? melhorPlacaProdutividade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) : "0.0";
     document.getElementById('bestPlacaName').innerText = `Placa: ${melhorPlacaNome}`;
 
-    // Gráficos e Tabelas secundárias
+    // --- RENDERIZAR COMPARATIVO SERRANALOG VS TERCEIROS ---
+    const tbodyComp = document.getElementById('comparativoBody');
+    if (tbodyComp) {
+        const dataSerrana = filteredData.filter(d => String(d.transportadora||'').toUpperCase().includes('SERRANALOG'));
+        const dataOutras = filteredData.filter(d => !String(d.transportadora||'').toUpperCase().includes('SERRANALOG'));
+        
+        const stSerrana = calcStats(dataSerrana);
+        const stOutras = calcStats(dataOutras);
+        const stGlobal = calcStats(filteredData);
+
+        tbodyComp.innerHTML = `
+            <tr class="hover:bg-slate-800/30 transition-colors">
+                <td class="px-6 py-4 font-bold text-white"><i class="fas fa-box-open text-indigo-400 w-5"></i> Volume Médio / Viagem</td>
+                <td class="px-6 py-4 font-mono text-emerald-400 text-right font-bold">${stSerrana.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-amber-400 text-right font-bold">${stOutras.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-sky-400 text-right font-bold">${stGlobal.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30 transition-colors">
+                <td class="px-6 py-4 font-bold text-white"><i class="fas fa-tachometer-alt text-cyan-400 w-5"></i> Produtividade (m³/hora)</td>
+                <td class="px-6 py-4 font-mono text-emerald-400 text-right font-bold">${stSerrana.prod.toLocaleString('pt-PT',{maximumFractionDigits:2})} m³/h</td>
+                <td class="px-6 py-4 font-mono text-amber-400 text-right font-bold">${stOutras.prod.toLocaleString('pt-PT',{maximumFractionDigits:2})} m³/h</td>
+                <td class="px-6 py-4 font-mono text-sky-400 text-right font-bold">${stGlobal.prod.toLocaleString('pt-PT',{maximumFractionDigits:2})} m³/h</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30 transition-colors">
+                <td class="px-6 py-4 font-bold text-white"><i class="fas fa-stopwatch text-blue-400 w-5"></i> Ciclo Médio Total</td>
+                <td class="px-6 py-4 font-mono text-emerald-400 text-right font-bold">${formatarHorasMinutos(stSerrana.medCiclo)}</td>
+                <td class="px-6 py-4 font-mono text-amber-400 text-right font-bold">${formatarHorasMinutos(stOutras.medCiclo)}</td>
+                <td class="px-6 py-4 font-mono text-sky-400 text-right font-bold">${formatarHorasMinutos(stGlobal.medCiclo)}</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-700/50">
+                <td class="px-6 py-4 font-bold text-slate-300 text-[11px] uppercase tracking-wider"><i class="fas fa-hourglass-half text-amber-500 w-5"></i> Espera Média no Campo</td>
+                <td class="px-6 py-4 font-mono text-emerald-400 text-right">${formatarHorasMinutos(stSerrana.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-mono text-amber-400 text-right">${formatarHorasMinutos(stOutras.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-mono text-sky-400 text-right">${formatarHorasMinutos(stGlobal.medFilaCpo)}</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30 transition-colors">
+                <td class="px-6 py-4 font-bold text-slate-300 text-[11px] uppercase tracking-wider"><i class="fas fa-truck-loading text-emerald-500 w-5"></i> Tempo Médio Carregamento</td>
+                <td class="px-6 py-4 font-mono text-emerald-400 text-right">${formatarHorasMinutos(stSerrana.medCarreg)}</td>
+                <td class="px-6 py-4 font-mono text-amber-400 text-right">${formatarHorasMinutos(stOutras.medCarreg)}</td>
+                <td class="px-6 py-4 font-mono text-sky-400 text-right">${formatarHorasMinutos(stGlobal.medCarreg)}</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30 transition-colors">
+                <td class="px-6 py-4 font-bold text-slate-300 text-[11px] uppercase tracking-wider"><i class="fas fa-industry text-rose-500 w-5"></i> Espera Média na Fábrica</td>
+                <td class="px-6 py-4 font-mono text-emerald-400 text-right">${formatarHorasMinutos(stSerrana.medFilaFab)}</td>
+                <td class="px-6 py-4 font-mono text-amber-400 text-right">${formatarHorasMinutos(stOutras.medFilaFab)}</td>
+                <td class="px-6 py-4 font-mono text-sky-400 text-right">${formatarHorasMinutos(stGlobal.medFilaFab)}</td>
+            </tr>
+        `;
+    }
+
+    // --- GRÁFICOS INFERIORES ---
     const transpCount = new Map();
     const transpCicloSum = new Map();
     const transpCicloCount = new Map();
