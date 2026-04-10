@@ -14,6 +14,7 @@ let currentStatusFilter = 'ALL';
 
 let chartStatusFrota = null;
 let chartFaixaHoras = null;
+let chartEvolucaoOcorrencias = null; // NOVO GRÁFICO
 
 const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
@@ -222,6 +223,7 @@ function renderizarPainelJornadas() {
         document.getElementById('jorTopExtrasBody').innerHTML = '';
         if(chartStatusFrota) chartStatusFrota.destroy();
         if(chartFaixaHoras) chartFaixaHoras.destroy();
+        if(chartEvolucaoOcorrencias) chartEvolucaoOcorrencias.destroy();
         return; 
     }
 
@@ -343,6 +345,7 @@ function renderizarPainelJornadas() {
 
     if (chartStatusFrota) chartStatusFrota.destroy();
     if (chartFaixaHoras) chartFaixaHoras.destroy();
+    if (chartEvolucaoOcorrencias) chartEvolucaoOcorrencias.destroy();
 
     const totalStatus = qtdOk + qtdEstouros;
     
@@ -450,6 +453,79 @@ function renderizarPainelJornadas() {
             } 
         }
     });
+
+    // --- NOVO GRÁFICO: Evolução Diária de Ocorrências ---
+    const dailyInfractions = new Map();
+    
+    dados.forEach(d => {
+        const isEstouro = (d.total_trabalho_horas || 0) > 12;
+        if (isEstouro) {
+            let dataStr = '-';
+            const matchDate = d.inicio ? d.inicio.match(regexDate) : null;
+            if(matchDate) {
+                dataStr = matchDate[0];
+                if (dataStr.length <= 5) dataStr += '/' + new Date().getFullYear();
+            }
+            if (dataStr !== '-') {
+                dailyInfractions.set(dataStr, (dailyInfractions.get(dataStr) || 0) + 1);
+            }
+        }
+    });
+
+    const sortedDatesInfractions = Array.from(dailyInfractions.keys()).sort((a, b) => {
+        return extrairDataParaFiltro(a) - extrairDataParaFiltro(b);
+    });
+
+    const displayDatesInf = sortedDatesInfractions.slice(-30);
+    const displayCountsInf = displayDatesInf.map(dt => dailyInfractions.get(dt));
+    
+    const displayLabelsInf = displayDatesInf.map(dt => {
+        const p = dt.split('/');
+        return `${p[0]}/${p[1]}`;
+    });
+
+    const ctxEvoOcc = document.getElementById('evolucaoOcorrenciasChart');
+    if (ctxEvoOcc) {
+        const ctxO = ctxEvoOcc.getContext('2d');
+        
+        chartEvolucaoOcorrencias = new Chart(ctxO, {
+            type: 'line',
+            data: {
+                labels: displayLabelsInf,
+                datasets: [{
+                    label: 'Infrações (>12h)',
+                    data: displayCountsInf,
+                    backgroundColor: 'rgba(244, 63, 94, 0.2)',
+                    borderColor: '#f43f5e',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#f43f5e',
+                    pointBorderColor: '#fff',
+                    pointRadius: 4,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    datalabels: {
+                        color: '#fff',
+                        align: 'top',
+                        anchor: 'end',
+                        font: { size: 11, weight: 'bold' },
+                        formatter: (v) => v > 0 ? v : ''
+                    }
+                },
+                scales: {
+                    y: { display: false, beginAtZero: true, suggestedMax: Math.max(...displayCountsInf, 1) * 1.3 },
+                    x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11, weight: 'bold' }, color: '#cbd5e1' } }
+                },
+                layout: { padding: { top: 25 } }
+            }
+        });
+    }
 }
 
 // ==========================================
