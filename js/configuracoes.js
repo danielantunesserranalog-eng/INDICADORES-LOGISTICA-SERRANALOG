@@ -4,8 +4,168 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     carregarMetasGlobais();
-    carregarHistoricoImportacoes(); // Carrega a tabela assim que abre a página
+    carregarHistoricoImportacoes(); 
+    carregarFrentesGruas(); // NOVO: Carrega as Frentes e Gruas
 });
+
+// ==========================================
+// CADASTRO DE FRENTES E GRUAS (ATUALIZADO COM EDIÇÃO E MULTIPLAS GRUAS)
+// ==========================================
+async function carregarFrentesGruas() {
+    const tb = document.getElementById('tabelaFrentesGruasBody');
+    if (!tb) return;
+    
+    tb.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i> Carregando...</td></tr>';
+    
+    try {
+        const { data, error } = await supabaseClient
+            .from('frentes_gruas')
+            .select('*')
+            .order('frente', { ascending: true });
+
+        if (error) throw error;
+
+        tb.innerHTML = '';
+        if (!data || data.length === 0) {
+            tb.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-slate-500">Nenhum registro encontrado.</td></tr>';
+            return;
+        }
+
+        data.forEach(d => {
+            // Escapa as aspas simples caso o nome da frente as tenha
+            const f = d.frente.replace(/'/g, "\\'");
+            const g = d.grua.replace(/'/g, "\\'");
+            
+            // Separa as gruas por vírgula para criar os "cartões" visuais
+            const arrayGruas = d.grua.split(',').filter(item => item.trim() !== '');
+            const htmlGruas = arrayGruas.map(grua => 
+                `<span class="inline-flex items-center gap-1 bg-amber-900/40 text-amber-200 border border-amber-700/50 px-2 py-1 rounded text-[10px] font-medium"><i class="fas fa-truck-loading text-[10px]"></i> ${grua.trim()}</span>`
+            ).join(' ');
+
+            tb.insertAdjacentHTML('beforeend', `
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                    <td class="px-6 py-3 font-semibold text-slate-200">${d.frente}</td>
+                    <td class="px-6 py-3">
+                        <div class="flex flex-wrap gap-2">
+                            ${htmlGruas}
+                        </div>
+                    </td>
+                    <td class="px-6 py-3 text-center space-x-3">
+                        <button onclick="editarFrenteGrua(${d.id}, '${f}', '${g}')" class="text-sky-400 hover:text-sky-300 transition-colors" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="excluirFrenteGrua(${d.id})" class="text-rose-400 hover:text-rose-300 transition-colors" title="Excluir">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                </tr>
+            `);
+        });
+    } catch (e) {
+        console.error(e);
+        tb.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-rose-500">Erro ao carregar dados.</td></tr>';
+    }
+}
+
+// Elementos do formulário
+const btnSalvarFrenteGrua = document.getElementById('btnSalvarFrenteGrua');
+const btnCancelarEdicaoFrente = document.getElementById('btnCancelarEdicaoFrente');
+const inputEditId = document.getElementById('editFrenteGruaId');
+const inputFrente = document.getElementById('inputFrente');
+const inputGrua = document.getElementById('inputGrua');
+const textoSalvarFrente = document.getElementById('textoSalvarFrente');
+const iconSalvarFrente = document.getElementById('iconSalvarFrente');
+
+// Função para limpar o formulário e sair do modo edição
+function resetFormFrente() {
+    if(inputEditId) inputEditId.value = '';
+    if(inputFrente) inputFrente.value = '';
+    if(inputGrua) inputGrua.value = '';
+    
+    if(textoSalvarFrente) textoSalvarFrente.innerText = 'Adicionar';
+    if(iconSalvarFrente) iconSalvarFrente.className = 'fas fa-plus mr-1';
+    
+    if(btnSalvarFrenteGrua) {
+        btnSalvarFrenteGrua.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+        btnSalvarFrenteGrua.classList.add('bg-sky-600', 'hover:bg-sky-500');
+    }
+    if(btnCancelarEdicaoFrente) btnCancelarEdicaoFrente.classList.add('hidden');
+}
+
+// Ativa o modo de edição quando clica no Lápis
+window.editarFrenteGrua = function(id, frente, grua) {
+    inputEditId.value = id;
+    inputFrente.value = frente;
+    inputGrua.value = grua;
+    
+    textoSalvarFrente.innerText = 'Atualizar';
+    iconSalvarFrente.className = 'fas fa-save mr-1';
+    
+    btnSalvarFrenteGrua.classList.remove('bg-sky-600', 'hover:bg-sky-500');
+    btnSalvarFrenteGrua.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+    btnCancelarEdicaoFrente.classList.remove('hidden');
+    
+    // Rola suavemente para o formulário
+    inputFrente.focus();
+}
+
+if (btnCancelarEdicaoFrente) {
+    btnCancelarEdicaoFrente.addEventListener('click', resetFormFrente);
+}
+
+if (btnSalvarFrenteGrua) {
+    btnSalvarFrenteGrua.addEventListener('click', async () => {
+        const id = inputEditId.value;
+        const frente = inputFrente.value.trim();
+        const grua = inputGrua.value.trim();
+
+        if (!frente || !grua) {
+            alert('Por favor, preencha o nome da Frente e a(s) Grua(s).');
+            return;
+        }
+
+        const textoOriginal = textoSalvarFrente.innerText;
+        btnSalvarFrenteGrua.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Salvando...';
+        
+        try {
+            if (id) {
+                // UPDATE: Modo Edição
+                const { error } = await supabaseClient.from('frentes_gruas').update({
+                    frente: frente,
+                    grua: grua
+                }).eq('id', id);
+                if (error) throw error;
+            } else {
+                // INSERT: Modo Adição
+                const { error } = await supabaseClient.from('frentes_gruas').insert([{
+                    frente: frente,
+                    grua: grua
+                }]);
+                if (error) throw error;
+            }
+            
+            resetFormFrente();
+            carregarFrentesGruas();
+        } catch(e) { 
+            console.error(e);
+            alert('Erro ao salvar registro.');
+            btnSalvarFrenteGrua.innerHTML = `<i class="fas fa-save mr-1" id="iconSalvarFrente"></i> <span id="textoSalvarFrente">${textoOriginal}</span>`;
+        }
+    });
+}
+
+window.excluirFrenteGrua = async function(id) {
+    if(confirm('Tem certeza que deseja excluir esta Frente/Grua?')) {
+        try {
+            const { error } = await supabaseClient.from('frentes_gruas').delete().eq('id', id);
+            if (error) throw error;
+            carregarFrentesGruas();
+        } catch (e) {
+            console.error(e);
+            alert('Erro ao excluir registro.');
+        }
+    }
+}
 
 // ==========================================
 // LÓGICA DE METAS GLOBAIS
@@ -64,7 +224,7 @@ async function carregarHistoricoImportacoes() {
             .from('historico_importacoes')
             .select('*')
             .order('id', { ascending: false })
-            .limit(10); // Mostra só as últimas 10
+            .limit(10); 
 
         if (error) throw error;
 
@@ -122,26 +282,22 @@ if (btnLimparBanco) {
                 btnLimparBanco.disabled = true;
                 btnLimparBanco.classList.add('opacity-50', 'cursor-not-allowed');
 
-                // FUNÇÃO NOVA CORRIGIDA: Usa colunas garantidas de existirem nas tabelas
                 async function apagarEmLotes(tabela, colunaReferencia) {
                     let temDados = true;
-                    let contador = 0; // Proteção extra contra laços infinitos
+                    let contador = 0; 
                     
                     while (temDados && contador < 100) {
                         contador++;
-                        // Verifica se tem algum dado procurando pela coluna específica
                         const { data, error } = await supabaseClient.from(tabela).select(colunaReferencia).limit(1);
                         
                         if (error || !data || data.length === 0) {
-                            temDados = false; // Tabela vazia ou fim dos dados
+                            temDados = false; 
                         } else {
-                            // Deleta os registros filtrando pela coluna que sabemos que existe
                             await supabaseClient.from(tabela).delete().not(colunaReferencia, 'is', null);
                         }
                     }
                 }
 
-                // Agora acionamos a exclusão com a coluna exata de cada tabela!
                 if (tipo === 'tudo' || tipo === 'viagens') {
                     await apagarEmLotes('historico_viagens', 'movimento');
                 }
@@ -176,7 +332,7 @@ if (btnLimparBanco) {
 }
 
 // ==========================================
-// IMPORTAÇÃO DE JORNADAS (CSV) - COM FILTRO ANTI-DUPLICAÇÃO
+// IMPORTAÇÃO DE JORNADAS (CSV)
 // ==========================================
 async function processAndSaveJornadasFile(file) {
     const errorMsgDiv = document.getElementById('errorMsgJornadas');
@@ -322,7 +478,7 @@ if(dropZoneJornadas && fileInputJornadas){
 }
 
 // ==========================================
-// IMPORTAÇÃO DE VIAGENS (PRODUÇÃO EXCEL) - COM FILTRO ANTI-DUPLICAÇÃO
+// IMPORTAÇÃO DE VIAGENS (PRODUÇÃO EXCEL)
 // ==========================================
 function parseSheetToData(sheet) {
     const rawData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
@@ -537,7 +693,7 @@ if(dropZone && fileInput){
 }
 
 // ==========================================
-// IMPORTAÇÃO DE EVENTOS (TELEMETRIA) - ADICIONADO AQUI
+// IMPORTAÇÃO DE EVENTOS (TELEMETRIA)
 // ==========================================
 const dropZoneEventos = document.getElementById('dropZoneEventos');
 const fileInputEventos = document.getElementById('fileInputEventos');
