@@ -9,12 +9,14 @@ Chart.defaults.font.family = "'Inter', sans-serif";
 
 let fullJornadasData = []; 
 let jornadasGlobalData = [];
+let dadosFiltradosGlobal = []; // NOVO
 let activeQuickFilterJor = 'ALL';
 let currentStatusFilter = 'ALL'; 
+let currentAnaliticoFilter = 'ALL'; // NOVO
 
 let chartStatusFrota = null;
 let chartFaixaHoras = null;
-let chartEvolucaoOcorrencias = null; // NOVO GRÁFICO
+let chartEvolucaoOcorrencias = null; 
 
 const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
@@ -22,6 +24,15 @@ const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 document.addEventListener('DOMContentLoaded', () => {
     configurarFiltros();
     carregarPainelJornadas();
+
+    // Adicionado Listener para o Dropdown Analítico
+    const filterAnaliticoSelect = document.getElementById('filterAnaliticoMotorista');
+    if (filterAnaliticoSelect) {
+        filterAnaliticoSelect.addEventListener('change', (e) => {
+            currentAnaliticoFilter = e.target.value;
+            atualizarTabelaAnalitica();
+        });
+    }
 });
 
 function atualizarBotoesFiltro() {
@@ -221,6 +232,7 @@ function renderizarPainelJornadas() {
         document.getElementById('jorTopEstourosBody').innerHTML = '';
         document.getElementById('jorTopNoturnasBody').innerHTML = '';
         document.getElementById('jorTopExtrasBody').innerHTML = '';
+        document.getElementById('jorInfratoresRecorrentesBody').innerHTML = ''; // NOVO
         if(chartStatusFrota) chartStatusFrota.destroy();
         if(chartFaixaHoras) chartFaixaHoras.destroy();
         if(chartEvolucaoOcorrencias) chartEvolucaoOcorrencias.destroy();
@@ -241,16 +253,19 @@ function renderizarPainelJornadas() {
 
     dadosFiltrados.sort((a, b) => (b.total_trabalho_horas || 0) - (a.total_trabalho_horas || 0));
 
+    // Salvar global para uso no Filtro Analítico
+    dadosFiltradosGlobal = dadosFiltrados;
+
     document.getElementById('jorFilterStatus').innerText = `${dadosFiltrados.length} Registros`;
 
     let totalMinutosDirecao = 0; let qtdDirecao = 0;
     let fx8_10 = 0, fx10_12 = 0, fx12_14 = 0, fx14mais = 0;
     
-    const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody'); tbodyAnalitica.innerHTML = '';
     const tbodyEstouro = document.getElementById('jorTopEstourosBody'); tbodyEstouro.innerHTML = '';
     
     const agregacaoMotoristas = new Map();
     let infracoesList = [];
+    const recorrentesMap = new Map(); // NOVO MAPA DE RECORRENTES
 
     dadosFiltrados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
@@ -271,43 +286,37 @@ function renderizarPainelJornadas() {
         motObj.noturnas += (linha.horas_noturnas || 0);
         motObj.extras += (linha.horas_extras || 0);
         if (horas > motObj.maxTrabalho) motObj.maxTrabalho = horas;
-
-        let dataInicioStr = '-', horaInicioStr = '-', dataFimStr = '-', horaFimStr = '-';
-        if (linha.inicio) {
-            const mD = linha.inicio.match(regexDate); const mT = linha.inicio.match(regexTime);
-            if (mD) { dataInicioStr = mD[0]; if (dataInicioStr.length <= 5) dataInicioStr += '/' + new Date().getFullYear(); }
-            if (mT) horaInicioStr = mT[0]; if (!mD && !mT) horaInicioStr = linha.inicio;
-        }
-        if (linha.fim) {
-            const mDF = linha.fim.match(regexDate); const mTF = linha.fim.match(regexTime);
-            if (mDF) { dataFimStr = mDF[0]; if (dataFimStr.length <= 5) dataFimStr += '/' + new Date().getFullYear(); } else dataFimStr = dataInicioStr; 
-            if (mTF) horaFimStr = mTF[0]; else horaFimStr = linha.fim.replace(regexDate, '').replace('-', '').trim() || linha.fim;
-        }
-
-        let corLinha = 'text-emerald-400';
-        let badge = `<span class="border border-emerald-500 text-emerald-500 bg-emerald-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">OK</span>`;
         
         if(isEstouro) {
-            corLinha = 'text-rose-500 font-bold';
-            badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold animate-pulse">INFRAÇÃO</span>`;
             infracoesList.push({ nome: motNome, horas: horas }); 
+            recorrentesMap.set(motNome, (recorrentesMap.get(motNome) || 0) + 1); // Contagem para Recorrentes
         }
-
-        tbodyAnalitica.insertAdjacentHTML('beforeend', `
-            <tr class="hover:bg-slate-800/30 transition-colors border-b border-slate-800/50">
-                <td class="px-4 py-3 text-sky-400 font-semibold truncate max-w-[150px]">${motNome}</td>
-                <td class="px-4 py-3"><span class="text-[10px] text-slate-500 mr-2"><i class="far fa-calendar-alt"></i> ${dataInicioStr}</span></td>
-                <td class="px-4 py-3 text-center text-slate-200 font-mono">${horaInicioStr}</td>
-                <td class="px-4 py-3 text-center text-slate-200 font-mono">${horaFimStr}</td>
-                <td class="px-4 py-3 text-center text-indigo-400 font-bold">${formatarHorasMinutos(linha.horas_noturnas)}</td>
-                <td class="px-4 py-3 text-center text-amber-400 font-bold">${formatarHorasMinutos(linha.horas_extras)}</td>
-                <td class="px-4 py-3 text-center ${corLinha}">${formatarHorasMinutos(horas)}</td>
-                <td class="px-4 py-3 text-center text-slate-400">${formatarHorasMinutos(linha.direcao_horas || 0)}</td>
-                <td class="px-4 py-3 text-center">${badge}</td>
-            </tr>
-        `);
     });
 
+    // Renderização do Novo Painel de Infratores Recorrentes
+    const infratoresRecorrentes = Array.from(recorrentesMap.entries())
+        .map(([nome, qtd]) => ({ nome, qtd }))
+        .sort((a, b) => b.qtd - a.qtd);
+
+    const tbodyRecorrentes = document.getElementById('jorInfratoresRecorrentesBody');
+    if (tbodyRecorrentes) {
+        tbodyRecorrentes.innerHTML = '';
+        if (infratoresRecorrentes.length === 0) {
+            tbodyRecorrentes.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-slate-500">Sem infratores registrados no período.</td></tr>';
+        } else {
+            infratoresRecorrentes.forEach(inf => {
+                const tr = `
+                    <tr class="hover:bg-slate-800/30 transition-colors cursor-pointer group" onclick="filtrarMotoristaAnalitico('${inf.nome}')">
+                        <td class="px-6 py-3 text-sky-400 font-bold group-hover:underline"><i class="fas fa-search text-slate-500 mr-2 text-[10px]"></i>${inf.nome}</td>
+                        <td class="px-6 py-3 text-center text-rose-500 font-bold">${inf.qtd} vezes</td>
+                    </tr>
+                `;
+                tbodyRecorrentes.insertAdjacentHTML('beforeend', tr);
+            });
+        }
+    }
+
+    // Renderiza Demais Top Tabelas
     const topInfracoes = infracoesList.sort((a, b) => b.horas - a.horas).slice(0, 5);
     if(topInfracoes.length === 0) {
         tbodyEstouro.innerHTML = '<tr><td colspan="2" class="p-2 text-center text-slate-500 text-xs">Sem infrações registradas.</td></tr>';
@@ -343,6 +352,26 @@ function renderizarPainelJornadas() {
     if (currentStatusFilter !== 'ALL') filterText += ` | Status: ${currentStatusFilter}`;
     document.getElementById('jorDataReferencia').textContent = `Filtro: ${filterText}`;
 
+    // Popula o Dropdown de Seleção de Motorista para o Relatório Analítico
+    const selectMot = document.getElementById('filterAnaliticoMotorista');
+    if (selectMot) {
+        const motoristasUnicos = [...new Set(dadosFiltradosGlobal.map(d => d.motorista))].sort();
+        selectMot.innerHTML = '<option value="ALL">Todos os Motoristas</option>';
+        motoristasUnicos.forEach(m => {
+            selectMot.insertAdjacentHTML('beforeend', `<option value="${m}" ${m === currentAnaliticoFilter ? 'selected' : ''}>${m}</option>`);
+        });
+        
+        // Se o filtro atual não estiver na lista (ex: após mudar a data), reseta
+        if (currentAnaliticoFilter !== 'ALL' && !motoristasUnicos.includes(currentAnaliticoFilter)) {
+            currentAnaliticoFilter = 'ALL';
+            selectMot.value = 'ALL';
+        }
+    }
+
+    // Chama a função para renderizar a Tabela Analítica de fato
+    atualizarTabelaAnalitica();
+
+    // ================== GRÁFICOS ==================
     if (chartStatusFrota) chartStatusFrota.destroy();
     if (chartFaixaHoras) chartFaixaHoras.destroy();
     if (chartEvolucaoOcorrencias) chartEvolucaoOcorrencias.destroy();
@@ -454,7 +483,6 @@ function renderizarPainelJornadas() {
         }
     });
 
-    // --- NOVO GRÁFICO: Evolução Diária de Ocorrências ---
     const dailyInfractions = new Map();
     
     dados.forEach(d => {
@@ -527,6 +555,87 @@ function renderizarPainelJornadas() {
         });
     }
 }
+
+// NOVA FUNÇÃO: Atualiza apenas a Tabela do Relatório Analítico Baseado no Filtro
+function atualizarTabelaAnalitica() {
+    const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody');
+    if (!tbodyAnalitica) return;
+    
+    tbodyAnalitica.innerHTML = '';
+    
+    let linhasInseridas = 0;
+
+    dadosFiltradosGlobal.forEach(linha => {
+        const motNome = linha.motorista;
+        
+        // Aplica o filtro de Motorista selecionado
+        if (currentAnaliticoFilter !== 'ALL' && motNome !== currentAnaliticoFilter) return;
+        
+        linhasInseridas++;
+
+        const horas = linha.total_trabalho_horas || 0;
+        const isEstouro = horas > 12;
+
+        let dataInicioStr = '-', horaInicioStr = '-', dataFimStr = '-', horaFimStr = '-';
+        if (linha.inicio) {
+            const mD = linha.inicio.match(regexDate); const mT = linha.inicio.match(regexTime);
+            if (mD) { dataInicioStr = mD[0]; if (dataInicioStr.length <= 5) dataInicioStr += '/' + new Date().getFullYear(); }
+            if (mT) horaInicioStr = mT[0]; if (!mD && !mT) horaInicioStr = linha.inicio;
+        }
+        if (linha.fim) {
+            const mDF = linha.fim.match(regexDate); const mTF = linha.fim.match(regexTime);
+            if (mDF) { dataFimStr = mDF[0]; if (dataFimStr.length <= 5) dataFimStr += '/' + new Date().getFullYear(); } else dataFimStr = dataInicioStr; 
+            if (mTF) horaFimStr = mTF[0]; else horaFimStr = linha.fim.replace(regexDate, '').replace('-', '').trim() || linha.fim;
+        }
+
+        let corLinha = 'text-emerald-400';
+        let badge = `<span class="border border-emerald-500 text-emerald-500 bg-emerald-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">OK</span>`;
+        
+        if(isEstouro) {
+            corLinha = 'text-rose-500 font-bold';
+            badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold animate-pulse">INFRAÇÃO</span>`;
+        }
+
+        tbodyAnalitica.insertAdjacentHTML('beforeend', `
+            <tr class="hover:bg-slate-800/30 transition-colors border-b border-slate-800/50">
+                <td class="px-4 py-3 text-sky-400 font-semibold truncate max-w-[150px]">${motNome}</td>
+                <td class="px-4 py-3"><span class="text-[10px] text-slate-500 mr-2"><i class="far fa-calendar-alt"></i> ${dataInicioStr}</span></td>
+                <td class="px-4 py-3 text-center text-slate-200 font-mono">${horaInicioStr}</td>
+                <td class="px-4 py-3 text-center text-slate-200 font-mono">${horaFimStr}</td>
+                <td class="px-4 py-3 text-center text-indigo-400 font-bold">${formatarHorasMinutos(linha.horas_noturnas)}</td>
+                <td class="px-4 py-3 text-center text-amber-400 font-bold">${formatarHorasMinutos(linha.horas_extras)}</td>
+                <td class="px-4 py-3 text-center ${corLinha}">${formatarHorasMinutos(horas)}</td>
+                <td class="px-4 py-3 text-center text-slate-400">${formatarHorasMinutos(linha.direcao_horas || 0)}</td>
+                <td class="px-4 py-3 text-center">${badge}</td>
+            </tr>
+        `);
+    });
+
+    if (linhasInseridas === 0) {
+        tbodyAnalitica.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-slate-500">Nenhum registro encontrado para este motorista.</td></tr>';
+    }
+}
+
+// NOVA FUNÇÃO: Acionada ao clicar em um Motorista na Tabela de Recorrentes
+window.filtrarMotoristaAnalitico = function(nome) {
+    const select = document.getElementById('filterAnaliticoMotorista');
+    if (select) {
+        // Verifica se a opção já existe, senão adiciona (Prevenção)
+        const exists = Array.from(select.options).some(opt => opt.value === nome);
+        if(!exists) {
+            select.insertAdjacentHTML('beforeend', `<option value="${nome}">${nome}</option>`);
+        }
+        
+        select.value = nome;
+        currentAnaliticoFilter = nome;
+        
+        // Atualiza apenas a Tabela
+        atualizarTabelaAnalitica();
+        
+        // Rola a página suavemente até o Relatório Analítico
+        document.getElementById('jorTabelaAnaliticaBody').scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+};
 
 // ==========================================
 // EXPORTAÇÃO PARA EXCEL
