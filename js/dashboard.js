@@ -200,7 +200,7 @@ function loadDashboardData() {
     if (filteredData.length === 0) {
         document.getElementById('dbStatusLabel').innerText = "Sem dados para o filtro";
         document.getElementById('totalViagens').innerText = '0';
-        document.getElementById('totalPesoLiq').innerText = '0 t';
+        document.getElementById('totalPesoLiq').innerHTML = '<span class="text-white">0 t</span>';
         document.getElementById('produtividadeGlobal').innerText = '0.0';
         document.getElementById('ociosidadeGlobal').innerText = '0%';
         document.getElementById('bestPlacaValue').innerText = '0.0';
@@ -217,7 +217,7 @@ function loadDashboardData() {
     
     const totalViagens = filteredData.length;
     const totalPesoKg = filteredData.reduce((sum, r) => sum + r.pesoLiquido, 0);
-    const totalPesoTon = totalPesoKg / 1000;
+    const mediaPBTC = totalViagens > 0 ? (totalPesoKg / 1000) / totalViagens : 0;
     
     const totalVolumeReal = filteredData.reduce((sum, r) => sum + (parseFloat(String(r.volumeReal).replace(',','.')) || 0), 0);
     const mediaVolume = totalViagens > 0 ? totalVolumeReal / totalViagens : 0;
@@ -243,7 +243,27 @@ function loadDashboardData() {
     const produtividadeGlobalM3 = somaCiclosTotais > 0 ? (totalVolumeReal / somaCiclosTotais) : 0;
 
     document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
-    document.getElementById('totalPesoLiq').innerText = totalPesoTon.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " t";
+    
+    // --- LÓGICA DO INDICADOR PBTC ---
+    let pbtcCor = "text-white";
+    let pbtcIcone = "";
+    
+    if (mediaPBTC > 0) {
+        if (mediaPBTC < 74) {
+            pbtcCor = "text-yellow-400";
+            pbtcIcone = '<i class="fas fa-exclamation-triangle text-yellow-400 text-sm ml-2" title="Abaixo do ideal"></i>';
+        } else if (mediaPBTC >= 74 && mediaPBTC <= 77.7) {
+            pbtcCor = "text-green-400";
+            pbtcIcone = '<i class="fas fa-check-circle text-green-400 text-sm ml-2" title="Ideal"></i>';
+        } else if (mediaPBTC > 77.7) {
+            pbtcCor = "text-red-500";
+            pbtcIcone = '<i class="fas fa-times-circle text-red-500 text-sm ml-2" title="Acima do ideal"></i>';
+        }
+    }
+
+    document.getElementById('totalPesoLiq').innerHTML = `<span class="${pbtcCor}">${mediaPBTC.toLocaleString('pt-PT', {maximumFractionDigits: 1})} t</span>${pbtcIcone}`;
+    
+    // --- RESTANTE DOS INDICADORES ---
     document.getElementById('mediaVolumeViagem').innerText = mediaVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
     document.getElementById('totalVolumeReal').innerText = totalVolumeReal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
     document.getElementById('mediaDistancia').innerText = mediaDistTotal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " km";
