@@ -9,10 +9,10 @@ Chart.defaults.font.family = "'Inter', sans-serif";
 
 let fullJornadasData = []; 
 let jornadasGlobalData = [];
-let dadosFiltradosGlobal = []; // NOVO
+let dadosFiltradosGlobal = [];
 let activeQuickFilterJor = 'ALL';
 let currentStatusFilter = 'ALL'; 
-let currentAnaliticoFilter = 'ALL'; // NOVO
+let currentAnaliticoFilter = 'ALL'; 
 
 let chartStatusFrota = null;
 let chartFaixaHoras = null;
@@ -25,15 +25,39 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarFiltros();
     carregarPainelJornadas();
 
-    // Adicionado Listener para o Dropdown Analítico
     const filterAnaliticoSelect = document.getElementById('filterAnaliticoMotorista');
+    const btnLimparFiltroMotorista = document.getElementById('btnLimparFiltroMotorista'); // NOVO BOTÃO
+
     if (filterAnaliticoSelect) {
         filterAnaliticoSelect.addEventListener('change', (e) => {
             currentAnaliticoFilter = e.target.value;
             atualizarTabelaAnalitica();
+            toggleBtnLimparFiltro();
+        });
+    }
+
+    // Ação do botão de limpar filtro
+    if (btnLimparFiltroMotorista) {
+        btnLimparFiltroMotorista.addEventListener('click', () => {
+            currentAnaliticoFilter = 'ALL';
+            if (filterAnaliticoSelect) filterAnaliticoSelect.value = 'ALL';
+            atualizarTabelaAnalitica();
+            toggleBtnLimparFiltro();
         });
     }
 });
+
+// FUNÇÃO PARA CONTROLAR A VISIBILIDADE DO BOTÃO DE LIMPAR
+function toggleBtnLimparFiltro() {
+    const btn = document.getElementById('btnLimparFiltroMotorista');
+    if (btn) {
+        if (currentAnaliticoFilter !== 'ALL') {
+            btn.classList.remove('hidden');
+        } else {
+            btn.classList.add('hidden');
+        }
+    }
+}
 
 function atualizarBotoesFiltro() {
     const btnQFs = document.querySelectorAll('.btn-qf-jor');
@@ -232,7 +256,7 @@ function renderizarPainelJornadas() {
         document.getElementById('jorTopEstourosBody').innerHTML = '';
         document.getElementById('jorTopNoturnasBody').innerHTML = '';
         document.getElementById('jorTopExtrasBody').innerHTML = '';
-        document.getElementById('jorInfratoresRecorrentesBody').innerHTML = ''; // NOVO
+        document.getElementById('jorInfratoresRecorrentesBody').innerHTML = ''; 
         if(chartStatusFrota) chartStatusFrota.destroy();
         if(chartFaixaHoras) chartFaixaHoras.destroy();
         if(chartEvolucaoOcorrencias) chartEvolucaoOcorrencias.destroy();
@@ -265,7 +289,7 @@ function renderizarPainelJornadas() {
     
     const agregacaoMotoristas = new Map();
     let infracoesList = [];
-    const recorrentesMap = new Map(); // NOVO MAPA DE RECORRENTES
+    const recorrentesMap = new Map();
 
     dadosFiltrados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
@@ -289,11 +313,11 @@ function renderizarPainelJornadas() {
         
         if(isEstouro) {
             infracoesList.push({ nome: motNome, horas: horas }); 
-            recorrentesMap.set(motNome, (recorrentesMap.get(motNome) || 0) + 1); // Contagem para Recorrentes
+            recorrentesMap.set(motNome, (recorrentesMap.get(motNome) || 0) + 1); 
         }
     });
 
-    // Renderização do Novo Painel de Infratores Recorrentes
+    // Renderização do Painel de Infratores Recorrentes
     const infratoresRecorrentes = Array.from(recorrentesMap.entries())
         .map(([nome, qtd]) => ({ nome, qtd }))
         .sort((a, b) => b.qtd - a.qtd);
@@ -352,7 +376,6 @@ function renderizarPainelJornadas() {
     if (currentStatusFilter !== 'ALL') filterText += ` | Status: ${currentStatusFilter}`;
     document.getElementById('jorDataReferencia').textContent = `Filtro: ${filterText}`;
 
-    // Popula o Dropdown de Seleção de Motorista para o Relatório Analítico
     const selectMot = document.getElementById('filterAnaliticoMotorista');
     if (selectMot) {
         const motoristasUnicos = [...new Set(dadosFiltradosGlobal.map(d => d.motorista))].sort();
@@ -361,14 +384,14 @@ function renderizarPainelJornadas() {
             selectMot.insertAdjacentHTML('beforeend', `<option value="${m}" ${m === currentAnaliticoFilter ? 'selected' : ''}>${m}</option>`);
         });
         
-        // Se o filtro atual não estiver na lista (ex: após mudar a data), reseta
         if (currentAnaliticoFilter !== 'ALL' && !motoristasUnicos.includes(currentAnaliticoFilter)) {
             currentAnaliticoFilter = 'ALL';
             selectMot.value = 'ALL';
         }
+        
+        toggleBtnLimparFiltro(); // Garante o estado visual correto do botão
     }
 
-    // Chama a função para renderizar a Tabela Analítica de fato
     atualizarTabelaAnalitica();
 
     // ================== GRÁFICOS ==================
@@ -556,7 +579,7 @@ function renderizarPainelJornadas() {
     }
 }
 
-// NOVA FUNÇÃO: Atualiza apenas a Tabela do Relatório Analítico Baseado no Filtro
+// Atualiza apenas a Tabela do Relatório Analítico Baseado no Filtro
 function atualizarTabelaAnalitica() {
     const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody');
     if (!tbodyAnalitica) return;
@@ -568,7 +591,6 @@ function atualizarTabelaAnalitica() {
     dadosFiltradosGlobal.forEach(linha => {
         const motNome = linha.motorista;
         
-        // Aplica o filtro de Motorista selecionado
         if (currentAnaliticoFilter !== 'ALL' && motNome !== currentAnaliticoFilter) return;
         
         linhasInseridas++;
@@ -616,11 +638,10 @@ function atualizarTabelaAnalitica() {
     }
 }
 
-// NOVA FUNÇÃO: Acionada ao clicar em um Motorista na Tabela de Recorrentes
+// Acionada ao clicar em um Motorista na Tabela de Recorrentes
 window.filtrarMotoristaAnalitico = function(nome) {
     const select = document.getElementById('filterAnaliticoMotorista');
     if (select) {
-        // Verifica se a opção já existe, senão adiciona (Prevenção)
         const exists = Array.from(select.options).some(opt => opt.value === nome);
         if(!exists) {
             select.insertAdjacentHTML('beforeend', `<option value="${nome}">${nome}</option>`);
@@ -629,10 +650,9 @@ window.filtrarMotoristaAnalitico = function(nome) {
         select.value = nome;
         currentAnaliticoFilter = nome;
         
-        // Atualiza apenas a Tabela
         atualizarTabelaAnalitica();
+        toggleBtnLimparFiltro(); // Garante que o botão apareça ao clicar
         
-        // Rola a página suavemente até o Relatório Analítico
         document.getElementById('jorTabelaAnaliticaBody').scrollIntoView({behavior: 'smooth', block: 'center'});
     }
 };
@@ -643,7 +663,6 @@ window.filtrarMotoristaAnalitico = function(nome) {
 document.getElementById('btnExportarJornada').addEventListener('click', () => {
     const filtroStatus = document.getElementById('exportStatusFilter').value;
     
-    // Filtra os dados de acordo com a seleção no dropdown
     let dadosExportar = jornadasGlobalData.filter(d => {
         const isEstouro = (d.total_trabalho_horas || 0) > 12;
         if (filtroStatus === 'OK' && isEstouro) return false;
@@ -653,7 +672,6 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
 
     if (dadosExportar.length === 0) return alert("Nenhum dado para exportar com este filtro de status.");
 
-    // Ordena do maior para o menor antes de exportar
     dadosExportar.sort((a, b) => (b.total_trabalho_horas || 0) - (a.total_trabalho_horas || 0));
 
     const ws = XLSX.utils.json_to_sheet(dadosExportar.map(d => {
@@ -685,7 +703,6 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
 document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () => {
     const filtroStatus = document.getElementById('exportStatusFilter').value;
     
-    // Filtra os dados de acordo com a seleção no dropdown
     let dadosExportar = jornadasGlobalData.filter(d => {
         const isEstouro = (d.total_trabalho_horas || 0) > 12;
         if (filtroStatus === 'OK' && isEstouro) return false;
@@ -695,10 +712,8 @@ document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () =
 
     if (dadosExportar.length === 0) return alert("Nenhum dado para exportar com este filtro de status.");
 
-    // Ordena do maior para o menor antes de exportar
     dadosExportar.sort((a, b) => (b.total_trabalho_horas || 0) - (a.total_trabalho_horas || 0));
 
-    // Inicializa o jsPDF (formato 'landscape' / paisagem)
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('landscape');
 
@@ -739,7 +754,6 @@ document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () =
         ]);
     });
 
-    // Definir texto do subtítulo baseado no filtro
     let dataReferencia = document.getElementById('jorDataReferencia').textContent;
     let textoFiltro = "Todos os Status";
     if (filtroStatus === 'OK') textoFiltro = "Apenas registros OK (<= 12h)";
