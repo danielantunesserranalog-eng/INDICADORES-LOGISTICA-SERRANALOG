@@ -5,7 +5,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     carregarMetasGlobais();
     carregarHistoricoImportacoes(); 
-    carregarFrentesGruas(); // NOVO: Carrega as Frentes e Gruas
+    carregarFrentesGruas(); 
 });
 
 // ==========================================
@@ -32,11 +32,9 @@ async function carregarFrentesGruas() {
         }
 
         data.forEach(d => {
-            // Escapa as aspas simples caso o nome da frente as tenha
             const f = d.frente.replace(/'/g, "\\'");
             const g = d.grua.replace(/'/g, "\\'");
             
-            // Separa as gruas por vírgula para criar os "cartões" visuais
             const arrayGruas = d.grua.split(',').filter(item => item.trim() !== '');
             const htmlGruas = arrayGruas.map(grua => 
                 `<span class="inline-flex items-center gap-1 bg-amber-900/40 text-amber-200 border border-amber-700/50 px-2 py-1 rounded text-[10px] font-medium"><i class="fas fa-truck-loading text-[10px]"></i> ${grua.trim()}</span>`
@@ -67,7 +65,6 @@ async function carregarFrentesGruas() {
     }
 }
 
-// Elementos do formulário
 const btnSalvarFrenteGrua = document.getElementById('btnSalvarFrenteGrua');
 const btnCancelarEdicaoFrente = document.getElementById('btnCancelarEdicaoFrente');
 const inputEditId = document.getElementById('editFrenteGruaId');
@@ -76,7 +73,6 @@ const inputGrua = document.getElementById('inputGrua');
 const textoSalvarFrente = document.getElementById('textoSalvarFrente');
 const iconSalvarFrente = document.getElementById('iconSalvarFrente');
 
-// Função para limpar o formulário e sair do modo edição
 function resetFormFrente() {
     if(inputEditId) inputEditId.value = '';
     if(inputFrente) inputFrente.value = '';
@@ -92,7 +88,6 @@ function resetFormFrente() {
     if(btnCancelarEdicaoFrente) btnCancelarEdicaoFrente.classList.add('hidden');
 }
 
-// Ativa o modo de edição quando clica no Lápis
 window.editarFrenteGrua = function(id, frente, grua) {
     inputEditId.value = id;
     inputFrente.value = frente;
@@ -105,7 +100,6 @@ window.editarFrenteGrua = function(id, frente, grua) {
     btnSalvarFrenteGrua.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
     btnCancelarEdicaoFrente.classList.remove('hidden');
     
-    // Rola suavemente para o formulário
     inputFrente.focus();
 }
 
@@ -129,14 +123,12 @@ if (btnSalvarFrenteGrua) {
         
         try {
             if (id) {
-                // UPDATE: Modo Edição
                 const { error } = await supabaseClient.from('frentes_gruas').update({
                     frente: frente,
                     grua: grua
                 }).eq('id', id);
                 if (error) throw error;
             } else {
-                // INSERT: Modo Adição
                 const { error } = await supabaseClient.from('frentes_gruas').insert([{
                     frente: frente,
                     grua: grua
@@ -516,6 +508,9 @@ function parseSheetToData(sheet) {
     const dtSaidaBaseKey = findKey(['data de saída', 'data saída', 'data saída fábrica']);
     const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saída', 'hora saida']);
     const cicloProntoKey = findKey(['ciclo', 'tempo de ciclo', 'ciclo horas', 'horas ciclo', 'tempo ciclo']);
+    
+    // NOVA CHAVE: CARREGADOR FLORESTAL (GRUA)
+    const gruaKey = findKey(['carregador florestal', 'carregador']); 
 
     const today = new Date().toLocaleDateString('pt-PT');
 
@@ -569,6 +564,7 @@ function parseSheetToData(sheet) {
             filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), false),
             tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
+            grua: String(getValue(gruaKey) || "-").trim(), // CAPTURA A GRUA AQUI
             _timestamp: timestampSaida
         };
     });
@@ -610,11 +606,15 @@ async function processAndSaveFile(file) {
 
         if (!newRows || newRows.length === 0) throw new Error("Planilha vazia ou sem dados válidos.");
 
+        // 1. Puxar IDs existentes
         const { data: existingIds, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento').limit(100000);
         if (selErr) throw selErr;
         
         const existingSet = new Set(existingIds ? existingIds.map(e => e.movimento) : []);
         
+        // 2. Puxar o Cadastro de Frentes e Gruas para fazer o Cruzamento
+        const { data: frentesData } = await supabaseClient.from('frentes_gruas').select('*');
+
         let duplicadasIgnoradas = 0;
         const viagensNovasArray = newRows.filter(item => {
             if (existingSet.has(item.movimento)) {
@@ -629,6 +629,26 @@ async function processAndSaveFile(file) {
         if (viagensNovasArray.length === 0) {
             throw new Error(`Todas as ${newRows.length} viagens da planilha já existem no banco. Nenhuma nova viagem adicionada.`);
         }
+
+        // 3. CRUZAMENTO DE DADOS (Frente X Grua)
+        viagensNovasArray.forEach(viagem => {
+            viagem.frente = "Outras Frentes"; // Valor padrão caso não ache a grua
+            
+            if (viagem.grua && viagem.grua !== "-") {
+                const gruaViagemLimpa = viagem.grua.toLowerCase().trim();
+                
+                if (frentesData && frentesData.length > 0) {
+                    for (let f of frentesData) {
+                        const arrayGruasCadastradas = f.grua.split(',').map(g => g.trim().toLowerCase());
+                        
+                        if (arrayGruasCadastradas.includes(gruaViagemLimpa)) {
+                            viagem.frente = f.frente;
+                            break; // Se achou, para de procurar e vai pra próxima viagem
+                        }
+                    }
+                }
+            }
+        });
 
         const datasEncontradas = [...new Set(viagensNovasArray.map(r => r.dataDaBaseExcel).filter(d => d && d !== 'Desconhecida'))];
         
