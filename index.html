@@ -69,24 +69,10 @@
             </div>
 
             <section class="space-y-6 animate-fade-in">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    <div class="glass-card rounded-2xl p-6 border-l-4 border-l-cyan-400 card-hover flex items-center justify-between relative overflow-hidden">
-                        <div class="absolute -right-6 -top-6 text-slate-700/30 text-9xl"><i class="fas fa-tachometer-alt"></i></div>
-                        <div class="relative z-10"><p class="text-cyan-400 text-xs font-bold uppercase tracking-widest mb-1">Produtividade Global</p><div class="flex items-end gap-2"><p id="produtividadeGlobal" class="text-4xl font-black text-white">0.0</p><span class="text-slate-400 font-bold mb-1">m³/h</span></div></div>
-                    </div>
-                    <div class="glass-card rounded-2xl p-6 border-l-4 border-l-rose-500 card-hover flex items-center justify-between relative overflow-hidden">
-                        <div class="absolute -right-4 -top-4 text-slate-700/30 text-9xl"><i class="fas fa-traffic-light"></i></div>
-                        <div class="relative z-10"><p class="text-rose-400 text-xs font-bold uppercase tracking-widest mb-1">Taxa de Ociosidade</p><div class="flex items-end gap-2"><p id="ociosidadeGlobal" class="text-4xl font-black text-white">0%</p><span class="text-slate-400 font-bold mb-1">do tempo em espera</span></div></div>
-                    </div>
-                    <div class="glass-card rounded-2xl p-6 border-l-4 border-l-emerald-400 card-hover flex flex-col justify-between relative overflow-hidden">
-                        <div class="absolute -right-2 -top-2 text-slate-700/30 text-8xl"><i class="fas fa-truck-fast"></i></div>
-                        <div class="relative z-10"><p class="text-emerald-400 text-xs font-bold uppercase tracking-widest mb-1">Cavalo Destaque</p><div class="flex items-end gap-2"><p id="bestPlacaValue" class="text-4xl font-black text-white">0.0</p><span class="text-slate-400 font-bold mb-1">m³/h</span></div><p id="bestPlacaName" class="text-xs font-mono text-emerald-300 mt-2 bg-emerald-900/30 inline-block px-2 py-1 rounded border border-emerald-800/50 shadow-inner">Carregando...</p></div>
-                    </div>
-                </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
                     <div class="glass-card rounded-2xl p-5 glow-border-blue card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Viagens</p><p id="totalViagens" class="text-3xl font-extrabold text-white mt-1">0</p></div><i class="fas fa-route text-blue-500 text-2xl self-end -mt-6"></i></div>
-                    <div class="glass-card rounded-2xl p-5 glow-border-cyan card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Peso Total</p><p id="totalPesoLiq" class="text-3xl font-extrabold text-white mt-1">0 t</p></div><i class="fas fa-weight-hanging text-cyan-400 text-2xl self-end -mt-6"></i></div>
+                    <div class="glass-card rounded-2xl p-5 glow-border-cyan card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">PBTC</p><p id="totalPesoLiq" class="text-3xl font-extrabold text-white mt-1">0 t</p></div><i class="fas fa-weight-hanging text-cyan-400 text-2xl self-end -mt-6"></i></div>
                     
                     <div class="glass-card rounded-2xl p-5 glow-border-indigo card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Média de Vol (m³)</p><p id="mediaVolumeViagem" class="text-3xl font-extrabold text-white mt-1">0 m³</p></div><i class="fas fa-box-open text-indigo-400 text-2xl self-end -mt-6"></i></div>
                     
@@ -96,9 +82,9 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-4">
                     <div class="glass-card rounded-2xl p-6 glow-border-blue card-hover"><div class="flex justify-between items-start"><div><p class="text-blue-400 text-[10px] font-bold uppercase tracking-widest">Ciclo Médio</p><p id="cicloMedio" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-stopwatch text-blue-500/50 text-3xl"></i></div></div>
-                    <div class="glass-card rounded-2xl p-6 glow-border-amber card-hover"><div class="flex justify-between items-start"><div><p class="text-amber-400 text-[10px] font-bold uppercase tracking-widest">Fila de Carregamento</p><p id="filaCampo" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-tractor text-amber-500/50 text-3xl"></i></div></div>
-                    <div class="glass-card rounded-2xl p-6 glow-border-emerald card-hover"><div class="flex justify-between items-start"><div><p class="text-emerald-400 text-[10px] font-bold uppercase tracking-widest">T. Médio Carregamento</p><p id="tempoCarregamento" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-truck-loading text-emerald-500/50 text-3xl"></i></div></div>
-                    <div class="glass-card rounded-2xl p-6 glow-border-rose card-hover"><div class="flex justify-between items-start"><div><p class="text-rose-400 text-[10px] font-bold uppercase tracking-widest">Fila Média Fábrica</p><p id="filaFabrica" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-industry text-rose-500/50 text-3xl"></i></div></div>
+                    <div class="glass-card rounded-2xl p-6 glow-border-amber card-hover"><div class="flex justify-between items-start"><div><p class="text-amber-400 text-[10px] font-bold uppercase tracking-widest">Tempo Médio de Campo</p><p id="filaCampo" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-tractor text-amber-500/50 text-3xl"></i></div></div>
+                    <div class="glass-card rounded-2xl p-6 glow-border-emerald card-hover"><div class="flex justify-between items-start"><div><p class="text-emerald-400 text-[10px] font-bold uppercase tracking-widest">Tempo Médio de Carga</p><p id="tempoCarregamento" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-truck-loading text-emerald-500/50 text-3xl"></i></div></div>
+                    <div class="glass-card rounded-2xl p-6 glow-border-rose card-hover"><div class="flex justify-between items-start"><div><p class="text-rose-400 text-[10px] font-bold uppercase tracking-widest">Tempo Médio de Fábrica</p><p id="filaFabrica" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-industry text-rose-500/50 text-3xl"></i></div></div>
                 </div>
 
                 <div class="glass-card rounded-xl border border-slate-700/50 shadow-xl overflow-hidden mb-6">
