@@ -251,7 +251,24 @@ function atualizarPainelOperacional() {
     const mediaPbtc = totalV_Global > 0 ? (totalP_Global / totalV_Global) : 0;
     const metaPbtc = metasGlobais.pbtc_prog || 0;
     document.getElementById('disp_pbtc_prog').innerText = metaPbtc;
-    document.getElementById('disp_pbtc_real').innerText = mediaPbtc.toLocaleString('pt-PT', {maximumFractionDigits:2});
+    
+    let pbtcCor = "text-white";
+    let pbtcIcone = "";
+    
+    if (mediaPbtc > 0) {
+        if (mediaPbtc < 74) {
+            pbtcCor = "text-yellow-400";
+            pbtcIcone = '<i class="fas fa-exclamation-triangle text-yellow-400 text-sm ml-2" title="Abaixo do ideal"></i>';
+        } else if (mediaPbtc >= 74 && mediaPbtc <= 77.7) {
+            pbtcCor = "text-green-400";
+            pbtcIcone = '<i class="fas fa-check-circle text-green-400 text-sm ml-2" title="Ideal"></i>';
+        } else if (mediaPbtc > 77.7) {
+            pbtcCor = "text-red-500";
+            pbtcIcone = '<i class="fas fa-times-circle text-red-500 text-sm ml-2" title="Acima do ideal"></i>';
+        }
+    }
+    document.getElementById('disp_pbtc_real').innerHTML = `<span class="${pbtcCor}">${mediaPbtc.toLocaleString('pt-PT', {maximumFractionDigits:2})}</span>${pbtcIcone}`;
+    
     atualizarBarra('bar_pbtc_perc', 'disp_pbtc_perc', mediaPbtc, metaPbtc);
 
     // Gráficos
@@ -261,7 +278,7 @@ function atualizarPainelOperacional() {
 
     // Renderiza Tabelas
     renderLeaderboards(filteredSerrana);
-    renderManutencaoTables(filteredManutencao); // CHAMADA DAS NOVAS TABELAS DE MANUTENÇÃO
+    renderManutencaoTables(filteredManutencao); 
     renderDashboardsGerenciais(filteredGlobal);
 }
 
@@ -578,14 +595,7 @@ function renderManutencaoTables(data) {
             const tr = `<tr>
                 <td class="px-4 py-3 font-bold text-white text-base max-w-[150px] truncate" title="${x.tipo}">${x.tipo}</td>
                 <td class="px-4 py-3 text-right font-mono text-white text-lg font-bold">${x.qtd}</td>
-                <td class="px-4 py-3">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs font-bold text-white w-8 text-right">${perc.toFixed(0)}%</span>
-                        <div class="w-full bg-slate-800 rounded-full h-2 shadow-inner">
-                            <div class="bg-amber-500 h-2 rounded-full transition-all duration-500" style="width: ${perc}%"></div>
-                        </div>
-                    </div>
-                </td>
+                <td class="px-4 py-3 text-right font-mono text-slate-400 text-sm">${perc.toFixed(1)}%</td>
             </tr>`;
             bTipos.insertAdjacentHTML('beforeend', tr);
         });
@@ -595,170 +605,64 @@ function renderManutencaoTables(data) {
     }
 }
 
+
 function renderDashboardsGerenciais(data) {
-    const placaMap = new Map();
-    let somaFilaCpo = 0, countFilaCpo = 0;
-    let somaCarreg = 0, countCarreg = 0;
-    let somaFilaFab = 0, countFilaFab = 0;
-    const viagensComCiclo = [];
-
-    const calcularInicioFim = (d, ciclo) => {
-        let dtIn = d.dataDaBaseExcel || '-';
-        let hrIn = '--:--';
-        let dtOut = '-';
-        let hrOut = '--:--';
-
-        let possibleTime = d.horaSaidaFabrica || d.hora_saida_fabrica || d.horaSaida || null;
-
-        if (!possibleTime) {
-            for (let key in d) {
-                if (typeof d[key] === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(d[key].trim())) {
-                    possibleTime = d[key].trim();
-                    break;
-                }
-            }
-        }
-
-        if (possibleTime && possibleTime.includes(':')) {
-            hrIn = possibleTime.substring(0, 5); 
-
-            if (dtIn !== '-' && ciclo > 0) {
-                const p = dtIn.split('/');
-                if (p.length === 3) {
-                    let y = parseInt(p[2], 10); if (y < 100) y += 2000;
-                    let m = parseInt(p[1], 10) - 1;
-                    let day = parseInt(p[0], 10);
-                    let base = new Date(y, m, day);
-                    
-                    const t = possibleTime.split(':');
-                    base.setHours(parseInt(t[0], 10) || 0, parseInt(t[1], 10) || 0, 0, 0);
-
-                    base.setTime(base.getTime() + (ciclo * 3600 * 1000));
-                    
-                    const fD = String(base.getDate()).padStart(2, '0');
-                    const fM = String(base.getMonth() + 1).padStart(2, '0');
-                    const fY = base.getFullYear();
-                    const fH = String(base.getHours()).padStart(2, '0');
-                    const fMin = String(base.getMinutes()).padStart(2, '0');
-                    
-                    dtOut = `${fD}/${fM}/${fY}`;
-                    hrOut = `${fH}:${fMin}`;
-                }
-            }
-        }
-
-        return { dtIn, hrIn, dtOut, hrOut };
-    };
-
+    const tMap = new Map();
     data.forEach(d => {
-        const transpNome = String(d.transportadora || "").toUpperCase();
-        if (transpNome.includes('SERRANALOG')) {
-            const pl = d.placa || 'N/A';
-            const vol = parseFloat(String(d.volumeReal).replace(',', '.')) || 0;
-            
-            if(!placaMap.has(pl)) placaMap.set(pl, { nome: pl, volTotal: 0, viagens: 0 });
-            const objP = placaMap.get(pl);
-            objP.volTotal += vol;
-            objP.viagens++;
-        }
-
-        if (d.filaCampoHoras > 0) { somaFilaCpo += d.filaCampoHoras; countFilaCpo++; }
-        if (d.tempoCarregamentoHoras > 0) { somaCarreg += d.tempoCarregamentoHoras; countCarreg++; }
-        if (d.filaFabricaHoras > 0) { somaFilaFab += d.filaFabricaHoras; countFilaFab++; }
-
-        if (d.cicloHoras > 0) {
-            const temp = calcularInicioFim(d, d.cicloHoras);
-            viagensComCiclo.push({
-                placa: d.placa || '-',
-                transp: d.transportadora || '-',
-                ciclo: d.cicloHoras,
-                dtIn: temp.dtIn,
-                hrIn: temp.hrIn,
-                dtOut: temp.dtOut,
-                hrOut: temp.hrOut
-            });
-        }
+        const tr = d.transportadora || 'N/A';
+        const vol = parseFloat(String(d.volumeReal).replace(',', '.')) || 0;
+        if(!tMap.has(tr)) tMap.set(tr, {vol:0, v:0});
+        const o = tMap.get(tr);
+        o.vol += vol; o.v++;
     });
 
-    const topCaixaMedia = Array.from(placaMap.values())
-        .map(x => ({ ...x, media: x.volTotal / (x.viagens || 1) }))
-        .sort((a,b) => b.media - a.media);
+    const arr = Array.from(tMap.entries()).map(x => ({t: x[0], vol: x[1].vol, v: x[1].v})).sort((a,b)=>b.vol - a.vol);
+    const totVol = arr.reduce((s,x)=>s+x.vol, 0);
 
-    const bodyCaixa = document.getElementById('leaderboardCaixaMedia');
-    if(bodyCaixa) {
-        bodyCaixa.innerHTML = '';
+    const bPerf = document.getElementById('perfTranspBody');
+    if(bPerf) {
+        bPerf.innerHTML = '';
+        arr.forEach(x => {
+            const perc = totVol > 0 ? (x.vol/totVol)*100 : 0;
+            const tr = `<tr><td class="px-4 py-3 font-bold text-white">${x.t}</td><td class="px-4 py-3 text-center text-slate-300">${x.v}</td><td class="px-4 py-3 text-right font-mono text-emerald-400">${x.vol.toLocaleString('pt-PT',{maximumFractionDigits:1})}</td><td class="px-4 py-3 text-right font-mono text-sky-400">${perc.toFixed(1)}%</td></tr>`;
+            bPerf.insertAdjacentHTML('beforeend', tr);
+        });
+    }
+
+    const tRes = document.getElementById('resumoOperacionalBody');
+    if(tRes) {
+        const dSerrana = data.filter(d=>String(d.transportadora||'').toUpperCase().includes('SERRANALOG'));
+        const dOutras = data.filter(d=>!String(d.transportadora||'').toUpperCase().includes('SERRANALOG'));
         
-        const metaCx = metasGlobais.cx_prog || (topCaixaMedia.length > 0 ? topCaixaMedia[0].media : 1);
+        const calcResumo = (arrD) => {
+            const v = arrD.length;
+            const vol = arrD.reduce((s,x)=>s+(parseFloat(String(x.volumeReal).replace(',','.'))||0),0);
+            return {v, vol};
+        };
 
-        topCaixaMedia.forEach((x, i) => {
-            const perc = Math.min((x.media / metaCx) * 100, 100);
-            
-            let corBarra = 'bg-indigo-500';
-            if (perc >= 95) corBarra = 'bg-emerald-500';
-            else if (perc >= 80) corBarra = 'bg-amber-500';
-            else corBarra = 'bg-rose-500';
+        const rS = calcResumo(dSerrana);
+        const rO = calcResumo(dOutras);
+        const rG = calcResumo(data);
 
-            const tr = `<tr>
-                <td class="px-4 py-3 font-bold text-white truncate max-w-[150px]"><span class="text-slate-500 mr-1">${i+1}.</span> ${x.nome}</td>
-                <td class="px-4 py-3 text-center text-slate-300">${x.viagens}</td>
-                <td class="px-4 py-3 text-right">
-                    <div class="flex flex-col items-end justify-center gap-1.5">
-                        <span class="font-mono text-white text-[15px] sm:text-base font-black">${x.media.toLocaleString('pt-PT',{maximumFractionDigits:2})}</span>
-                        <div class="w-full max-w-[90px] bg-slate-800 rounded-full h-1.5 shadow-inner overflow-hidden" title="${perc.toFixed(1)}% da Meta">
-                            <div class="${corBarra} h-1.5 rounded-full transition-all duration-500 shadow-[0_0_8px_currentColor]" style="width: ${perc}%"></div>
-                        </div>
-                    </div>
-                </td>
-            </tr>`;
-            bodyCaixa.insertAdjacentHTML('beforeend', tr);
-        });
-    }
-
-    const gargalos = [
-        { nome: '1. Fila no Campo', media: countFilaCpo > 0 ? (somaFilaCpo/countFilaCpo) : 0, amostras: countFilaCpo },
-        { nome: '2. Carregamento', media: countCarreg > 0 ? (somaCarreg/countCarreg) : 0, amostras: countCarreg },
-        { nome: '3. Fila na Fábrica/Balança', media: countFilaFab > 0 ? (somaFilaFab/countFilaFab) : 0, amostras: countFilaFab }
-    ];
-
-    const bodyGargalos = document.getElementById('leaderboardGargalos');
-    if(bodyGargalos) {
-        bodyGargalos.innerHTML = '';
-        gargalos.forEach((x) => {
-            const tr = `<tr>
-                <td class="px-4 py-3 font-bold text-white truncate max-w-[150px]">${x.nome}</td>
-                <td class="px-4 py-3 text-center text-slate-300">${x.amostras}</td>
-                <td class="px-4 py-3 text-right font-mono text-white text-sm font-bold">${formatarHorasMinutos(x.media)}</td>
-            </tr>`;
-            bodyGargalos.insertAdjacentHTML('beforeend', tr);
-        });
-    }
-
-    const topPioresCiclos = viagensComCiclo.sort((a,b) => b.ciclo - a.ciclo).slice(0, 10);
-
-    const bodyPiores = document.getElementById('leaderboardPioresCiclos');
-    if(bodyPiores) {
-        bodyPiores.innerHTML = '';
-        topPioresCiclos.forEach((x, i) => {
-            let transpShort = x.transp.length > 15 ? x.transp.substring(0,12) + '...' : x.transp;
-
-            const tr = `<tr>
-                <td class="px-4 py-2">
-                    <div class="font-bold text-white text-sm"><span class="text-slate-500 text-xs mr-1">${i+1}.</span>${x.placa}</div>
-                    <div class="text-[10px] text-slate-400 truncate max-w-[100px]" title="${x.transp}">${transpShort}</div>
-                </td>
-                <td class="px-4 py-2">
-                    <div class="font-bold text-white text-sm">${x.dtIn}</div>
-                    <div class="text-xs text-slate-400 font-mono">${x.hrIn}</div>
-                </td>
-                <td class="px-4 py-2">
-                    <div class="font-bold text-white text-sm">${x.dtOut}</div>
-                    <div class="text-xs text-slate-400 font-mono">${x.hrOut}</div>
-                </td>
-                <td class="px-4 py-2 text-right">
-                    <div class="font-mono text-white text-sm font-bold">${formatarHorasMinutos(x.ciclo)}</div>
-                </td>
-            </tr>`;
-            bodyPiores.insertAdjacentHTML('beforeend', tr);
-        });
+        tRes.innerHTML = `
+            <tr class="hover:bg-slate-800/30 transition-colors border-b border-slate-700/50">
+                <td class="px-4 py-3 font-bold text-white">Serranalog</td>
+                <td class="px-4 py-3 text-center font-mono text-slate-300">${rS.v}</td>
+                <td class="px-4 py-3 text-right font-mono text-emerald-400">${rS.vol.toLocaleString('pt-PT',{maximumFractionDigits:1})}</td>
+                <td class="px-4 py-3 text-right font-mono text-sky-400">${rG.vol>0?((rS.vol/rG.vol)*100).toFixed(1):'0.0'}%</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30 transition-colors border-b border-slate-700/50">
+                <td class="px-4 py-3 font-bold text-white">Terceiros</td>
+                <td class="px-4 py-3 text-center font-mono text-slate-300">${rO.v}</td>
+                <td class="px-4 py-3 text-right font-mono text-emerald-400">${rO.vol.toLocaleString('pt-PT',{maximumFractionDigits:1})}</td>
+                <td class="px-4 py-3 text-right font-mono text-sky-400">${rG.vol>0?((rO.vol/rG.vol)*100).toFixed(1):'0.0'}%</td>
+            </tr>
+            <tr class="bg-slate-800/50 border-t border-slate-600">
+                <td class="px-4 py-3 font-bold text-white uppercase tracking-wider text-xs">Total Global</td>
+                <td class="px-4 py-3 text-center font-mono font-bold text-white">${rG.v}</td>
+                <td class="px-4 py-3 text-right font-mono font-bold text-emerald-400">${rG.vol.toLocaleString('pt-PT',{maximumFractionDigits:1})}</td>
+                <td class="px-4 py-3 text-right font-mono font-bold text-sky-400">100.0%</td>
+            </tr>
+        `;
     }
 }
