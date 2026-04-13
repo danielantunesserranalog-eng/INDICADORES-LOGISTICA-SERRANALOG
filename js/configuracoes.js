@@ -491,7 +491,7 @@ function parseSheetToData(sheet) {
     const movimentoKey = findKey(['movimento', 'id_movimento']);
     const transpKey = findKey(['transportadora', 'nome da transportadora']);
     const placaKey = findKey(['placa do cavalo', 'placa cavalo', 'placa']);
-    const pesoLiqKey = findKey(['peso líquido', 'peso liquido']);
+    const pesoLiqKey = findKey(['Peso na Entrada', 'Peso na Entrada']);
     const volumeKey = findKey(['volume real', 'volume_real']);
     const distAsfaltoKey = findKey(['distancia por asfalto', 'distância por asfalto', 'distancia asfalto']);
     const distTerraKey = findKey(['distancia por terra', 'distância por terra', 'distancia terra']);
