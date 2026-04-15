@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Indicadores Serrana Florestal</title>
+    <title>Indicadores Suzano - Serrana Florestal</title>
     
     <script>
         if (!localStorage.getItem('serranalog_user')) {
@@ -30,8 +30,8 @@
             <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm flex-wrap gap-4">
                 <div class="flex items-center gap-4 flex-wrap">
                     <div>
-                        <h1 class="text-2xl font-extrabold text-white">Indicadores Serrana</h1>
-                        <p class="text-sm text-slate-400 font-medium">Análise de indicadores específicos da operação</p>
+                        <h1 class="text-2xl font-extrabold text-white">Indicadores Suzano</h1>
+                        <p class="text-sm text-slate-400 font-medium">Análise compilada de Produtividade, Metas e Jornadas</p>
                     </div>
                     <div id="indicadorAtualizacao" class="hidden flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner transition-all duration-500">
                         <i id="iconeAtualizacao" class="fas fa-sync fa-spin"></i>
@@ -74,24 +74,135 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
                     <div class="glass-card rounded-2xl p-5 glow-border-blue card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Viagens</p><p id="totalViagens" class="text-3xl font-extrabold text-white mt-1">0</p></div><i class="fas fa-route text-blue-500 text-2xl self-end -mt-6"></i></div>
-                    
                     <div class="glass-card rounded-2xl p-5 glow-border-cyan card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">MÉDIA DE PBTC</p><p id="totalPesoLiq" class="text-3xl font-extrabold text-white mt-1">0 t</p></div><i class="fas fa-weight-hanging text-cyan-400 text-2xl self-end -mt-6"></i></div>
-                    
                     <div class="glass-card rounded-2xl p-5 glow-border-indigo card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Média de Vol (m³)</p><p id="mediaVolumeViagem" class="text-3xl font-extrabold text-white mt-1">0 m³</p></div><i class="fas fa-box-open text-indigo-400 text-2xl self-end -mt-6"></i></div>
-                    
                     <div class="glass-card rounded-2xl p-5 glow-border-amber card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Volume Total</p><p id="totalVolumeReal" class="text-3xl font-extrabold text-white mt-1">0 m³</p></div><i class="fas fa-cubes text-amber-500 text-2xl self-end -mt-6"></i></div>
-                    
                     <div class="glass-card rounded-2xl p-5 glow-border-emerald card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Dist. Média</p><p id="mediaDistancia" class="text-3xl font-extrabold text-white mt-1">0 km</p><div class="flex flex-col mt-3 text-[11px] font-bold text-slate-500 border-t border-slate-700/50 pt-3 gap-2"><span class="flex justify-between items-center text-slate-300">Asfalto: <span id="mediaAsfalto" class="text-sm font-black text-sky-300 bg-sky-900/30 px-2 rounded border border-sky-800/50">0</span></span><span class="flex justify-between items-center text-amber-400">Terra: <span id="mediaTerra" class="text-sm font-black text-amber-400 bg-amber-900/30 px-2 rounded border border-amber-800/50">0</span></span></div></div></div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-4">
                     <div class="glass-card rounded-2xl p-6 glow-border-blue card-hover"><div class="flex justify-between items-start"><div><p class="text-blue-400 text-[10px] font-bold uppercase tracking-widest">Ciclo Médio</p><p id="cicloMedio" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-stopwatch text-blue-500/50 text-3xl"></i></div></div>
-                    
                     <div class="glass-card rounded-2xl p-6 glow-border-amber card-hover"><div class="flex justify-between items-start"><div><p class="text-amber-400 text-[10px] font-bold uppercase tracking-widest">Tempo de Campo</p><p id="filaCampo" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-tractor text-amber-500/50 text-3xl"></i></div></div>
-                    
                     <div class="glass-card rounded-2xl p-6 glow-border-emerald card-hover"><div class="flex justify-between items-start"><div><p class="text-emerald-400 text-[10px] font-bold uppercase tracking-widest">Tempo Médio de Carga</p><p id="tempoCarregamento" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-truck-loading text-emerald-500/50 text-3xl"></i></div></div>
-                    
                     <div class="glass-card rounded-2xl p-6 glow-border-rose card-hover"><div class="flex justify-between items-start"><div><p class="text-rose-400 text-[10px] font-bold uppercase tracking-widest">Tempo Médio de Fábrica</p><p id="filaFabrica" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-industry text-rose-500/50 text-3xl"></i></div></div>
+                </div>
+
+                <h3 class="text-white font-bold uppercase tracking-widest text-sm border-b border-slate-700/50 pb-2 mt-10 mb-4">
+                    <i class="fas fa-bullseye text-emerald-400 mr-2"></i> Metas Operacionais e Evolução
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="glass-card p-6 rounded-2xl glow-border-blue flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-blue-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-route"></i></div>
+                        <div>
+                            <h3 class="text-blue-400 font-bold tracking-widest text-[11px] uppercase mb-4 relative z-10">Meta de Viagens</h3>
+                            <div class="flex justify-between items-end mb-6 relative z-10">
+                                <div class="w-1/2 pr-2"><label class="text-[10px] text-slate-500 uppercase font-bold">Prog. (<span id="diasMultiplicador1">1d</span>)</label><p id="disp_v_prog" class="text-2xl font-black text-slate-300 mt-1">0</p></div>
+                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50"><label class="text-[10px] text-slate-500 uppercase font-bold">Realizado</label><p id="disp_v_real" class="text-3xl font-black text-white mt-1">0</p></div>
+                            </div>
+                        </div>
+                        <div class="relative z-10"><div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Atingimento</span><span id="disp_v_perc" class="text-blue-400 text-sm">0%</span></div><div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_v_perc" class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div></div>
+                    </div>
+
+                    <div class="glass-card p-6 rounded-2xl glow-border-emerald flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-emerald-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-cubes"></i></div>
+                        <div>
+                            <h3 class="text-emerald-400 font-bold tracking-widest text-[11px] uppercase mb-4 relative z-10">Volume Realizado (m³)</h3>
+                            <div class="flex justify-between items-end mb-6 relative z-10">
+                                <div class="w-1/2 pr-2"><label class="text-[10px] text-slate-500 uppercase font-bold">Prog. (<span id="diasMultiplicador2">1d</span>)</label><p id="disp_vol_prog" class="text-2xl font-black text-slate-300 mt-1">0</p></div>
+                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50"><label class="text-[10px] text-slate-500 uppercase font-bold">Realizado</label><p id="disp_vol_real" class="text-3xl font-black text-white mt-1">0</p></div>
+                            </div>
+                        </div>
+                        <div class="relative z-10"><div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Atingimento</span><span id="disp_vol_perc" class="text-emerald-400 text-sm">0%</span></div><div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_vol_perc" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div></div>
+                    </div>
+
+                    <div class="glass-card p-6 rounded-2xl glow-border-amber flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-amber-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-box-open"></i></div>
+                        <div>
+                            <h3 class="text-amber-400 font-bold tracking-widest text-[11px] uppercase mb-4 relative z-10">Caixa de Carga Média (m³)</h3>
+                            <div class="flex justify-between items-end mb-6 relative z-10">
+                                <div class="w-1/2 pr-2"><label class="text-[10px] text-slate-500 uppercase font-bold">Meta Base</label><p id="disp_cx_prog" class="text-2xl font-black text-slate-300 mt-1">0</p></div>
+                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50"><label class="text-[10px] text-slate-500 uppercase font-bold">Realizada</label><p id="disp_cx_real" class="text-3xl font-black text-white mt-1">0</p></div>
+                            </div>
+                        </div>
+                        <div class="relative z-10"><div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Desempenho</span><span id="disp_cx_perc" class="text-amber-400 text-sm">0%</span></div><div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_cx_perc" class="bg-amber-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div></div>
+                    </div>
+
+                    <div class="glass-card p-6 rounded-2xl glow-border-rose flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-rose-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-truck-moving"></i></div>
+                        <div>
+                            <h3 class="text-rose-400 font-bold tracking-widest text-[11px] uppercase mb-4 relative z-10">PBTC Médio Realizado</h3>
+                            <div class="flex justify-between items-end mb-6 relative z-10">
+                                <div class="w-1/2 pr-2"><label class="text-[10px] text-slate-500 uppercase font-bold">Meta Base</label><p id="disp_pbtc_prog" class="text-2xl font-black text-slate-300 mt-1">0</p></div>
+                                <div class="w-1/2 pl-2 text-right border-l border-slate-700/50"><label class="text-[10px] text-slate-500 uppercase font-bold">Realizado</label><p id="disp_pbtc_real" class="text-3xl font-black text-white mt-1">0</p></div>
+                            </div>
+                        </div>
+                        <div class="relative z-10"><div class="flex justify-between text-[11px] mb-2 font-bold uppercase tracking-wider"><span class="text-slate-400">Atingimento</span><span id="disp_pbtc_perc" class="text-rose-400 text-sm">0%</span></div><div class="w-full bg-slate-800 rounded-full h-2.5 shadow-inner"><div id="bar_pbtc_perc" class="bg-rose-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div></div></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 mb-8">
+                    <div class="glass-card rounded-xl shadow-2xl p-5 border border-slate-700/50 flex flex-col w-full lg:col-span-2">
+                        <div class="flex justify-between items-center mb-2 border-b border-slate-700/50 pb-3">
+                            <h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase"><i class="fas fa-chart-line text-emerald-400 mr-2 text-lg"></i> Evolução Diária de Volume (m³)</h3>
+                        </div>
+                        <div class="w-full relative h-[250px]"><canvas id="evolucaoDiariaChart"></canvas></div>
+                    </div>
+
+                    <div class="glass-card rounded-xl shadow-2xl p-5 border border-slate-700/50 flex flex-col w-full">
+                        <div class="flex justify-between items-center mb-2 border-b border-slate-700/50 pb-3">
+                            <h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase"><i class="fas fa-forward text-sky-400 mr-2 text-lg"></i> Projeção (Próx. 5 Dias)</h3>
+                        </div>
+                        <div class="w-full relative h-[250px]"><canvas id="projecaoDiariaChart"></canvas></div>
+                    </div>
+                </div>
+
+                <h3 class="text-white font-bold uppercase tracking-widest text-sm border-b border-slate-700/50 pb-2 mt-10 mb-4">
+                    <i class="fas fa-user-clock text-blue-400 mr-2"></i> Monitoramento de Jornadas da Frota
+                </h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+                    <div class="glass-card rounded-2xl p-5 glow-border-blue flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-blue-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-users"></i></div>
+                        <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest relative z-10">Motoristas Monitorados</p><p id="jorTotalMotoristas" class="text-4xl font-black text-white mt-1 relative z-10">0</p></div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-5 border-l-4 border-l-rose-500 flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-rose-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-siren-on"></i></div>
+                        <div><p class="text-rose-400 text-[11px] font-bold uppercase tracking-widest relative z-10">Infrações (>12h)</p><p id="jorQtdEstouros" class="text-4xl font-black text-rose-400 mt-1 relative z-10">0</p></div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-5 glow-border-emerald flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-emerald-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-steering-wheel"></i></div>
+                        <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest relative z-10">Média de Direção</p><p id="jorMediaDirecao" class="text-4xl font-black text-white mt-1 relative z-10">0h 00m</p></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="glass-card rounded-xl p-5 border border-slate-700/50 col-span-1 flex flex-col items-center justify-center">
+                        <h3 class="font-bold text-slate-200 border-b border-slate-700 w-full pb-3 mb-4 text-sm uppercase text-left"><i class="fas fa-chart-pie text-cyan-500 mr-2"></i> Status da Frota</h3>
+                        <div class="w-full relative flex justify-center items-center h-[280px]">
+                            <canvas id="statusFrotaChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-xl p-5 border border-slate-700/50 col-span-2">
+                        <h3 class="font-bold text-slate-200 border-b border-slate-700 pb-3 mb-4 text-sm uppercase"><i class="fas fa-chart-bar text-emerald-500 mr-2"></i> Distribuição de Jornadas (Carga Horária)</h3>
+                        <div class="w-full h-[280px]">
+                            <canvas id="faixaHorasChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-6 mb-8">
+                    <div class="glass-card rounded-xl p-5 border border-slate-700/50 flex flex-col w-full">
+                        <div class="flex justify-between items-center mb-2 border-b border-slate-700/50 pb-3">
+                            <h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase">
+                                <i class="fas fa-chart-line text-rose-500 mr-2 text-lg"></i> Evolução Diária de Ocorrências (Infrações > 12h)
+                            </h3>
+                        </div>
+                        <div class="w-full relative h-[250px]">
+                            <canvas id="evolucaoOcorrenciasChart"></canvas>
+                        </div>
+                    </div>
                 </div>
 
             </section>
@@ -103,12 +214,48 @@
         <span id="ociosidadeGlobal"></span>
         <span id="bestPlacaValue"></span>
         <span id="bestPlacaName"></span>
-        
-        <table>
-            <tbody id="comparativoBody"></tbody>
-        </table>
+        <table><tbody id="comparativoBody"></tbody></table>
         <canvas id="cicloChart"></canvas>
         <canvas id="transportadorasChart"></canvas>
+
+        <input type="date" id="opDatePicker">
+        <button data-op-qf="D-1" class="btn-op-qf"></button>
+        <button data-op-qf="D-2" class="btn-op-qf"></button>
+        <button data-op-qf="D-7" class="btn-op-qf"></button>
+        <button data-op-qf="D-30" class="btn-op-qf"></button>
+        <button data-op-qf="ALL" class="btn-op-qf"></button>
+        <span id="opStatusFetch"></span>
+        <canvas id="evolucaoManutencaoChart"></canvas>
+        <table>
+            <tbody id="leaderboardBody"></tbody>
+            <tbody id="leaderboardCicloBody"></tbody>
+            <tbody id="leaderboardCaminhoesQuebram"></tbody>
+            <tbody id="leaderboardTiposServico"></tbody>
+            <tbody id="leaderboardCaixaMedia"></tbody>
+            <tbody id="leaderboardGargalos"></tbody>
+            <tbody id="leaderboardPioresCiclos"></tbody>
+        </table>
+
+        <select id="filterDataSelect"></select>
+        <button data-qf="D-1" class="btn-qf-jor"></button>
+        <button data-qf="D-2" class="btn-qf-jor"></button>
+        <button data-qf="D-7" class="btn-qf-jor"></button>
+        <button data-qf="D-30" class="btn-qf-jor"></button>
+        <button data-qf="ALL" class="btn-qf-jor"></button>
+        <span id="jorFilterStatus"></span>
+        <select id="exportStatusFilter"></select>
+        <button id="btnExportarJornada"></button>
+        <button id="btnExportarPDFJornada"></button>
+        <span id="jorDataReferencia"></span>
+        <select id="filterAnaliticoMotorista"></select>
+        <button id="btnLimparFiltroMotorista"></button>
+        <table>
+            <tbody id="jorInfratoresRecorrentesBody"></tbody>
+            <tbody id="jorTopEstourosBody"></tbody>
+            <tbody id="jorTopNoturnasBody"></tbody>
+            <tbody id="jorTopExtrasBody"></tbody>
+            <tbody id="jorTabelaAnaliticaBody"></tbody>
+        </table>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -116,5 +263,67 @@
     <script src="js/common.js"></script>
     <script src="js/menu.js"></script>
     <script src="js/dashboard.js"></script>
+    <script src="js/operacional.js"></script>
+    <script src="js/jornadas.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Um pequeno delay para garantir que os outros 3 arquivos JS carregaram e configuraram os botões originais
+            setTimeout(() => {
+                
+                // 1. Sincronizando os botões de atalho (D-1, D-2, Todos...)
+                const mainQFs = document.querySelectorAll('#quickFiltersGroup .btn-qf');
+                mainQFs.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const val = e.currentTarget.getAttribute('data-qf'); // Ex: "D-1"
+                        
+                        // Clica no botão invisível do operacional
+                        const opBtn = document.querySelector(`.hidden .btn-op-qf[data-op-qf="${val}"]`);
+                        if(opBtn) opBtn.click();
+                        
+                        // Clica no botão invisível de jornadas
+                        const jorBtn = document.querySelector(`.hidden .btn-qf-jor[data-qf="${val}"]`);
+                        if(jorBtn) jorBtn.click();
+                    });
+                });
+
+                // 2. Sincronizando a caixa de seleção de Data
+                const mainDateSelect = document.getElementById('filterData');
+                if(mainDateSelect) {
+                    mainDateSelect.addEventListener('change', (e) => {
+                        const val = e.target.value; // Ex: "15/04/2026" ou "ALL"
+                        
+                        // Sincroniza com as Jornadas (que usa outro select escondido)
+                        const jorSelect = document.getElementById('filterDataSelect');
+                        if(jorSelect) {
+                            jorSelect.value = val;
+                            jorSelect.dispatchEvent(new Event('change'));
+                        }
+
+                        // Sincroniza com o Operacional (que usa um input de data escondido no formato "YYYY-MM-DD")
+                        const opDate = document.getElementById('opDatePicker');
+                        if(opDate) {
+                            if(val === 'ALL') {
+                                opDate.value = '';
+                                // Ao escolher "ALL", forçamos o clique no botão oculto "ALL" do operacional
+                                document.querySelector(`.hidden .btn-op-qf[data-op-qf="ALL"]`)?.click();
+                            } else {
+                                // O dashboard usa DD/MM/YYYY, o input de data precisa de YYYY-MM-DD
+                                const parts = val.split('/');
+                                if(parts.length === 3) {
+                                    opDate.value = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                                    opDate.dispatchEvent(new Event('change'));
+                                } else if(parts.length === 2) { 
+                                    const ano = new Date().getFullYear();
+                                    opDate.value = `${ano}-${parts[1]}-${parts[0]}`;
+                                    opDate.dispatchEvent(new Event('change'));
+                                }
+                            }
+                        }
+                    });
+                }
+            }, 1000); 
+        });
+    </script>
 </body>
 </html>
