@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Indicadores Suzano - Serrana Florestal</title>
+    
+    <script>
+        if (!localStorage.getItem('serranalog_user')) {
+            window.location.href = 'login.html';
+        }
+    </script>
+
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/indicadores.css">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="bg-slate-900 min-h-screen text-slate-200 selection:bg-sky-500/30 flex overflow-hidden">
+
+    <aside id="sidebar-container" class="w-72 bg-slate-800/80 border-r border-slate-700/50 backdrop-blur-xl flex flex-col justify-between h-screen shadow-2xl relative z-20 flex-shrink-0"></aside>
+
+    <main class="flex-1 h-screen overflow-y-auto relative">
+        <div class="max-w-[96rem] mx-auto px-6 py-8">
+
+            <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm flex-wrap gap-4">
+                <div class="flex items-center gap-4 flex-wrap">
+                    <div>
+                        <h1 class="text-2xl font-extrabold text-white">Indicadores Suzano</h1>
+                        <p class="text-sm text-slate-400 font-medium">Área reservada para o painel de indicadores</p>
+                    </div>
+                </div>
+            </div>
+
+            <section id="conteudo-indicadores" class="space-y-6 animate-fade-in">
+                <div class="glass-card rounded-2xl p-10 border border-slate-700/50 text-center flex flex-col items-center justify-center min-h-[50vh]">
+                    <i class="fas fa-tools text-6xl text-slate-600 mb-4"></i>
+                    <h2 class="text-2xl font-bold text-slate-400">Módulo em Construção</h2>
+                    <p class="text-slate-500 mt-2 max-w-md">Esta tela está estruturada e pronta para receber os novos componentes visuais, integrações e métricas de desempenho.</p>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabaseClient.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/menu.js"></script>
+    <script src="js/indicadores.js"></script>
+</body>
+</html>

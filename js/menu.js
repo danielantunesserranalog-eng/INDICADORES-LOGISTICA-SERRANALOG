@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const menuItems = [
         { href: 'index.html', icon: 'fas fa-chart-line', text: 'Visão Geral' },
+        { href: 'indicadores.html', icon: 'fas fa-chart-bar', text: 'Indicadores' },
         { href: 'operacional.html', icon: 'fas fa-bullseye', text: 'Metas Operacionais' },
         { href: 'jornadas.html', icon: 'fas fa-user-clock', text: 'Monitor de Jornadas' },
         { href: 'historico.html', icon: 'fas fa-truck', text: 'Histórico de Produção' },

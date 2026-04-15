@@ -1,0 +1,12 @@
+/* ==========================================
+   css/indicadores.css - Estilos Exclusivos
+   ========================================== */
+
+/* Adicione aqui todas as regras CSS e animações 
+   que serão utilizadas apenas na tela de Indicadores.
+*/
+
+#conteudo-indicadores {
+    position: relative;
+    width: 100%;
+}
