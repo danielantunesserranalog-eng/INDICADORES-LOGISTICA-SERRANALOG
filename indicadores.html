@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Indicadores Suzano - Serrana Florestal</title>
+    <title>Indicadores Serrana Florestal</title>
     
     <script>
         if (!localStorage.getItem('serranalog_user')) {
@@ -13,9 +13,12 @@
 
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/indicadores.css">
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 </head>
 <body class="bg-slate-900 min-h-screen text-slate-200 selection:bg-sky-500/30 flex overflow-hidden">
 
@@ -27,27 +30,91 @@
             <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm flex-wrap gap-4">
                 <div class="flex items-center gap-4 flex-wrap">
                     <div>
-                        <h1 class="text-2xl font-extrabold text-white">Indicadores Suzano</h1>
-                        <p class="text-sm text-slate-400 font-medium">Área reservada para o painel de indicadores</p>
+                        <h1 class="text-2xl font-extrabold text-white">Indicadores Serrana</h1>
+                        <p class="text-sm text-slate-400 font-medium">Análise de indicadores específicos da operação</p>
+                    </div>
+                    <div id="indicadorAtualizacao" class="hidden flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] sm:text-xs font-bold uppercase tracking-widest shadow-inner transition-all duration-500">
+                        <i id="iconeAtualizacao" class="fas fa-sync fa-spin"></i>
+                        <span id="textoAtualizacao">Verificando...</span>
+                    </div>
+                </div>
+                
+                <div id="dashboardFilters" class="flex items-center gap-4 bg-slate-900/80 p-2 rounded-xl border border-sky-800 shadow-lg shadow-sky-900/20 flex-wrap">
+                    <div class="flex items-center gap-2">
+                        <label for="filterData" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="far fa-calendar-alt mr-1"></i> Data:</label>
+                        <select id="filterData" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-4 py-2 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner">
+                            <option value="ALL">TODO O PERÍODO</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-1 bg-slate-800/80 p-1 rounded-lg border border-slate-700/50 shadow-inner" id="quickFiltersGroup">
+                        <button data-qf="D-1" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all">D-1</button>
+                        <button data-qf="D-2" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all">D-2</button>
+                        <button data-qf="D-7" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all">D-7</button>
+                        <button data-qf="D-30" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all">D-30</button>
+                        <div class="w-px h-4 bg-slate-700 mx-1"></div>
+                        <button data-qf="ALL" class="btn-qf active bg-sky-900/50 text-sky-400 border border-sky-800/50 text-[10px] font-bold px-2 py-1.5 rounded transition-all shadow-[0_0_10px_rgba(14,165,233,0.2)]"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label for="filterTransportadora" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="fas fa-truck mr-1"></i> Transp:</label>
+                        <select id="filterTransportadora" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-4 py-2 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner">
+                            <option value="ALL">TODAS AS TRANSPORTADORAS</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <button id="btnExportar" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-colors text-sm flex items-center gap-2"><i class="fas fa-file-excel"></i> Exportar</button>
+                    <div class="bg-slate-900 border border-slate-700 rounded-full px-5 py-2 shadow-inner text-sm font-mono text-sky-300 flex items-center">
+                        <i class="fas fa-database mr-2 text-sky-500"></i> <span id="dbStatusLabel">Carregando...</span>
                     </div>
                 </div>
             </div>
 
-            <section id="conteudo-indicadores" class="space-y-6 animate-fade-in">
-                <div class="glass-card rounded-2xl p-10 border border-slate-700/50 text-center flex flex-col items-center justify-center min-h-[50vh]">
-                    <i class="fas fa-tools text-6xl text-slate-600 mb-4"></i>
-                    <h2 class="text-2xl font-bold text-slate-400">Módulo em Construção</h2>
-                    <p class="text-slate-500 mt-2 max-w-md">Esta tela está estruturada e pronta para receber os novos componentes visuais, integrações e métricas de desempenho.</p>
-                </div>
-            </section>
+            <section class="space-y-6 animate-fade-in">
 
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+                    <div class="glass-card rounded-2xl p-5 glow-border-blue card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Viagens</p><p id="totalViagens" class="text-3xl font-extrabold text-white mt-1">0</p></div><i class="fas fa-route text-blue-500 text-2xl self-end -mt-6"></i></div>
+                    
+                    <div class="glass-card rounded-2xl p-5 glow-border-cyan card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">MÉDIA DE PBTC</p><p id="totalPesoLiq" class="text-3xl font-extrabold text-white mt-1">0 t</p></div><i class="fas fa-weight-hanging text-cyan-400 text-2xl self-end -mt-6"></i></div>
+                    
+                    <div class="glass-card rounded-2xl p-5 glow-border-indigo card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Média de Vol (m³)</p><p id="mediaVolumeViagem" class="text-3xl font-extrabold text-white mt-1">0 m³</p></div><i class="fas fa-box-open text-indigo-400 text-2xl self-end -mt-6"></i></div>
+                    
+                    <div class="glass-card rounded-2xl p-5 glow-border-amber card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Volume Total</p><p id="totalVolumeReal" class="text-3xl font-extrabold text-white mt-1">0 m³</p></div><i class="fas fa-cubes text-amber-500 text-2xl self-end -mt-6"></i></div>
+                    
+                    <div class="glass-card rounded-2xl p-5 glow-border-emerald card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Dist. Média</p><p id="mediaDistancia" class="text-3xl font-extrabold text-white mt-1">0 km</p><div class="flex flex-col mt-3 text-[11px] font-bold text-slate-500 border-t border-slate-700/50 pt-3 gap-2"><span class="flex justify-between items-center text-slate-300">Asfalto: <span id="mediaAsfalto" class="text-sm font-black text-sky-300 bg-sky-900/30 px-2 rounded border border-sky-800/50">0</span></span><span class="flex justify-between items-center text-amber-400">Terra: <span id="mediaTerra" class="text-sm font-black text-amber-400 bg-amber-900/30 px-2 rounded border border-amber-800/50">0</span></span></div></div></div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-4">
+                    <div class="glass-card rounded-2xl p-6 glow-border-blue card-hover"><div class="flex justify-between items-start"><div><p class="text-blue-400 text-[10px] font-bold uppercase tracking-widest">Ciclo Médio</p><p id="cicloMedio" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-stopwatch text-blue-500/50 text-3xl"></i></div></div>
+                    
+                    <div class="glass-card rounded-2xl p-6 glow-border-amber card-hover"><div class="flex justify-between items-start"><div><p class="text-amber-400 text-[10px] font-bold uppercase tracking-widest">Tempo de Campo</p><p id="filaCampo" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-tractor text-amber-500/50 text-3xl"></i></div></div>
+                    
+                    <div class="glass-card rounded-2xl p-6 glow-border-emerald card-hover"><div class="flex justify-between items-start"><div><p class="text-emerald-400 text-[10px] font-bold uppercase tracking-widest">Tempo Médio de Carga</p><p id="tempoCarregamento" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-truck-loading text-emerald-500/50 text-3xl"></i></div></div>
+                    
+                    <div class="glass-card rounded-2xl p-6 glow-border-rose card-hover"><div class="flex justify-between items-start"><div><p class="text-rose-400 text-[10px] font-bold uppercase tracking-widest">Tempo Médio de Fábrica</p><p id="filaFabrica" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-industry text-rose-500/50 text-3xl"></i></div></div>
+                </div>
+
+            </section>
         </div>
     </main>
+
+    <div class="hidden">
+        <span id="produtividadeGlobal"></span>
+        <span id="ociosidadeGlobal"></span>
+        <span id="bestPlacaValue"></span>
+        <span id="bestPlacaName"></span>
+        
+        <table>
+            <tbody id="comparativoBody"></tbody>
+        </table>
+        <canvas id="cicloChart"></canvas>
+        <canvas id="transportadorasChart"></canvas>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabaseClient.js"></script>
     <script src="js/common.js"></script>
     <script src="js/menu.js"></script>
-    <script src="js/indicadores.js"></script>
+    <script src="js/dashboard.js"></script>
 </body>
 </html>
