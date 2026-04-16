@@ -81,13 +81,6 @@
                     <div class="glass-card rounded-2xl p-5 glow-border-emerald card-hover flex flex-col justify-between"><div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Dist. Média</p><p id="mediaDistancia" class="text-3xl font-extrabold text-white mt-1">0 km</p><div class="flex flex-col mt-3 text-[11px] font-bold text-slate-500 border-t border-slate-700/50 pt-3 gap-2"><span class="flex justify-between items-center text-slate-300">Asfalto: <span id="mediaAsfalto" class="text-sm font-black text-sky-300 bg-sky-900/30 px-2 rounded border border-sky-800/50">0</span></span><span class="flex justify-between items-center text-amber-400">Terra: <span id="mediaTerra" class="text-sm font-black text-amber-400 bg-amber-900/30 px-2 rounded border border-amber-800/50">0</span></span></div></div></div>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-4">
-                    <div class="glass-card rounded-2xl p-6 glow-border-blue card-hover"><div class="flex justify-between items-start"><div><p class="text-blue-400 text-[10px] font-bold uppercase tracking-widest">Ciclo Médio</p><p id="cicloMedio" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-stopwatch text-blue-500/50 text-3xl"></i></div></div>
-                    <div class="glass-card rounded-2xl p-6 glow-border-amber card-hover"><div class="flex justify-between items-start"><div><p class="text-amber-400 text-[10px] font-bold uppercase tracking-widest">Tempo de Campo</p><p id="filaCampo" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-tractor text-amber-500/50 text-3xl"></i></div></div>
-                    <div class="glass-card rounded-2xl p-6 glow-border-emerald card-hover"><div class="flex justify-between items-start"><div><p class="text-emerald-400 text-[10px] font-bold uppercase tracking-widest">Tempo Médio de Carga</p><p id="tempoCarregamento" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-truck-loading text-emerald-500/50 text-3xl"></i></div></div>
-                    <div class="glass-card rounded-2xl p-6 glow-border-rose card-hover"><div class="flex justify-between items-start"><div><p class="text-rose-400 text-[10px] font-bold uppercase tracking-widest">Tempo Médio de Fábrica</p><p id="filaFabrica" class="text-3xl font-black text-white mt-2">0 h</p></div><i class="fas fa-industry text-rose-500/50 text-3xl"></i></div></div>
-                </div>
-
                 <h3 class="text-white font-bold uppercase tracking-widest text-sm border-b border-slate-700/50 pb-2 mt-10 mb-4">
                     <i class="fas fa-bullseye text-emerald-400 mr-2"></i> Metas Operacionais e Evolução
                 </h3>
@@ -166,7 +159,7 @@
                     <div class="glass-card rounded-xl p-5 border border-slate-700/50 flex flex-col w-full">
                         <div class="flex justify-between items-center mb-2 border-b border-slate-700/50 pb-3">
                             <h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase">
-                                <i class="fas fa-cogs text-blue-400 mr-2 text-lg"></i> DM Geral - Oficina
+                                📊 Disponibilidade Mecânica (DM) por Cavalo
                             </h3>
                         </div>
                         <div class="w-full relative h-[350px]" id="graficoEvolucaoDM"></div>
@@ -175,7 +168,7 @@
                     <div class="glass-card rounded-xl p-5 border border-slate-700/50 flex flex-col w-full">
                         <div class="flex justify-between items-center mb-2 border-b border-slate-700/50 pb-3">
                             <h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase">
-                                <i class="fas fa-truck text-emerald-400 mr-2 text-lg"></i> DM Operacional (Rodando/Frota)
+                                🚚 DM Operacional (Carros Rodando / Frota Total) - Importado
                             </h3>
                             <button class="bg-emerald-600/20 text-emerald-400 border border-emerald-500/50 hover:bg-emerald-600 hover:text-white px-3 py-1 rounded text-xs font-bold transition-colors" onclick="document.getElementById('uploadDMExcel').click()">
                                 <i class="fas fa-file-excel mr-1"></i> Importar Dados

@@ -186,7 +186,22 @@ window.renderizarGraficoDMOperacional = async function(filtroPeriodo = '30') {
                 smooth: true,
                 symbol: 'circle',
                 symbolSize: 8,
-                label: { show: true, position: 'top', color: '#ffffff', fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 'bold', formatter: '{c}%' },
+                // ---> AQUI ESTÁ A CORREÇÃO VISUAL PARA MOSTRAR A FRAÇÃO
+                label: { 
+                    show: true, 
+                    position: 'top', 
+                    color: '#ffffff', 
+                    fontFamily: "'Inter', sans-serif", 
+                    fontSize: 11, 
+                    fontWeight: 'bold',
+                    textBorderColor: 'rgba(0, 0, 0, 0.8)',
+                    textBorderWidth: 2,
+                    lineHeight: 14,
+                    align: 'center',
+                    formatter: function (params) {
+                        return params.data.value + '%\n(' + params.data.rodaram + ' / ' + params.data.total + ')';
+                    } 
+                },
                 itemStyle: { color: '#10b981' },
                 lineStyle: { color: '#10b981', width: 3 },
                 areaStyle: {
@@ -216,7 +231,6 @@ window.renderizarGraficoEvolucaoDM = async function(filtroValue = '30') {
     if (!chartDom || chartDom.offsetWidth === 0) return;
 
     try {
-        // Busca frotas e ordens de serviço do banco de dados da oficina (Conforme os_core.js)
         const { data: frotasData, error: errFrotas } = await supabaseDM
             .from('frotas_manutencao')
             .select('*')
@@ -241,7 +255,6 @@ window.renderizarGraficoEvolucaoDM = async function(filtroValue = '30') {
             return;
         }
 
-        // === LÓGICA ORIGINAL DO grafico_evolucao_dm.js ===
         const agora = new Date();
         const categoriasDias = [];
         const dadosDM = [];
@@ -249,7 +262,7 @@ window.renderizarGraficoEvolucaoDM = async function(filtroValue = '30') {
         const msPorDia = 24 * 60 * 60 * 1000;
         const totalMsDisponivelPorDia = frotasManutencao.length * msPorDia;
         
-        let diasARenderizar = 30; // padrão
+        let diasARenderizar = 30;
 
         if (filtroValue === 'mes_atual') {
             const primeiroDiaMes = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0);
@@ -260,7 +273,6 @@ window.renderizarGraficoEvolucaoDM = async function(filtroValue = '30') {
             diasARenderizar = parseInt(filtroValue) || 30;
         }
 
-        // Iterar do dia mais antigo até hoje
         for (let i = diasARenderizar - 1; i >= 0; i--) {
             const dataDia = new Date(agora.getTime() - (i * msPorDia));
             const inicioDia = new Date(dataDia.getFullYear(), dataDia.getMonth(), dataDia.getDate(), 0, 0, 0);
@@ -370,16 +382,11 @@ window.renderizarGraficoEvolucaoDM = async function(filtroValue = '30') {
 setInterval(() => {
     const divGrafico = document.getElementById('graficoDmOperacional');
     
-    // Se a div existe, está na tela e ainda não foi renderizada...
     if (divGrafico && divGrafico.offsetWidth > 0 && !divGrafico.getAttribute('data-rendered')) {
         divGrafico.setAttribute('data-rendered', 'true');
-        
         const selectFiltro = document.getElementById('filtroPeriodoDM');
         const filtroVal = selectFiltro ? selectFiltro.value : '30';
-        
-        // Chama o gráfico Operacional
         window.renderizarGraficoDMOperacional(filtroVal);
-        // Chama o gráfico da Oficina
         window.renderizarGraficoEvolucaoDM(filtroVal);
     }
 }, 1000);
