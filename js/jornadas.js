@@ -581,12 +581,14 @@ function atualizarTabelaAnalitica() {
             corLinha = 'text-rose-500 font-bold';
             badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">INFRAÇÃO</span>`;
             
-            // Lógica da Auditoria Visual (Botões Grandes e Chamativos)
+            // Monta a string formatada para a data e hora
+            const dataHoraDetalhe = `${dataInicioStr} ${horaInicioStr} até ${dataFimStr} ${horaFimStr} (Total: ${formatarHorasMinutos(horas)})`;
+            
             if (linha.auditado) {
                 const obsSegura = linha.observacao_auditoria ? linha.observacao_auditoria.replace(/'/g, "\\'").replace(/"/g, '&quot;') : '';
-                auditHtml = `<button onclick="abrirModalVisAuditoria('${obsSegura}')" class="bg-emerald-900/40 border border-emerald-500 text-emerald-400 px-3 py-1 rounded text-[10px] uppercase font-bold flex items-center gap-1 hover:bg-emerald-800 transition-colors shadow-sm" title="Ver observação"><i class="fas fa-check-double text-xs"></i> Auditado</button>`;
+                auditHtml = `<button onclick="abrirModalVisAuditoria('${obsSegura}', '${motNome}', '${dataHoraDetalhe}')" class="bg-emerald-900/40 border border-emerald-500 text-emerald-400 px-3 py-1 rounded text-[10px] uppercase font-bold flex items-center gap-1 hover:bg-emerald-800 transition-colors shadow-sm" title="Ver observação"><i class="fas fa-check-double text-xs"></i> Auditado</button>`;
             } else {
-                auditHtml = `<button onclick="abrirModalAuditoria(${linha.id}, '${motNome}')" class="bg-amber-600/20 border border-amber-500 text-amber-500 px-3 py-1 rounded text-[10px] uppercase font-bold flex items-center gap-1 hover:bg-amber-600/40 transition-colors animate-pulse shadow-[0_0_12px_rgba(245,158,11,0.4)]" title="Tratar Pendência!"><i class="fas fa-exclamation-triangle text-xs"></i> Auditar</button>`;
+                auditHtml = `<button onclick="abrirModalAuditoria(${linha.id}, '${motNome}', '${dataHoraDetalhe}')" class="bg-amber-600/20 border border-amber-500 text-amber-500 px-3 py-1 rounded text-[10px] uppercase font-bold flex items-center gap-1 hover:bg-amber-600/40 transition-colors animate-pulse shadow-[0_0_12px_rgba(245,158,11,0.4)]" title="Tratar Pendência!"><i class="fas fa-exclamation-triangle text-xs"></i> Auditar</button>`;
             }
         }
 
@@ -629,7 +631,12 @@ function criarModaisAuditoria() {
                 <h3 class="text-lg font-bold text-sky-400 flex items-center gap-2"><i class="fas fa-edit"></i> Tratar Infração</h3>
                 <button onclick="fecharModalAuditoria()" class="text-slate-400 hover:text-rose-500 transition-colors"><i class="fas fa-times text-xl"></i></button>
             </div>
-            <p class="text-sm text-slate-300 mb-4">Motorista: <span id="auditMotoristaNome" class="font-bold text-white bg-slate-700/50 px-2 py-1 rounded"></span></p>
+            
+            <div class="mb-4 bg-slate-900/50 p-3 rounded-lg border border-slate-700">
+                <p class="text-sm text-slate-300">Motorista: <span id="auditMotoristaNome" class="font-bold text-sky-400"></span></p>
+                <p class="text-xs text-slate-400 mt-1"><i class="far fa-clock mr-1"></i> Jornada: <span id="auditDataHora" class="text-slate-200 font-mono"></span></p>
+            </div>
+
             <div class="mb-4">
                 <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Motivo / Observação</label>
                 <textarea id="auditObservacao" rows="4" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all placeholder-slate-600" placeholder="Descreva o motivo da infração (ex: Pneu furado, trânsito, problema mecânico, etc)..."></textarea>
@@ -647,6 +654,12 @@ function criarModaisAuditoria() {
                 <h3 class="text-lg font-bold text-emerald-400 flex items-center gap-2"><i class="fas fa-check-circle"></i> Detalhes da Auditoria</h3>
                 <button onclick="fecharModalVisAuditoria()" class="text-slate-400 hover:text-rose-500 transition-colors"><i class="fas fa-times text-xl"></i></button>
             </div>
+
+            <div class="mb-4 bg-slate-900/50 p-3 rounded-lg border border-slate-700">
+                <p class="text-sm text-slate-300">Motorista: <span id="visAuditMotoristaNome" class="font-bold text-emerald-400"></span></p>
+                <p class="text-xs text-slate-400 mt-1"><i class="far fa-clock mr-1"></i> Jornada: <span id="visAuditDataHora" class="text-slate-200 font-mono"></span></p>
+            </div>
+
             <div class="bg-slate-900/50 border border-slate-700 rounded-lg p-4 mb-2 shadow-inner">
                 <p id="visAuditTexto" class="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed"></p>
             </div>
@@ -661,9 +674,10 @@ function criarModaisAuditoria() {
 
 let currentAuditId = null;
 
-window.abrirModalAuditoria = function(id, motorista) {
+window.abrirModalAuditoria = function(id, motorista, dataHora) {
     currentAuditId = id;
     document.getElementById('auditMotoristaNome').textContent = motorista;
+    document.getElementById('auditDataHora').textContent = dataHora; // Injeta os dados da hora
     document.getElementById('auditObservacao').value = '';
     document.getElementById('modalAuditoria').classList.remove('hidden');
 }
@@ -706,7 +720,9 @@ window.salvarAuditoria = async function() {
     }
 }
 
-window.abrirModalVisAuditoria = function(obs) {
+window.abrirModalVisAuditoria = function(obs, motorista, dataHora) {
+    document.getElementById('visAuditMotoristaNome').textContent = motorista;
+    document.getElementById('visAuditDataHora').textContent = dataHora; // Injeta os dados da hora
     document.getElementById('visAuditTexto').textContent = obs || "Nenhuma observação detalhada registrada.";
     document.getElementById('modalVisAuditoria').classList.remove('hidden');
 }
