@@ -390,6 +390,9 @@
             }, 1000); 
         });
 
+        // ==========================================
+        // GERAÇÃO DE PDF OTIMIZADA
+        // ==========================================
         document.getElementById('btnGerarPDFDashboard').addEventListener('click', function () {
             const elemento = document.getElementById('conteudo-relatorio');
             const botao = this;
@@ -398,11 +401,12 @@
             botao.classList.add('opacity-75', 'cursor-not-allowed');
             botao.disabled = true;
 
-            const widthOriginal = elemento.style.width;
-            const maxWidthOriginal = elemento.style.maxWidth;
+            // 1. Remove as limitações de margem/largura temporariamente
+            const classesOriginais = elemento.className;
+            elemento.classList.remove('max-w-[96rem]', 'mx-auto');
             elemento.style.width = '1600px';
-            elemento.style.maxWidth = '1600px';
 
+            // 2. Redimensiona os gráficos para a nova largura
             if (typeof Chart !== 'undefined') { Object.values(Chart.instances).forEach(c => c.resize()); }
             if (typeof echarts !== 'undefined') {
                 document.querySelectorAll('div[_echarts_instance_]').forEach(dom => {
@@ -411,32 +415,50 @@
                 });
             }
 
+            // Aumentamos o tempo para 800ms para dar tempo dos novos gráficos renderizarem perfeitamente
             setTimeout(() => {
                 botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando PDF...';
+                
                 let dataFiltro = "TODO_PERIODO";
                 const selectData = document.getElementById('filterData');
                 if (selectData && selectData.value !== 'ALL') dataFiltro = selectData.value.replace(/\//g, '-');
+                
                 const btnAtivo = document.querySelector('#quickFiltersGroup .btn-qf.active');
                 let qfAtivo = btnAtivo ? btnAtivo.innerText.trim() : 'Filtro';
                 if(qfAtivo === '') qfAtivo = 'Tudo'; 
+                
                 const nomeArquivo = `Dashboard_SerranaLog_${qfAtivo}_${dataFiltro}.pdf`;
 
+                // 3. Calcula as dimensões garantindo sobra (padding)
                 const larguraPx = elemento.scrollWidth;
                 const alturaPx = elemento.scrollHeight;
-                const ptWidth = larguraPx * 0.75;
-                const ptHeight = alturaPx * 0.75;
+                const ptWidth = (larguraPx * 0.75) + 30; 
+                const ptHeight = (alturaPx * 0.75) + 30;
 
+                // 4. Configuração blindada do html2canvas
                 const opt = {
-                    margin: 0,
+                    margin: 15, // Adiciona margem escura em volta da folha
                     filename: nomeArquivo,
                     image: { type: 'jpeg', quality: 1.0 },
-                    html2canvas: { scale: 3, useCORS: true, backgroundColor: '#0f172a', scrollY: 0, windowWidth: 1600 },
-                    jsPDF: { unit: 'pt', format: [ptWidth, ptHeight], orientation: ptWidth > ptHeight ? 'landscape' : 'portrait' }
+                    html2canvas: { 
+                        scale: 2, // Scale 2 é o ideal: alta definição, sem esgotar a memória
+                        useCORS: true, 
+                        backgroundColor: '#0f172a', 
+                        scrollY: 0, 
+                        windowWidth: larguraPx + 100 // Abre bem a "câmera" para não cortar a direita
+                    },
+                    jsPDF: { 
+                        unit: 'pt', 
+                        format: [ptWidth, ptHeight], 
+                        orientation: ptWidth > ptHeight ? 'landscape' : 'portrait' 
+                    }
                 };
 
                 html2pdf().set(opt).from(elemento).save().then(() => {
-                    elemento.style.width = widthOriginal;
-                    elemento.style.maxWidth = maxWidthOriginal;
+                    // 5. Restaura tudo ao normal após salvar
+                    elemento.className = classesOriginais;
+                    elemento.style.width = '';
+                    
                     if (typeof Chart !== 'undefined') { Object.values(Chart.instances).forEach(c => c.resize()); }
                     if (typeof echarts !== 'undefined') {
                         document.querySelectorAll('div[_echarts_instance_]').forEach(dom => {
@@ -449,12 +471,12 @@
                     botao.disabled = false;
                 }).catch(err => {
                     console.error("Erro ao gerar PDF:", err);
-                    alert("Erro ao gerar o PDF.");
+                    alert("Erro ao gerar o PDF. A página pode estar muito pesada.");
                     botao.innerHTML = textoOriginal;
                     botao.classList.remove('opacity-75', 'cursor-not-allowed');
                     botao.disabled = false;
                 });
-            }, 500);
+            }, 800);
         });
     </script>
 </body>
