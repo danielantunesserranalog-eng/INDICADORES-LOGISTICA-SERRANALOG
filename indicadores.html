@@ -158,17 +158,65 @@
                 </div>
 
                 <h3 class="text-white font-bold uppercase tracking-widest text-sm border-b border-slate-700/50 pb-2 mt-10 mb-4">
-                    <i class="fas fa-wrench text-amber-400 mr-2"></i> Disponibilidade Mecânica (DM)
+                    <i class="fas fa-wrench text-amber-400 mr-2"></i> Disponibilidade Mecânica (DM) e Evolução Horária
                 </h3>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+                    <div class="glass-card rounded-2xl p-5 glow-border-blue flex flex-col justify-between">
+                        <div>
+                            <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Média DM Geral</p>
+                            <p id="avgDM" class="text-3xl font-extrabold text-blue-500 mt-1">0%</p>
+                        </div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-5 glow-border-emerald flex flex-col justify-between">
+                        <div>
+                            <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Média Disponíveis</p>
+                            <div class="flex items-baseline gap-2 mt-1">
+                                <p id="avgAtivos" class="text-3xl font-extrabold text-emerald-500">0</p>
+                                <span class="text-slate-500 text-xs font-bold">veículos</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-5 glow-border-amber flex flex-col justify-between">
+                        <div>
+                            <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Média Manutenção</p>
+                            <div class="flex items-baseline gap-2 mt-1">
+                                <p id="avgManut" class="text-3xl font-extrabold text-amber-500">0</p>
+                                <span class="text-slate-500 text-xs font-bold">veículos</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-5 glow-border-rose flex flex-col justify-between">
+                        <div>
+                            <p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest">Média SOS</p>
+                            <div class="flex items-baseline gap-2 mt-1">
+                                <p id="avgSOS" class="text-3xl font-extrabold text-rose-500">0</p>
+                                <span class="text-slate-500 text-xs font-bold">chamados</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="grid grid-cols-1 gap-6 mb-8">
                     <div class="glass-card rounded-xl p-5 border border-slate-700/50 flex flex-col w-full">
-                        <div class="flex justify-between items-center mb-2 border-b border-slate-700/50 pb-3">
+                        <div class="flex justify-between items-center mb-4 border-b border-slate-700/50 pb-3">
                             <h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase">
-                                📊 Disponibilidade Mecânica (DM) por Cavalo
+                                <i class="fas fa-chart-line text-blue-500 mr-2 text-lg"></i> Evolução Horária da DM
                             </h3>
+                            <div class="flex items-center gap-2">
+                                <input type="date" id="filtroDataEvolucaoDM" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-3 py-1.5 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner" onchange="renderizarGraficoEvolucaoDM(this.value)">
+                            </div>
                         </div>
                         <div class="w-full relative h-[350px]" id="graficoEvolucaoDM"></div>
+                    </div>
+
+                    <div class="glass-card rounded-xl p-5 border border-slate-700/50 flex flex-col w-full">
+                        <div class="flex justify-between items-center mb-4 border-b border-slate-700/50 pb-3">
+                            <h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase">
+                                <i class="fas fa-truck text-amber-500 mr-2 text-lg"></i> Disponibilidade Horária de Equipamentos
+                            </h3>
+                        </div>
+                        <div class="w-full relative h-[350px]" id="graficoStatusFrotaHorario"></div>
                     </div>
 
                     <div class="glass-card rounded-xl p-5 border border-slate-700/50 flex flex-col w-full">
@@ -300,6 +348,7 @@
     <script src="js/operacional.js"></script>
     <script src="js/jornadas.js"></script>
     <script src="js/dm_operacional.js"></script>
+    <script src="js/indicadores.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -341,31 +390,20 @@
             }, 1000); 
         });
 
-        // ==========================================
-        // LÓGICA DO RELATÓRIO PDF ALTA RESOLUÇÃO E SEM CORTES
-        // ==========================================
         document.getElementById('btnGerarPDFDashboard').addEventListener('click', function () {
             const elemento = document.getElementById('conteudo-relatorio');
             const botao = this;
             const textoOriginal = botao.innerHTML;
-
-            // Altera estado do botão
             botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando...';
             botao.classList.add('opacity-75', 'cursor-not-allowed');
             botao.disabled = true;
 
-            // 1. Salva estilos originais
             const widthOriginal = elemento.style.width;
             const maxWidthOriginal = elemento.style.maxWidth;
-            
-            // 2. Força uma largura de Desktop ideal para impedir que gráficos "espremam" ou quebrem layouts em telas menores
             elemento.style.width = '1600px';
             elemento.style.maxWidth = '1600px';
 
-            // 3. Força todos os gráficos a se redimensionarem para a nova largura perfeita
-            if (typeof Chart !== 'undefined') {
-                Object.values(Chart.instances).forEach(c => c.resize());
-            }
+            if (typeof Chart !== 'undefined') { Object.values(Chart.instances).forEach(c => c.resize()); }
             if (typeof echarts !== 'undefined') {
                 document.querySelectorAll('div[_echarts_instance_]').forEach(dom => {
                     const instance = echarts.getInstanceByDom(dom);
@@ -373,63 +411,39 @@
                 });
             }
 
-            // Aguarda meio segundo para os gráficos terminarem de animar o resize
             setTimeout(() => {
                 botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando PDF...';
-
-                // Pega nomes para salvar o arquivo
                 let dataFiltro = "TODO_PERIODO";
                 const selectData = document.getElementById('filterData');
                 if (selectData && selectData.value !== 'ALL') dataFiltro = selectData.value.replace(/\//g, '-');
-                
                 const btnAtivo = document.querySelector('#quickFiltersGroup .btn-qf.active');
                 let qfAtivo = btnAtivo ? btnAtivo.innerText.trim() : 'Filtro';
                 if(qfAtivo === '') qfAtivo = 'Tudo'; 
                 const nomeArquivo = `Dashboard_SerranaLog_${qfAtivo}_${dataFiltro}.pdf`;
 
-                // 4. Calcula dimensões EXATAS renderizadas para não haver corte de página
                 const larguraPx = elemento.scrollWidth;
                 const alturaPx = elemento.scrollHeight;
-
-                // Converte pixels em "Pontos" (1 px = 0.75 pt) para o jsPDF desenhar perfeitamente sem auto-pagebreak
                 const ptWidth = larguraPx * 0.75;
                 const ptHeight = alturaPx * 0.75;
 
                 const opt = {
-                    margin:       0,
-                    filename:     nomeArquivo,
-                    image:        { type: 'jpeg', quality: 1.0 }, // Máxima qualidade JPG
-                    html2canvas:  { 
-                        scale: 3, // Multiplica os pixels por 3 (Resolução Retina/4K, zero embaçamento)
-                        useCORS: true, 
-                        backgroundColor: '#0f172a',
-                        scrollY: 0,
-                        windowWidth: 1600 // Mantém a referência da largura
-                    },
-                    jsPDF: { 
-                        unit: 'pt', 
-                        format: [ptWidth, ptHeight], // Página Única do tamanho exato da Div (Tamanho Poster)
-                        orientation: ptWidth > ptHeight ? 'landscape' : 'portrait' 
-                    }
+                    margin: 0,
+                    filename: nomeArquivo,
+                    image: { type: 'jpeg', quality: 1.0 },
+                    html2canvas: { scale: 3, useCORS: true, backgroundColor: '#0f172a', scrollY: 0, windowWidth: 1600 },
+                    jsPDF: { unit: 'pt', format: [ptWidth, ptHeight], orientation: ptWidth > ptHeight ? 'landscape' : 'portrait' }
                 };
 
-                // Executa a geração do PDF
                 html2pdf().set(opt).from(elemento).save().then(() => {
-                    // 5. Devolve o Dashboard pro estado original após baixar
                     elemento.style.width = widthOriginal;
                     elemento.style.maxWidth = maxWidthOriginal;
-
-                    if (typeof Chart !== 'undefined') {
-                        Object.values(Chart.instances).forEach(c => c.resize());
-                    }
+                    if (typeof Chart !== 'undefined') { Object.values(Chart.instances).forEach(c => c.resize()); }
                     if (typeof echarts !== 'undefined') {
                         document.querySelectorAll('div[_echarts_instance_]').forEach(dom => {
                             const instance = echarts.getInstanceByDom(dom);
                             if (instance) instance.resize();
                         });
                     }
-
-                    // Volta o botão
                     botao.innerHTML = textoOriginal;
                     botao.classList.remove('opacity-75', 'cursor-not-allowed');
                     botao.disabled = false;
@@ -440,8 +454,7 @@
                     botao.classList.remove('opacity-75', 'cursor-not-allowed');
                     botao.disabled = false;
                 });
-
-            }, 500); // Fim do setTimeout
+            }, 500);
         });
     </script>
 </body>

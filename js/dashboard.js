@@ -207,13 +207,13 @@ function loadDashboardData() {
     });
 
     if (filteredData.length === 0) {
-        document.getElementById('dbStatusLabel').innerText = "Sem dados para o filtro";
-        document.getElementById('totalViagens').innerText = '0';
-        document.getElementById('totalPesoLiq').innerHTML = '<span class="text-white">0 t</span>';
-        document.getElementById('produtividadeGlobal').innerText = '0.0';
-        document.getElementById('ociosidadeGlobal').innerText = '0%';
-        document.getElementById('bestPlacaValue').innerText = '0.0';
-        document.getElementById('bestPlacaName').innerText = 'Nenhum cavalo encontrado';
+        if(document.getElementById('dbStatusLabel')) document.getElementById('dbStatusLabel').innerText = "Sem dados para o filtro";
+        if(document.getElementById('totalViagens')) document.getElementById('totalViagens').innerText = '0';
+        if(document.getElementById('totalPesoLiq')) document.getElementById('totalPesoLiq').innerHTML = '<span class="text-white">0 t</span>';
+        if(document.getElementById('produtividadeGlobal')) document.getElementById('produtividadeGlobal').innerText = '0.0';
+        if(document.getElementById('ociosidadeGlobal')) document.getElementById('ociosidadeGlobal').innerText = '0%';
+        if(document.getElementById('bestPlacaValue')) document.getElementById('bestPlacaValue').innerText = '0.0';
+        if(document.getElementById('bestPlacaName')) document.getElementById('bestPlacaName').innerText = 'Nenhum cavalo encontrado';
         if(document.getElementById('tempoCarregamento')) document.getElementById('tempoCarregamento').innerText = '0 h';
         if(chartCiclo) chartCiclo.destroy();
         if(chartTransp) chartTransp.destroy();
@@ -222,7 +222,7 @@ function loadDashboardData() {
         return;
     }
 
-    document.getElementById('dbStatusLabel').innerText = `${filteredData.length} Viagens`;
+    if(document.getElementById('dbStatusLabel')) document.getElementById('dbStatusLabel').innerText = `${filteredData.length} Viagens`;
     
     const totalViagens = filteredData.length;
     const totalPesoKg = filteredData.reduce((sum, r) => sum + r.pesoLiquido, 0);
@@ -251,7 +251,7 @@ function loadDashboardData() {
     // --- PRODUTIVIDADE GLOBAL EM m³/h ---
     const produtividadeGlobalM3 = somaCiclosTotais > 0 ? (totalVolumeReal / somaCiclosTotais) : 0;
 
-    document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
+    if(document.getElementById('totalViagens')) document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
     
     // --- LÓGICA DO INDICADOR PBTC ---
     let pbtcCor = "text-white";
@@ -270,25 +270,26 @@ function loadDashboardData() {
         }
     }
 
-    document.getElementById('totalPesoLiq').innerHTML = `<span class="${pbtcCor}">${mediaPBTC.toLocaleString('pt-PT', {maximumFractionDigits: 1})} t</span>${pbtcIcone}`;
+    if(document.getElementById('totalPesoLiq')) document.getElementById('totalPesoLiq').innerHTML = `<span class="${pbtcCor}">${mediaPBTC.toLocaleString('pt-PT', {maximumFractionDigits: 1})} t</span>${pbtcIcone}`;
     
-    // --- RESTANTE DOS INDICADORES ---
-    document.getElementById('mediaVolumeViagem').innerText = mediaVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
-    document.getElementById('totalVolumeReal').innerText = totalVolumeReal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
-    document.getElementById('mediaDistancia').innerText = mediaDistTotal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " km";
-    document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
-    document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
+    // --- RESTANTE DOS INDICADORES COM CHECAGEM ---
+    if(document.getElementById('mediaVolumeViagem')) document.getElementById('mediaVolumeViagem').innerText = mediaVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
+    if(document.getElementById('totalVolumeReal')) document.getElementById('totalVolumeReal').innerText = totalVolumeReal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
+    if(document.getElementById('mediaDistancia')) document.getElementById('mediaDistancia').innerText = mediaDistTotal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " km";
+    if(document.getElementById('mediaAsfalto')) document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
+    if(document.getElementById('mediaTerra')) document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
     
-    document.getElementById('cicloMedio').innerText = formatarHorasMinutos(mediaCiclo);
-    document.getElementById('filaCampo').innerText = formatarHorasMinutos(mediaFilaCampo);
+    // AS LINHAS QUE CAUSAVAM O ERRO FORAM PROTEGIDAS
+    if(document.getElementById('cicloMedio')) document.getElementById('cicloMedio').innerText = formatarHorasMinutos(mediaCiclo);
+    if(document.getElementById('filaCampo')) document.getElementById('filaCampo').innerText = formatarHorasMinutos(mediaFilaCampo);
     if(document.getElementById('tempoCarregamento')) document.getElementById('tempoCarregamento').innerText = formatarHorasMinutos(mediaTempoCarregamento);
-    document.getElementById('filaFabrica').innerText = formatarHorasMinutos(mediaFilaFabrica);
+    if(document.getElementById('filaFabrica')) document.getElementById('filaFabrica').innerText = formatarHorasMinutos(mediaFilaFabrica);
     
-    document.getElementById('produtividadeGlobal').innerText = produtividadeGlobalM3.toLocaleString('pt-PT', {maximumFractionDigits: 2});
+    if(document.getElementById('produtividadeGlobal')) document.getElementById('produtividadeGlobal').innerText = produtividadeGlobalM3.toLocaleString('pt-PT', {maximumFractionDigits: 2});
 
     const somaFilas = filteredData.reduce((s, d) => s + (d.filaCampoHoras || 0) + (d.filaFabricaHoras || 0), 0);
     const taxaOciosidade = somaCiclosTotais > 0 ? (somaFilas / somaCiclosTotais) * 100 : 0;
-    document.getElementById('ociosidadeGlobal').innerText = taxaOciosidade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + '%';
+    if(document.getElementById('ociosidadeGlobal')) document.getElementById('ociosidadeGlobal').innerText = taxaOciosidade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + '%';
 
     // --- CÁLCULO DE CAVALO DESTAQUE EM m³/h ---
     const mapaPlacas = new Map();
@@ -310,8 +311,8 @@ function loadDashboardData() {
         }
     });
     
-    document.getElementById('bestPlacaValue').innerText = melhorPlacaProdutividade > 0 ? melhorPlacaProdutividade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) : "0.0";
-    document.getElementById('bestPlacaName').innerText = `Placa: ${melhorPlacaNome}`;
+    if(document.getElementById('bestPlacaValue')) document.getElementById('bestPlacaValue').innerText = melhorPlacaProdutividade > 0 ? melhorPlacaProdutividade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) : "0.0";
+    if(document.getElementById('bestPlacaName')) document.getElementById('bestPlacaName').innerText = `Placa: ${melhorPlacaNome}`;
 
     // --- RENDERIZAR COMPARATIVO SERRANALOG VS TERCEIROS ---
     const tbodyComp = document.getElementById('comparativoBody');
@@ -323,7 +324,6 @@ function loadDashboardData() {
         const stOutras = calcStats(dataOutras);
         const stGlobal = calcStats(filteredData);
 
-        // AQUI ESTÃO AS ALTERAÇÕES PARA TEXTO BRANCO (text-white), MAIOR (text-lg) E NEGRITO (font-bold)
         tbodyComp.innerHTML = `
             <tr class="hover:bg-slate-800/30 transition-colors">
                 <td class="px-6 py-4 font-bold text-white"><i class="fas fa-box-open text-indigo-400 w-5"></i> Volume Médio / Viagem</td>
