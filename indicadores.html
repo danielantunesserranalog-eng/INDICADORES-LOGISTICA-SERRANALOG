@@ -391,22 +391,53 @@
         });
 
         // ==========================================
-        // GERAÇÃO DE PDF OTIMIZADA
+        // GERAÇÃO DE PDF OTIMIZADA E CORRIGIDA (SEM NÉVOA)
         // ==========================================
         document.getElementById('btnGerarPDFDashboard').addEventListener('click', function () {
             const elemento = document.getElementById('conteudo-relatorio');
+            const mainContainer = document.querySelector('main');
+            const bodyElement = document.body;
+            
             const botao = this;
             const textoOriginal = botao.innerHTML;
             botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando...';
             botao.classList.add('opacity-75', 'cursor-not-allowed');
             botao.disabled = true;
 
-            // 1. Remove as limitações de margem/largura temporariamente
-            const classesOriginais = elemento.className;
-            elemento.classList.remove('max-w-[96rem]', 'mx-auto');
-            elemento.style.width = '1600px';
+            // --- INÍCIO DA CORREÇÃO DA NÉVOA AZUL ---
+            // Cria um estilo temporário que desativa os efeitos de "vidro fosco" (backdrop-filter)
+            // e força uma cor de fundo sólida para que o gerador de PDF consiga ler nitidamente.
+            const cssFix = document.createElement('style');
+            cssFix.id = 'pdf-glass-fix';
+            cssFix.innerHTML = `
+                .glass-card, [class*="backdrop-blur"] {
+                    backdrop-filter: none !important;
+                    -webkit-backdrop-filter: none !important;
+                    background-color: #1e293b !important; /* Força um fundo sólido slate-800 */
+                    box-shadow: none !important; /* Remove sombras que também podem gerar névoa */
+                }
+            `;
+            document.head.appendChild(cssFix);
+            // --- FIM DA CORREÇÃO DA NÉVOA AZUL ---
 
-            // 2. Redimensiona os gráficos para a nova largura
+            // Guardar estilos originais do layout
+            const origMainOverflow = mainContainer.style.overflowY;
+            const origMainHeight = mainContainer.style.height;
+            const origBodyOverflow = bodyElement.style.overflow;
+            const origScrollTop = mainContainer.scrollTop;
+
+            // Destravar o scroll
+            mainContainer.style.overflowY = 'visible';
+            mainContainer.style.height = 'auto';
+            bodyElement.style.overflow = 'visible';
+            
+            // Remove as limitações de largura
+            const classesOriginais = elemento.className;
+            elemento.classList.remove('max-w-[96rem]', 'mx-auto', 'overflow-hidden');
+            elemento.style.width = '1920px'; 
+            elemento.style.padding = '20px';
+
+            // Redimensiona os gráficos
             if (typeof Chart !== 'undefined') { Object.values(Chart.instances).forEach(c => c.resize()); }
             if (typeof echarts !== 'undefined') {
                 document.querySelectorAll('div[_echarts_instance_]').forEach(dom => {
@@ -415,7 +446,7 @@
                 });
             }
 
-            // Aumentamos o tempo para 800ms para dar tempo dos novos gráficos renderizarem perfeitamente
+            // Aguarda a aplicação dos estilos temporários e redimensionamento
             setTimeout(() => {
                 botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando PDF...';
                 
@@ -429,36 +460,46 @@
                 
                 const nomeArquivo = `Dashboard_SerranaLog_${qfAtivo}_${dataFiltro}.pdf`;
 
-                // 3. Calcula as dimensões garantindo sobra (padding)
                 const larguraPx = elemento.scrollWidth;
                 const alturaPx = elemento.scrollHeight;
-                const ptWidth = (larguraPx * 0.75) + 30; 
-                const ptHeight = (alturaPx * 0.75) + 30;
+                const ptWidth = (larguraPx * 0.75); 
+                const ptHeight = (alturaPx * 0.75);
 
-                // 4. Configuração blindada do html2canvas
                 const opt = {
-                    margin: 15, // Adiciona margem escura em volta da folha
+                    margin: 15,
                     filename: nomeArquivo,
-                    image: { type: 'jpeg', quality: 1.0 },
+                    image: { type: 'png', quality: 1.0 }, 
                     html2canvas: { 
-                        scale: 2, // Scale 2 é o ideal: alta definição, sem esgotar a memória
+                        scale: 2, 
                         useCORS: true, 
                         backgroundColor: '#0f172a', 
                         scrollY: 0, 
-                        windowWidth: larguraPx + 100 // Abre bem a "câmera" para não cortar a direita
+                        scrollX: 0,
+                        windowWidth: larguraPx + 50,
+                        windowHeight: alturaPx + 50
                     },
                     jsPDF: { 
                         unit: 'pt', 
-                        format: [ptWidth, ptHeight], 
+                        format: [ptWidth + 30, ptHeight + 30], 
                         orientation: ptWidth > ptHeight ? 'landscape' : 'portrait' 
                     }
                 };
 
                 html2pdf().set(opt).from(elemento).save().then(() => {
-                    // 5. Restaura tudo ao normal após salvar
+                    // Restaura tudo ao normal
                     elemento.className = classesOriginais;
                     elemento.style.width = '';
+                    elemento.style.padding = '';
                     
+                    mainContainer.style.overflowY = origMainOverflow;
+                    mainContainer.style.height = origMainHeight;
+                    bodyElement.style.overflow = origBodyOverflow;
+                    mainContainer.scrollTop = origScrollTop;
+                    
+                    // Remove o estilo temporário do fundo sólido para o "vidro" voltar
+                    const cssRemove = document.getElementById('pdf-glass-fix');
+                    if (cssRemove) cssRemove.remove();
+
                     if (typeof Chart !== 'undefined') { Object.values(Chart.instances).forEach(c => c.resize()); }
                     if (typeof echarts !== 'undefined') {
                         document.querySelectorAll('div[_echarts_instance_]').forEach(dom => {
@@ -472,11 +513,23 @@
                 }).catch(err => {
                     console.error("Erro ao gerar PDF:", err);
                     alert("Erro ao gerar o PDF. A página pode estar muito pesada.");
+                    
+                    // Em caso de erro, também restaura a tela e tira a cor sólida
+                    elemento.className = classesOriginais;
+                    elemento.style.width = '';
+                    elemento.style.padding = '';
+                    mainContainer.style.overflowY = origMainOverflow;
+                    mainContainer.style.height = origMainHeight;
+                    bodyElement.style.overflow = origBodyOverflow;
+                    
+                    const cssRemove = document.getElementById('pdf-glass-fix');
+                    if (cssRemove) cssRemove.remove();
+
                     botao.innerHTML = textoOriginal;
                     botao.classList.remove('opacity-75', 'cursor-not-allowed');
                     botao.disabled = false;
                 });
-            }, 800);
+            }, 1000); 
         });
     </script>
 </body>
