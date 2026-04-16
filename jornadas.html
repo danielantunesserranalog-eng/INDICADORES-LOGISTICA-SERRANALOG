@@ -61,7 +61,7 @@
             </div>
 
             <section class="space-y-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-5">
                     <div class="glass-card rounded-2xl p-5 glow-border-blue flex flex-col justify-between relative overflow-hidden group">
                         <div class="absolute -right-4 -top-4 text-blue-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-users"></i></div>
                         <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest relative z-10">Motoristas Monitorados</p><p id="jorTotalMotoristas" class="text-4xl font-black text-white mt-1 relative z-10">0</p></div>
@@ -73,6 +73,15 @@
                     <div class="glass-card rounded-2xl p-5 glow-border-emerald flex flex-col justify-between relative overflow-hidden group">
                         <div class="absolute -right-4 -top-4 text-emerald-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-steering-wheel"></i></div>
                         <div><p class="text-slate-400 text-[11px] font-bold uppercase tracking-widest relative z-10">Média de Direção</p><p id="jorMediaDirecao" class="text-4xl font-black text-white mt-1 relative z-10">0h 00m</p></div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-5 border-l-4 border-l-emerald-500 flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-emerald-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-check-double"></i></div>
+                        <div><p class="text-emerald-400 text-[11px] font-bold uppercase tracking-widest relative z-10">Auditadas</p><p id="jorQtdAuditados" class="text-4xl font-black text-emerald-400 mt-1 relative z-10">0</p></div>
+                    </div>
+                    <div class="glass-card rounded-2xl p-5 border-l-4 border-l-amber-500 flex flex-col justify-between relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-amber-500/10 text-8xl group-hover:scale-110 transition-transform"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div><p class="text-amber-400 text-[11px] font-bold uppercase tracking-widest relative z-10">Pendentes</p><p id="jorQtdPendentes" class="text-4xl font-black text-amber-500 mt-1 relative z-10 animate-pulse">0</p></div>
                     </div>
                 </div>
 
@@ -171,7 +180,7 @@
                                     <th class="px-4 py-3 text-center text-amber-300">H. Extras</th>
                                     <th class="px-4 py-3 text-center">T. Trabalho</th>
                                     <th class="px-4 py-3 text-center">Direção</th>
-                                    <th class="px-4 py-3 text-center">Status</th>
+                                    <th class="px-4 py-3 text-center">Status / Auditoria</th>
                                 </tr>
                             </thead>
                             <tbody id="jorTabelaAnaliticaBody" class="divide-y divide-slate-800/80 text-slate-300"></tbody>

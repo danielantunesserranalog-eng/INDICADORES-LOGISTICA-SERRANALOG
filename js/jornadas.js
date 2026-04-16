@@ -22,7 +22,7 @@ const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 
 document.addEventListener('DOMContentLoaded', () => {
-    criarModaisAuditoria(); // Injeta os modais na tela
+    criarModaisAuditoria(); 
     configurarFiltros();
     carregarPainelJornadas();
 
@@ -263,6 +263,9 @@ function renderizarPainelJornadas() {
         document.getElementById('jorTotalMotoristas').innerText = '0';
         document.getElementById('jorQtdEstouros').innerText = '0';
         document.getElementById('jorMediaDirecao').innerText = '0h 00m';
+        if (document.getElementById('jorQtdAuditados')) document.getElementById('jorQtdAuditados').innerText = '0';
+        if (document.getElementById('jorQtdPendentes')) document.getElementById('jorQtdPendentes').innerText = '0';
+        
         document.getElementById('jorTabelaAnaliticaBody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-slate-500">Nenhum dado encontrado para o filtro.</td></tr>';
         document.getElementById('jorTopEstourosBody').innerHTML = '';
         document.getElementById('jorTopNoturnasBody').innerHTML = '';
@@ -301,6 +304,10 @@ function renderizarPainelJornadas() {
     let infracoesList = [];
     const recorrentesMap = new Map();
 
+    // Contadores para auditoria
+    let totalAuditados = 0;
+    let totalPendentes = 0;
+
     dadosFiltrados.forEach(linha => {
         const horas = linha.total_trabalho_horas || 0;
         const isEstouro = horas > 12;
@@ -324,6 +331,13 @@ function renderizarPainelJornadas() {
         if(isEstouro) {
             infracoesList.push({ nome: motNome, horas: horas }); 
             recorrentesMap.set(motNome, (recorrentesMap.get(motNome) || 0) + 1); 
+            
+            // Incrementa os contadores dos novos indicadores
+            if (linha.auditado) {
+                totalAuditados++;
+            } else {
+                totalPendentes++;
+            }
         }
     });
 
@@ -380,6 +394,13 @@ function renderizarPainelJornadas() {
     document.getElementById('jorQtdEstouros').textContent = dadosFiltrados.filter(d => (d.total_trabalho_horas || 0) > 12).length;
     document.getElementById('jorMediaDirecao').textContent = formatarHorasMinutos(qtdDirecao > 0 ? (totalMinutosDirecao / qtdDirecao) / 60 : 0);
     
+    // Atualiza os indicadores de auditoria
+    const elAuditados = document.getElementById('jorQtdAuditados');
+    if (elAuditados) elAuditados.textContent = totalAuditados;
+
+    const elPendentes = document.getElementById('jorQtdPendentes');
+    if (elPendentes) elPendentes.textContent = totalPendentes;
+
     let filterText = dataEspec !== 'ALL' ? dataEspec : activeQuickFilterJor;
     if (currentStatusFilter !== 'ALL') filterText += ` | Status: ${currentStatusFilter}`;
     document.getElementById('jorDataReferencia').textContent = `Filtro: ${filterText}`;
@@ -581,7 +602,6 @@ function atualizarTabelaAnalitica() {
             corLinha = 'text-rose-500 font-bold';
             badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">INFRAÇÃO</span>`;
             
-            // Monta a string formatada para a data e hora
             const dataHoraDetalhe = `${dataInicioStr} ${horaInicioStr} até ${dataFimStr} ${horaFimStr} (Total: ${formatarHorasMinutos(horas)})`;
             
             if (linha.auditado) {
@@ -622,7 +642,7 @@ function atualizarTabelaAnalitica() {
 // ==========================================
 
 function criarModaisAuditoria() {
-    if (document.getElementById('modalAuditoria')) return; // Evita duplicar
+    if (document.getElementById('modalAuditoria')) return; 
 
     const modalHtml = `
     <div id="modalAuditoria" class="fixed inset-0 z-[100] hidden bg-slate-900/80 backdrop-blur-sm flex justify-center items-center">
@@ -677,7 +697,7 @@ let currentAuditId = null;
 window.abrirModalAuditoria = function(id, motorista, dataHora) {
     currentAuditId = id;
     document.getElementById('auditMotoristaNome').textContent = motorista;
-    document.getElementById('auditDataHora').textContent = dataHora; // Injeta os dados da hora
+    document.getElementById('auditDataHora').textContent = dataHora; 
     document.getElementById('auditObservacao').value = '';
     document.getElementById('modalAuditoria').classList.remove('hidden');
 }
@@ -710,7 +730,7 @@ window.salvarAuditoria = async function() {
         if (error) throw error;
         
         fecharModalAuditoria();
-        carregarPainelJornadas(); // Recarrega os dados silenciosamente e atualiza a tabela
+        carregarPainelJornadas(); 
     } catch (err) {
         console.error(err);
         alert("Erro ao registrar auditoria. Verifique a conexão com o banco.");
@@ -722,7 +742,7 @@ window.salvarAuditoria = async function() {
 
 window.abrirModalVisAuditoria = function(obs, motorista, dataHora) {
     document.getElementById('visAuditMotoristaNome').textContent = motorista;
-    document.getElementById('visAuditDataHora').textContent = dataHora; // Injeta os dados da hora
+    document.getElementById('visAuditDataHora').textContent = dataHora; 
     document.getElementById('visAuditTexto').textContent = obs || "Nenhuma observação detalhada registrada.";
     document.getElementById('modalVisAuditoria').classList.remove('hidden');
 }
@@ -730,7 +750,6 @@ window.abrirModalVisAuditoria = function(obs, motorista, dataHora) {
 window.fecharModalVisAuditoria = function() {
     document.getElementById('modalVisAuditoria').classList.add('hidden');
 }
-
 
 // Acionada ao clicar em um Motorista na Tabela de Recorrentes
 window.filtrarMotoristaAnalitico = function(nome) {
