@@ -22,11 +22,12 @@ const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 
 document.addEventListener('DOMContentLoaded', () => {
+    criarModaisAuditoria(); // Injeta os modais na tela
     configurarFiltros();
     carregarPainelJornadas();
 
     const filterAnaliticoSelect = document.getElementById('filterAnaliticoMotorista');
-    const btnLimparFiltroMotorista = document.getElementById('btnLimparFiltroMotorista'); // NOVO BOTÃO
+    const btnLimparFiltroMotorista = document.getElementById('btnLimparFiltroMotorista'); 
 
     if (filterAnaliticoSelect) {
         filterAnaliticoSelect.addEventListener('change', (e) => {
@@ -36,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Ação do botão de limpar filtro
     if (btnLimparFiltroMotorista) {
         btnLimparFiltroMotorista.addEventListener('click', () => {
             currentAnaliticoFilter = 'ALL';
@@ -47,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// FUNÇÃO PARA CONTROLAR A VISIBILIDADE DO BOTÃO DE LIMPAR
 function toggleBtnLimparFiltro() {
     const btn = document.getElementById('btnLimparFiltroMotorista');
     if (btn) {
@@ -242,14 +241,12 @@ function renderizarPainelJornadas() {
                 if (activeQuickFilterJor === 'D-7' && (diffDias < 0 || diffDias > 7)) return false;
                 if (activeQuickFilterJor === 'D-30' && (diffDias < 0 || diffDias > 30)) return false;
                 
-                // NOVO: Filtro para a Semana Atual
                 if (activeQuickFilterJor === 'SEM') {
                     const inicioSemana = new Date(hj);
-                    inicioSemana.setDate(hj.getDate() - hj.getDay()); // Domingo
+                    inicioSemana.setDate(hj.getDate() - hj.getDay()); 
                     if (dataParsed < inicioSemana || dataParsed > hj) return false;
                 }
                 
-                // NOVO: Filtro para o Mês Atual
                 if (activeQuickFilterJor === 'MES') {
                     if (dataParsed.getMonth() !== hj.getMonth() || dataParsed.getFullYear() !== hj.getFullYear()) return false;
                 }
@@ -291,7 +288,6 @@ function renderizarPainelJornadas() {
 
     dadosFiltrados.sort((a, b) => (b.total_trabalho_horas || 0) - (a.total_trabalho_horas || 0));
 
-    // Salvar global para uso no Filtro Analítico
     dadosFiltradosGlobal = dadosFiltrados;
 
     document.getElementById('jorFilterStatus').innerText = `${dadosFiltrados.length} Registros`;
@@ -331,7 +327,6 @@ function renderizarPainelJornadas() {
         }
     });
 
-    // Renderização do Painel de Infratores Recorrentes
     const infratoresRecorrentes = Array.from(recorrentesMap.entries())
         .map(([nome, qtd]) => ({ nome, qtd }))
         .sort((a, b) => b.qtd - a.qtd);
@@ -354,7 +349,6 @@ function renderizarPainelJornadas() {
         }
     }
 
-    // Renderiza Demais Top Tabelas
     const topInfracoes = infracoesList.sort((a, b) => b.horas - a.horas).slice(0, 5);
     if(topInfracoes.length === 0) {
         tbodyEstouro.innerHTML = '<tr><td colspan="2" class="p-2 text-center text-slate-500 text-xs">Sem infrações registradas.</td></tr>';
@@ -403,7 +397,7 @@ function renderizarPainelJornadas() {
             selectMot.value = 'ALL';
         }
         
-        toggleBtnLimparFiltro(); // Garante o estado visual correto do botão
+        toggleBtnLimparFiltro(); 
     }
 
     atualizarTabelaAnalitica();
@@ -436,9 +430,7 @@ function renderizarPainelJornadas() {
             responsive: true, 
             maintainAspectRatio: false, 
             cutout: '60%', 
-            layout: {
-                padding: { top: 40, bottom: 40, left: 20, right: 20 } 
-            },
+            layout: { padding: { top: 40, bottom: 40, left: 20, right: 20 } },
             onClick: (event, elements) => {
                 if (elements.length > 0) {
                     const index = elements[0].index;
@@ -453,18 +445,10 @@ function renderizarPainelJornadas() {
                 event.native.target.style.cursor = elements.length ? 'pointer' : 'default';
             },
             plugins: { 
-                legend: { 
-                    position: 'right', 
-                    labels: { boxWidth: 12, font: { size: 12 } } 
-                }, 
+                legend: { position: 'right', labels: { boxWidth: 12, font: { size: 12 } } }, 
                 datalabels: { 
-                    display: true,
-                    color: '#f8fafc',
-                    font: { weight: 'bold', size: 14 }, 
-                    textAlign: 'center',
-                    anchor: 'end',
-                    align: 'end',
-                    offset: 8, 
+                    display: true, color: '#f8fafc', font: { weight: 'bold', size: 14 }, 
+                    textAlign: 'center', anchor: 'end', align: 'end', offset: 8, 
                     formatter: (value) => {
                         if (value === 0) return null;
                         const perc = totalStatus > 0 ? ((value / totalStatus) * 100).toFixed(1) : 0;
@@ -484,46 +468,21 @@ function renderizarPainelJornadas() {
         data: { 
             labels: ['8h a 10h', '10h a 12h', '12h a 14h', '> 14h'], 
             datasets: [{ 
-                label: 'Qtd de Jornadas', 
-                data: [fx8_10, fx10_12, fx12_14, fx14mais], 
+                label: 'Qtd de Jornadas', data: [fx8_10, fx10_12, fx12_14, fx14mais], 
                 backgroundColor: [gradientBar, gradientBar, '#f43f5e', '#9f1239'], 
-                borderRadius: 4, 
-                barPercentage: 0.6 
+                borderRadius: 4, barPercentage: 0.6 
             }] 
         },
         options: { 
-            responsive: true, 
-            maintainAspectRatio: false, 
-            layout: { 
-                padding: { top: 25, bottom: 10 }
-            }, 
-            plugins: { 
-                legend: { display: false }, 
-                datalabels: { 
-                    color: '#fff', 
-                    anchor: 'end', 
-                    align: 'top', 
-                    font: { weight: 'bold', size: 13 } 
-                } 
-            }, 
-            scales: { 
-                y: { display: false }, 
-                x: { 
-                    grid: { display: false }, 
-                    border: { display: false },
-                    ticks: { 
-                        color: '#cbd5e1',
-                        font: { size: 13, weight: '600' }
-                    } 
-                } 
-            } 
+            responsive: true, maintainAspectRatio: false, layout: { padding: { top: 25, bottom: 10 } }, 
+            plugins: { legend: { display: false }, datalabels: { color: '#fff', anchor: 'end', align: 'top', font: { weight: 'bold', size: 13 } } }, 
+            scales: { y: { display: false }, x: { grid: { display: false }, border: { display: false }, ticks: { color: '#cbd5e1', font: { size: 13, weight: '600' } } } } 
         }
     });
 
     const dailyInfractions = new Map();
     
     dados.forEach(d => {
-        // 1. Primeiro descobre a data, independente de ser infração ou não
         let dataStr = '-';
         const matchDate = d.inicio ? d.inicio.match(regexDate) : null;
         if(matchDate) {
@@ -532,12 +491,10 @@ function renderizarPainelJornadas() {
         }
 
         if (dataStr !== '-') {
-            // 2. Garante que a data exista no mapa (iniciando com 0)
             if (!dailyInfractions.has(dataStr)) {
                 dailyInfractions.set(dataStr, 0);
             }
 
-            // 3. Verifica se estourou as 12h. Se sim, soma 1 à data correspondente.
             const isEstouro = (d.total_trabalho_horas || 0) > 12;
             if (isEstouro) {
                 dailyInfractions.set(dataStr, dailyInfractions.get(dataStr) + 1);
@@ -566,32 +523,15 @@ function renderizarPainelJornadas() {
             data: {
                 labels: displayLabelsInf,
                 datasets: [{
-                    label: 'Infrações (>12h)',
-                    data: displayCountsInf,
-                    backgroundColor: 'rgba(244, 63, 94, 0.2)',
-                    borderColor: '#f43f5e',
-                    borderWidth: 2,
-                    pointBackgroundColor: '#f43f5e',
-                    pointBorderColor: '#fff',
-                    pointRadius: 4,
-                    fill: true,
-                    tension: 0.3
+                    label: 'Infrações (>12h)', data: displayCountsInf,
+                    backgroundColor: 'rgba(244, 63, 94, 0.2)', borderColor: '#f43f5e',
+                    borderWidth: 2, pointBackgroundColor: '#f43f5e', pointBorderColor: '#fff',
+                    pointRadius: 4, fill: true, tension: 0.3
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    datalabels: {
-                        color: '#fff',
-                        align: 'top',
-                        anchor: 'end',
-                        font: { size: 11, weight: 'bold' },
-                        // ALTERAÇÃO AQUI: Removemos a condição "> 0" para que ele sempre exiba o número, mesmo sendo 0
-                        formatter: (v) => v 
-                    }
-                },
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, datalabels: { color: '#fff', align: 'top', anchor: 'end', font: { size: 11, weight: 'bold' }, formatter: (v) => v } },
                 scales: {
                     y: { display: false, beginAtZero: true, suggestedMax: Math.max(...displayCountsInf, 1) * 1.3 },
                     x: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 11, weight: 'bold' }, color: '#cbd5e1' } }
@@ -635,10 +575,19 @@ function atualizarTabelaAnalitica() {
 
         let corLinha = 'text-emerald-400';
         let badge = `<span class="border border-emerald-500 text-emerald-500 bg-emerald-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">OK</span>`;
+        let auditHtml = `<span class="text-slate-600" title="Não aplicável"><i class="fas fa-minus"></i></span>`;
         
         if(isEstouro) {
             corLinha = 'text-rose-500 font-bold';
-            badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold animate-pulse">INFRAÇÃO</span>`;
+            badge = `<span class="border border-rose-500 text-rose-500 bg-rose-900/20 px-2 py-1 rounded text-[10px] uppercase font-bold">INFRAÇÃO</span>`;
+            
+            // Lógica da Auditoria Visual (Botões Grandes e Chamativos)
+            if (linha.auditado) {
+                const obsSegura = linha.observacao_auditoria ? linha.observacao_auditoria.replace(/'/g, "\\'").replace(/"/g, '&quot;') : '';
+                auditHtml = `<button onclick="abrirModalVisAuditoria('${obsSegura}')" class="bg-emerald-900/40 border border-emerald-500 text-emerald-400 px-3 py-1 rounded text-[10px] uppercase font-bold flex items-center gap-1 hover:bg-emerald-800 transition-colors shadow-sm" title="Ver observação"><i class="fas fa-check-double text-xs"></i> Auditado</button>`;
+            } else {
+                auditHtml = `<button onclick="abrirModalAuditoria(${linha.id}, '${motNome}')" class="bg-amber-600/20 border border-amber-500 text-amber-500 px-3 py-1 rounded text-[10px] uppercase font-bold flex items-center gap-1 hover:bg-amber-600/40 transition-colors animate-pulse shadow-[0_0_12px_rgba(245,158,11,0.4)]" title="Tratar Pendência!"><i class="fas fa-exclamation-triangle text-xs"></i> Auditar</button>`;
+            }
         }
 
         tbodyAnalitica.insertAdjacentHTML('beforeend', `
@@ -651,7 +600,12 @@ function atualizarTabelaAnalitica() {
                 <td class="px-4 py-3 text-center text-amber-400 font-bold">${formatarHorasMinutos(linha.horas_extras)}</td>
                 <td class="px-4 py-3 text-center ${corLinha}">${formatarHorasMinutos(horas)}</td>
                 <td class="px-4 py-3 text-center text-slate-400">${formatarHorasMinutos(linha.direcao_horas || 0)}</td>
-                <td class="px-4 py-3 text-center">${badge}</td>
+                <td class="px-4 py-3">
+                    <div class="flex items-center justify-center gap-3">
+                        ${badge}
+                        ${auditHtml}
+                    </div>
+                </td>
             </tr>
         `);
     });
@@ -660,6 +614,107 @@ function atualizarTabelaAnalitica() {
         tbodyAnalitica.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-slate-500">Nenhum registro encontrado para este motorista.</td></tr>';
     }
 }
+
+// ==========================================
+// MODAIS DE AUDITORIA (CRIADOS DINAMICAMENTE)
+// ==========================================
+
+function criarModaisAuditoria() {
+    if (document.getElementById('modalAuditoria')) return; // Evita duplicar
+
+    const modalHtml = `
+    <div id="modalAuditoria" class="fixed inset-0 z-[100] hidden bg-slate-900/80 backdrop-blur-sm flex justify-center items-center">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.5)] p-6 w-11/12 max-w-md transform transition-all">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-700">
+                <h3 class="text-lg font-bold text-sky-400 flex items-center gap-2"><i class="fas fa-edit"></i> Tratar Infração</h3>
+                <button onclick="fecharModalAuditoria()" class="text-slate-400 hover:text-rose-500 transition-colors"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <p class="text-sm text-slate-300 mb-4">Motorista: <span id="auditMotoristaNome" class="font-bold text-white bg-slate-700/50 px-2 py-1 rounded"></span></p>
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-slate-400 uppercase mb-2">Motivo / Observação</label>
+                <textarea id="auditObservacao" rows="4" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-slate-200 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all placeholder-slate-600" placeholder="Descreva o motivo da infração (ex: Pneu furado, trânsito, problema mecânico, etc)..."></textarea>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="fecharModalAuditoria()" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-300 border border-slate-600 hover:bg-slate-700 transition-colors">Cancelar</button>
+                <button onclick="salvarAuditoria()" class="px-4 py-2 rounded-lg text-sm font-bold bg-sky-600 text-white hover:bg-sky-500 transition-colors flex items-center gap-2 shadow-lg" id="btnSalvarAuditoria"><i class="fas fa-save"></i> Salvar Tratativa</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalVisAuditoria" class="fixed inset-0 z-[100] hidden bg-slate-900/80 backdrop-blur-sm flex justify-center items-center">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.5)] p-6 w-11/12 max-w-md transform transition-all">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-700">
+                <h3 class="text-lg font-bold text-emerald-400 flex items-center gap-2"><i class="fas fa-check-circle"></i> Detalhes da Auditoria</h3>
+                <button onclick="fecharModalVisAuditoria()" class="text-slate-400 hover:text-rose-500 transition-colors"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="bg-slate-900/50 border border-slate-700 rounded-lg p-4 mb-2 shadow-inner">
+                <p id="visAuditTexto" class="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed"></p>
+            </div>
+            <div class="flex justify-end mt-6">
+                <button onclick="fecharModalVisAuditoria()" class="px-6 py-2 rounded-lg text-sm font-bold bg-slate-700 text-white hover:bg-slate-600 transition-colors shadow-lg">Fechar Aba</button>
+            </div>
+        </div>
+    </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+let currentAuditId = null;
+
+window.abrirModalAuditoria = function(id, motorista) {
+    currentAuditId = id;
+    document.getElementById('auditMotoristaNome').textContent = motorista;
+    document.getElementById('auditObservacao').value = '';
+    document.getElementById('modalAuditoria').classList.remove('hidden');
+}
+
+window.fecharModalAuditoria = function() {
+    currentAuditId = null;
+    document.getElementById('modalAuditoria').classList.add('hidden');
+}
+
+window.salvarAuditoria = async function() {
+    if (!currentAuditId) return;
+    
+    const obs = document.getElementById('auditObservacao').value.trim();
+    if (!obs) {
+        alert("Por favor, preencha a observação para salvar a tratativa.");
+        return;
+    }
+
+    const btn = document.getElementById('btnSalvarAuditoria');
+    const txtOriginal = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+    btn.disabled = true;
+
+    try {
+        const { error } = await supabaseClient
+            .from('historico_jornadas')
+            .update({ auditado: true, observacao_auditoria: obs })
+            .eq('id', currentAuditId);
+        
+        if (error) throw error;
+        
+        fecharModalAuditoria();
+        carregarPainelJornadas(); // Recarrega os dados silenciosamente e atualiza a tabela
+    } catch (err) {
+        console.error(err);
+        alert("Erro ao registrar auditoria. Verifique a conexão com o banco.");
+    } finally {
+        btn.innerHTML = txtOriginal;
+        btn.disabled = false;
+    }
+}
+
+window.abrirModalVisAuditoria = function(obs) {
+    document.getElementById('visAuditTexto').textContent = obs || "Nenhuma observação detalhada registrada.";
+    document.getElementById('modalVisAuditoria').classList.remove('hidden');
+}
+
+window.fecharModalVisAuditoria = function() {
+    document.getElementById('modalVisAuditoria').classList.add('hidden');
+}
+
 
 // Acionada ao clicar em um Motorista na Tabela de Recorrentes
 window.filtrarMotoristaAnalitico = function(nome) {
@@ -674,7 +729,7 @@ window.filtrarMotoristaAnalitico = function(nome) {
         currentAnaliticoFilter = nome;
         
         atualizarTabelaAnalitica();
-        toggleBtnLimparFiltro(); // Garante que o botão apareça ao clicar
+        toggleBtnLimparFiltro(); 
         
         document.getElementById('jorTabelaAnaliticaBody').scrollIntoView({behavior: 'smooth', block: 'center'});
     }
@@ -713,7 +768,9 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
             "Motorista": d.motorista, "Placa": d.placa, "Data Início": dI, "Hora Início": hI, "Data Fim": dF, "Hora Fim": hF,
             "H. Noturnas": formatarHorasMinutos(d.horas_noturnas), "H. Extras (Soma)": formatarHorasMinutos(d.horas_extras),
             "T. Trabalho (h)": d.total_trabalho_horas, "T. Direção (h)": d.direcao_horas, "Refeição (h)": d.refeicao_horas, "Repouso (h)": d.repouso_horas,
-            "Status": d.total_trabalho_horas > 12 ? 'INFRAÇÃO' : 'OK'
+            "Status": d.total_trabalho_horas > 12 ? 'INFRAÇÃO' : 'OK',
+            "Auditado": d.auditado ? 'Sim' : (d.total_trabalho_horas > 12 ? 'Pendente' : '-'),
+            "Obs Auditoria": d.observacao_auditoria || '-'
         };
     }));
     const wb = XLSX.utils.book_new(); XLSX.book_append_sheet(wb, ws, "Jornadas");
