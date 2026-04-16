@@ -20,15 +20,16 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body class="bg-slate-900 min-h-screen text-slate-200 selection:bg-sky-500/30 flex overflow-hidden">
 
     <aside id="sidebar-container" class="w-72 bg-slate-800/80 border-r border-slate-700/50 backdrop-blur-xl flex flex-col justify-between h-screen shadow-2xl relative z-20 flex-shrink-0"></aside>
 
     <main class="flex-1 h-screen overflow-y-auto relative">
-        <div class="max-w-[96rem] mx-auto px-6 py-8">
+        <div id="conteudo-relatorio" class="max-w-[96rem] mx-auto px-6 py-8 bg-slate-900 rounded-lg">
 
-            <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm flex-wrap gap-4">
+            <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm flex-wrap gap-4" data-html2canvas-ignore>
                 <div class="flex items-center gap-4 flex-wrap">
                     <div>
                         <h1 class="text-2xl font-extrabold text-white">Indicadores Serrana</h1>
@@ -66,7 +67,10 @@
                 </div>
 
                 <div class="flex items-center gap-4">
-                    <button id="btnExportar" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-colors text-sm flex items-center gap-2"><i class="fas fa-file-excel"></i> Exportar</button>
+                    <button id="btnGerarPDFDashboard" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-colors text-sm flex items-center gap-2">
+                        <i class="fas fa-file-pdf"></i> PDF
+                    </button>
+                    <button id="btnExportar" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-lg shadow-lg transition-colors text-sm flex items-center gap-2"><i class="fas fa-file-excel"></i> Excel</button>
                     <div class="bg-slate-900 border border-slate-700 rounded-full px-5 py-2 shadow-inner text-sm font-mono text-sky-300 flex items-center">
                         <i class="fas fa-database mr-2 text-sky-500"></i> <span id="dbStatusLabel">Carregando...</span>
                     </div>
@@ -168,7 +172,7 @@
                     </div>
 
                     <div class="glass-card rounded-xl p-5 border border-slate-700/50 flex flex-col w-full">
-                        <div class="flex justify-between items-center mb-2 border-b border-slate-700/50 pb-3">
+                        <div class="flex justify-between items-center mb-2 border-b border-slate-700/50 pb-3" data-html2canvas-ignore>
                             <h3 class="font-bold text-white tracking-wide flex items-center text-[13px] uppercase">
                                 🚚 DM Operacional (Carros Rodando / Frota Total) - Importado
                             </h3>
@@ -335,6 +339,109 @@
                     });
                 }
             }, 1000); 
+        });
+
+        // ==========================================
+        // LÓGICA DO RELATÓRIO PDF ALTA RESOLUÇÃO E SEM CORTES
+        // ==========================================
+        document.getElementById('btnGerarPDFDashboard').addEventListener('click', function () {
+            const elemento = document.getElementById('conteudo-relatorio');
+            const botao = this;
+            const textoOriginal = botao.innerHTML;
+
+            // Altera estado do botão
+            botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando...';
+            botao.classList.add('opacity-75', 'cursor-not-allowed');
+            botao.disabled = true;
+
+            // 1. Salva estilos originais
+            const widthOriginal = elemento.style.width;
+            const maxWidthOriginal = elemento.style.maxWidth;
+            
+            // 2. Força uma largura de Desktop ideal para impedir que gráficos "espremam" ou quebrem layouts em telas menores
+            elemento.style.width = '1600px';
+            elemento.style.maxWidth = '1600px';
+
+            // 3. Força todos os gráficos a se redimensionarem para a nova largura perfeita
+            if (typeof Chart !== 'undefined') {
+                Object.values(Chart.instances).forEach(c => c.resize());
+            }
+            if (typeof echarts !== 'undefined') {
+                document.querySelectorAll('div[_echarts_instance_]').forEach(dom => {
+                    const instance = echarts.getInstanceByDom(dom);
+                    if (instance) instance.resize();
+                });
+            }
+
+            // Aguarda meio segundo para os gráficos terminarem de animar o resize
+            setTimeout(() => {
+                botao.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando PDF...';
+
+                // Pega nomes para salvar o arquivo
+                let dataFiltro = "TODO_PERIODO";
+                const selectData = document.getElementById('filterData');
+                if (selectData && selectData.value !== 'ALL') dataFiltro = selectData.value.replace(/\//g, '-');
+                
+                const btnAtivo = document.querySelector('#quickFiltersGroup .btn-qf.active');
+                let qfAtivo = btnAtivo ? btnAtivo.innerText.trim() : 'Filtro';
+                if(qfAtivo === '') qfAtivo = 'Tudo'; 
+                const nomeArquivo = `Dashboard_SerranaLog_${qfAtivo}_${dataFiltro}.pdf`;
+
+                // 4. Calcula dimensões EXATAS renderizadas para não haver corte de página
+                const larguraPx = elemento.scrollWidth;
+                const alturaPx = elemento.scrollHeight;
+
+                // Converte pixels em "Pontos" (1 px = 0.75 pt) para o jsPDF desenhar perfeitamente sem auto-pagebreak
+                const ptWidth = larguraPx * 0.75;
+                const ptHeight = alturaPx * 0.75;
+
+                const opt = {
+                    margin:       0,
+                    filename:     nomeArquivo,
+                    image:        { type: 'jpeg', quality: 1.0 }, // Máxima qualidade JPG
+                    html2canvas:  { 
+                        scale: 3, // Multiplica os pixels por 3 (Resolução Retina/4K, zero embaçamento)
+                        useCORS: true, 
+                        backgroundColor: '#0f172a',
+                        scrollY: 0,
+                        windowWidth: 1600 // Mantém a referência da largura
+                    },
+                    jsPDF: { 
+                        unit: 'pt', 
+                        format: [ptWidth, ptHeight], // Página Única do tamanho exato da Div (Tamanho Poster)
+                        orientation: ptWidth > ptHeight ? 'landscape' : 'portrait' 
+                    }
+                };
+
+                // Executa a geração do PDF
+                html2pdf().set(opt).from(elemento).save().then(() => {
+                    // 5. Devolve o Dashboard pro estado original após baixar
+                    elemento.style.width = widthOriginal;
+                    elemento.style.maxWidth = maxWidthOriginal;
+
+                    if (typeof Chart !== 'undefined') {
+                        Object.values(Chart.instances).forEach(c => c.resize());
+                    }
+                    if (typeof echarts !== 'undefined') {
+                        document.querySelectorAll('div[_echarts_instance_]').forEach(dom => {
+                            const instance = echarts.getInstanceByDom(dom);
+                            if (instance) instance.resize();
+                        });
+                    }
+
+                    // Volta o botão
+                    botao.innerHTML = textoOriginal;
+                    botao.classList.remove('opacity-75', 'cursor-not-allowed');
+                    botao.disabled = false;
+                }).catch(err => {
+                    console.error("Erro ao gerar PDF:", err);
+                    alert("Erro ao gerar o PDF.");
+                    botao.innerHTML = textoOriginal;
+                    botao.classList.remove('opacity-75', 'cursor-not-allowed');
+                    botao.disabled = false;
+                });
+
+            }, 500); // Fim do setTimeout
         });
     </script>
 </body>

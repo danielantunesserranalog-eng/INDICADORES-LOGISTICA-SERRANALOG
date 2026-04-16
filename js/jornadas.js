@@ -523,16 +523,24 @@ function renderizarPainelJornadas() {
     const dailyInfractions = new Map();
     
     dados.forEach(d => {
-        const isEstouro = (d.total_trabalho_horas || 0) > 12;
-        if (isEstouro) {
-            let dataStr = '-';
-            const matchDate = d.inicio ? d.inicio.match(regexDate) : null;
-            if(matchDate) {
-                dataStr = matchDate[0];
-                if (dataStr.length <= 5) dataStr += '/' + new Date().getFullYear();
+        // 1. Primeiro descobre a data, independente de ser infração ou não
+        let dataStr = '-';
+        const matchDate = d.inicio ? d.inicio.match(regexDate) : null;
+        if(matchDate) {
+            dataStr = matchDate[0];
+            if (dataStr.length <= 5) dataStr += '/' + new Date().getFullYear();
+        }
+
+        if (dataStr !== '-') {
+            // 2. Garante que a data exista no mapa (iniciando com 0)
+            if (!dailyInfractions.has(dataStr)) {
+                dailyInfractions.set(dataStr, 0);
             }
-            if (dataStr !== '-') {
-                dailyInfractions.set(dataStr, (dailyInfractions.get(dataStr) || 0) + 1);
+
+            // 3. Verifica se estourou as 12h. Se sim, soma 1 à data correspondente.
+            const isEstouro = (d.total_trabalho_horas || 0) > 12;
+            if (isEstouro) {
+                dailyInfractions.set(dataStr, dailyInfractions.get(dataStr) + 1);
             }
         }
     });
@@ -580,7 +588,8 @@ function renderizarPainelJornadas() {
                         align: 'top',
                         anchor: 'end',
                         font: { size: 11, weight: 'bold' },
-                        formatter: (v) => v > 0 ? v : ''
+                        // ALTERAÇÃO AQUI: Removemos a condição "> 0" para que ele sempre exiba o número, mesmo sendo 0
+                        formatter: (v) => v 
                     }
                 },
                 scales: {
