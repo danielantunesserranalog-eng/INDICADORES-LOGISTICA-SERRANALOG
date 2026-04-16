@@ -236,10 +236,24 @@ function renderizarPainelJornadas() {
             if (dataParsed) {
                 const hj = new Date(); hj.setHours(0, 0, 0, 0); dataParsed.setHours(0, 0, 0, 0);
                 const diffDias = Math.round((hj - dataParsed) / 86400000);
+                
                 if (activeQuickFilterJor === 'D-1' && diffDias !== 1) return false;
                 if (activeQuickFilterJor === 'D-2' && diffDias !== 2) return false;
                 if (activeQuickFilterJor === 'D-7' && (diffDias < 0 || diffDias > 7)) return false;
                 if (activeQuickFilterJor === 'D-30' && (diffDias < 0 || diffDias > 30)) return false;
+                
+                // NOVO: Filtro para a Semana Atual
+                if (activeQuickFilterJor === 'SEM') {
+                    const inicioSemana = new Date(hj);
+                    inicioSemana.setDate(hj.getDate() - hj.getDay()); // Domingo
+                    if (dataParsed < inicioSemana || dataParsed > hj) return false;
+                }
+                
+                // NOVO: Filtro para o Mês Atual
+                if (activeQuickFilterJor === 'MES') {
+                    if (dataParsed.getMonth() !== hj.getMonth() || dataParsed.getFullYear() !== hj.getFullYear()) return false;
+                }
+
             } else return false;
         }
         return true;
