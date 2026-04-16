@@ -21,6 +21,38 @@ let chartEvolucaoOcorrencias = null;
 const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 
+// Função para auxiliar na ordenação por Data/Hora decrescente
+function obterDataHoraParaOrdenacao(inicioStr) {
+    if (!inicioStr) return 0;
+    const matchDate = inicioStr.match(regexDate);
+    const matchTime = inicioStr.match(regexTime);
+    
+    let dataObj = new Date(0);
+    if (matchDate) {
+        let match = matchDate[0].match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+        if (match) {
+            let year = parseInt(match[3], 10);
+            if (year < 100) year += 2000;
+            dataObj = new Date(year, match[2] - 1, match[1]); 
+        } else {
+            let matchISO = matchDate[0].match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (matchISO) dataObj = new Date(matchISO[1], matchISO[2] - 1, matchISO[3]);
+            else {
+                let matchCurto = matchDate[0].match(/(\d{1,2})\/(\d{1,2})/);
+                if (matchCurto) dataObj = new Date(new Date().getFullYear(), matchCurto[2] - 1, matchCurto[1]);
+            }
+        }
+    }
+    
+    if (matchTime) {
+        const parts = matchTime[0].split(':');
+        dataObj.setHours(parseInt(parts[0] || 0, 10));
+        dataObj.setMinutes(parseInt(parts[1] || 0, 10));
+        if(parts.length > 2) dataObj.setSeconds(parseInt(parts[2] || 0, 10));
+    }
+    return dataObj.getTime();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     criarModaisAuditoria(); 
     configurarFiltros();
@@ -43,6 +75,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (filterAnaliticoSelect) filterAnaliticoSelect.value = 'ALL';
             atualizarTabelaAnalitica();
             toggleBtnLimparFiltro();
+        });
+    }
+
+    // Ação para abrir o modal de Relatório de Auditoria
+    const btnRelAuditoria = document.getElementById('btnAbrirModalRelatorioAuditoria');
+    if (btnRelAuditoria) {
+        btnRelAuditoria.addEventListener('click', () => {
+            document.getElementById('relAuditDataInicio').value = '';
+            document.getElementById('relAuditDataFim').value = '';
+            document.getElementById('modalRelatorioAuditoria').classList.remove('hidden');
         });
     }
 });
@@ -289,7 +331,10 @@ function renderizarPainelJornadas() {
         return true;
     });
 
-    dadosFiltrados.sort((a, b) => (b.total_trabalho_horas || 0) - (a.total_trabalho_horas || 0));
+    // Ordenação Decrescente por Data/Hora (Mais recente primeiro)
+    dadosFiltrados.sort((a, b) => {
+        return obterDataHoraParaOrdenacao(b.inicio) - obterDataHoraParaOrdenacao(a.inicio);
+    });
 
     dadosFiltradosGlobal = dadosFiltrados;
 
@@ -304,7 +349,6 @@ function renderizarPainelJornadas() {
     let infracoesList = [];
     const recorrentesMap = new Map();
 
-    // Contadores para auditoria
     let totalAuditados = 0;
     let totalPendentes = 0;
 
@@ -332,7 +376,6 @@ function renderizarPainelJornadas() {
             infracoesList.push({ nome: motNome, horas: horas }); 
             recorrentesMap.set(motNome, (recorrentesMap.get(motNome) || 0) + 1); 
             
-            // Incrementa os contadores dos novos indicadores
             if (linha.auditado) {
                 totalAuditados++;
             } else {
@@ -394,7 +437,6 @@ function renderizarPainelJornadas() {
     document.getElementById('jorQtdEstouros').textContent = dadosFiltrados.filter(d => (d.total_trabalho_horas || 0) > 12).length;
     document.getElementById('jorMediaDirecao').textContent = formatarHorasMinutos(qtdDirecao > 0 ? (totalMinutosDirecao / qtdDirecao) / 60 : 0);
     
-    // Atualiza os indicadores de auditoria
     const elAuditados = document.getElementById('jorQtdAuditados');
     if (elAuditados) elAuditados.textContent = totalAuditados;
 
@@ -563,7 +605,6 @@ function renderizarPainelJornadas() {
     }
 }
 
-// Atualiza apenas a Tabela do Relatório Analítico Baseado no Filtro
 function atualizarTabelaAnalitica() {
     const tbodyAnalitica = document.getElementById('jorTabelaAnaliticaBody');
     if (!tbodyAnalitica) return;
@@ -638,7 +679,7 @@ function atualizarTabelaAnalitica() {
 }
 
 // ==========================================
-// MODAIS DE AUDITORIA (CRIADOS DINAMICAMENTE)
+// MODAIS DE AUDITORIA E RELATÓRIO
 // ==========================================
 
 function criarModaisAuditoria() {
@@ -685,6 +726,34 @@ function criarModaisAuditoria() {
             </div>
             <div class="flex justify-end mt-6">
                 <button onclick="fecharModalVisAuditoria()" class="px-6 py-2 rounded-lg text-sm font-bold bg-slate-700 text-white hover:bg-slate-600 transition-colors shadow-lg">Fechar Aba</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalRelatorioAuditoria" class="fixed inset-0 z-[100] hidden bg-slate-900/80 backdrop-blur-sm flex justify-center items-center">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-[0_0_40px_rgba(0,0,0,0.5)] p-6 w-11/12 max-w-md transform transition-all">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-700">
+                <h3 class="text-lg font-bold text-indigo-400 flex items-center gap-2"><i class="fas fa-file-contract"></i> Relatório de Auditorias</h3>
+                <button onclick="fecharModalRelatorioAuditoria()" class="text-slate-400 hover:text-rose-500 transition-colors"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <div class="mb-4">
+                <p class="text-sm text-slate-300 mb-4">Selecione o período para gerar o relatório em PDF das infrações já tratadas e auditadas.</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Data Início</label>
+                        <input type="date" id="relAuditDataInicio" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-indigo-500" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Data Fim</label>
+                        <input type="date" id="relAuditDataFim" class="w-full bg-slate-900 border border-slate-600 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-indigo-500" />
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="fecharModalRelatorioAuditoria()" class="px-4 py-2 rounded-lg text-sm font-bold text-slate-300 border border-slate-600 hover:bg-slate-700 transition-colors">Cancelar</button>
+                <button onclick="gerarRelatorioAuditoria()" id="btnGerarPdfAuditoria" class="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-600 text-white hover:bg-indigo-500 transition-colors flex items-center gap-2 shadow-lg"><i class="fas fa-download"></i> Gerar PDF</button>
             </div>
         </div>
     </div>
@@ -751,7 +820,131 @@ window.fecharModalVisAuditoria = function() {
     document.getElementById('modalVisAuditoria').classList.add('hidden');
 }
 
-// Acionada ao clicar em um Motorista na Tabela de Recorrentes
+window.fecharModalRelatorioAuditoria = function() {
+    document.getElementById('modalRelatorioAuditoria').classList.add('hidden');
+}
+
+// Função para gerar o relatório PDF filtrado pelo período de auditorias
+window.gerarRelatorioAuditoria = function() {
+    const dtIniStr = document.getElementById('relAuditDataInicio').value;
+    const dtFimStr = document.getElementById('relAuditDataFim').value;
+    
+    if(!dtIniStr || !dtFimStr) {
+        alert("Por favor, selecione as datas de início e fim.");
+        return;
+    }
+
+    const [y1, m1, d1] = dtIniStr.split('-');
+    const dtIni = new Date(y1, m1 - 1, d1, 0, 0, 0);
+
+    const [y2, m2, d2] = dtFimStr.split('-');
+    const dtFim = new Date(y2, m2 - 1, d2, 23, 59, 59);
+
+    const auditadas = fullJornadasData.filter(d => {
+        if (!d.auditado) return false;
+        
+        const m = d.inicio ? d.inicio.match(regexDate) : null;
+        const dataInicio = m ? extrairDataParaFiltro(m[0]) : null;
+        if(!dataInicio) return false;
+        
+        return dataInicio >= dtIni && dataInicio <= dtFim;
+    });
+
+    if(auditadas.length === 0) {
+        alert("Nenhuma infração auditada encontrada nesse período.");
+        return;
+    }
+    
+    // Efeito de carregamento no botão
+    const btnGerar = document.getElementById('btnGerarPdfAuditoria');
+    const textOriginalBtn = btnGerar.innerHTML;
+    btnGerar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+    btnGerar.disabled = true;
+
+    auditadas.sort((a,b) => obterDataHoraParaOrdenacao(b.inicio) - obterDataHoraParaOrdenacao(a.inicio));
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape');
+
+    // ATUALIZADO: Coluna de Tempo Excedido adicionada
+    const colunas = [
+        "Motorista", "Data Jornada", "Hora Início", "Hora Fim", "T. Trabalho", "Tempo Excedido", "Observação (Auditoria)"
+    ];
+    
+    const linhas = [];
+
+    auditadas.forEach(d => {
+        let dI = '-', hI = '-', dF = '-', hF = '-';
+        if (d.inicio) {
+            const mD = d.inicio.match(regexDate); const mT = d.inicio.match(regexTime);
+            if (mD) { dI = mD[0]; if (dI.length <= 5) dI += '/' + new Date().getFullYear(); }
+            if (mT) hI = mT[0]; if (!mD && !mT) hI = d.inicio;
+        }
+        if (d.fim) {
+            const mDF = d.fim.match(regexDate); const mTF = d.fim.match(regexTime);
+            if (mDF) { dF = mDF[0]; if (dF.length <= 5) dF += '/' + new Date().getFullYear(); } else dF = dI;
+            if (mTF) hF = mTF[0]; else hF = d.fim.replace(regexDate, '').replace('-', '').trim() || d.fim;
+        }
+        
+        let obsTxt = d.observacao_auditoria || 'Sem observação';
+        
+        // Cálculo do tempo excedido (total de horas - 12)
+        const totalHoras = d.total_trabalho_horas || 0;
+        const excedido = Math.max(0, totalHoras - 12);
+
+        linhas.push([
+            d.motorista || '-',
+            dI,
+            hI,
+            hF,
+            formatarHorasMinutos(totalHoras),
+            formatarHorasMinutos(excedido), // Exibe a nova coluna
+            obsTxt
+        ]);
+    });
+
+    doc.setFontSize(16);
+    doc.text("Relatório de Infrações Auditadas", 14, 15);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Período Selecionado: ${d1}/${m1}/${y1} a ${d2}/${m2}/${y2}`, 14, 22);
+
+    doc.autoTable({
+        head: [colunas],
+        body: linhas,
+        startY: 28, 
+        theme: 'striped',
+        headStyles: { fillColor: [15, 23, 42] }, 
+        styles: { fontSize: 8, cellPadding: 3 },
+        columnStyles: {
+            6: { cellWidth: 90 } // Ajuste na largura da coluna Observação
+        }
+    });
+
+    // ATUALIZADO: Carregar e adicionar a Logo da Empresa
+    const img = new Image();
+    img.src = 'assets/logoverde.png';
+    
+    img.onload = () => {
+        const pageWidth = doc.internal.pageSize.getWidth();
+        // Imprime a imagem no X: lado direito da folha, Y: 10, Largura: 32, Altura: 12
+        doc.addImage(img, 'PNG', pageWidth - 45, 10, 32, 12); 
+        doc.save(`SerranaLog_Auditorias_${dtIniStr}_a_${dtFimStr}.pdf`);
+        btnGerar.innerHTML = textOriginalBtn;
+        btnGerar.disabled = false;
+        fecharModalRelatorioAuditoria();
+    };
+    
+    img.onerror = () => {
+        // Se der falha ao carregar a logo, salva o PDF sem ela
+        doc.save(`SerranaLog_Auditorias_${dtIniStr}_a_${dtFimStr}.pdf`);
+        btnGerar.innerHTML = textOriginalBtn;
+        btnGerar.disabled = false;
+        fecharModalRelatorioAuditoria();
+    };
+}
+
 window.filtrarMotoristaAnalitico = function(nome) {
     const select = document.getElementById('filterAnaliticoMotorista');
     if (select) {
@@ -785,7 +978,7 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
 
     if (dadosExportar.length === 0) return alert("Nenhum dado para exportar com este filtro de status.");
 
-    dadosExportar.sort((a, b) => (b.total_trabalho_horas || 0) - (a.total_trabalho_horas || 0));
+    dadosExportar.sort((a, b) => obterDataHoraParaOrdenacao(b.inicio) - obterDataHoraParaOrdenacao(a.inicio));
 
     const ws = XLSX.utils.json_to_sheet(dadosExportar.map(d => {
         let dI = '-', hI = '-', dF = '-', hF = '-';
@@ -803,6 +996,7 @@ document.getElementById('btnExportarJornada').addEventListener('click', () => {
             "Motorista": d.motorista, "Placa": d.placa, "Data Início": dI, "Hora Início": hI, "Data Fim": dF, "Hora Fim": hF,
             "H. Noturnas": formatarHorasMinutos(d.horas_noturnas), "H. Extras (Soma)": formatarHorasMinutos(d.horas_extras),
             "T. Trabalho (h)": d.total_trabalho_horas, "T. Direção (h)": d.direcao_horas, "Refeição (h)": d.refeicao_horas, "Repouso (h)": d.repouso_horas,
+            "Tempo Excedido": formatarHorasMinutos(Math.max(0, (d.total_trabalho_horas || 0) - 12)), // Adicionado no Excel
             "Status": d.total_trabalho_horas > 12 ? 'INFRAÇÃO' : 'OK',
             "Auditado": d.auditado ? 'Sim' : (d.total_trabalho_horas > 12 ? 'Pendente' : '-'),
             "Obs Auditoria": d.observacao_auditoria || '-'
@@ -827,14 +1021,15 @@ document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () =
 
     if (dadosExportar.length === 0) return alert("Nenhum dado para exportar com este filtro de status.");
 
-    dadosExportar.sort((a, b) => (b.total_trabalho_horas || 0) - (a.total_trabalho_horas || 0));
+    dadosExportar.sort((a, b) => obterDataHoraParaOrdenacao(b.inicio) - obterDataHoraParaOrdenacao(a.inicio));
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('landscape');
 
+    // ATUALIZADO: Inclui coluna de T. Excedido
     const colunas = [
         "Motorista", "Placa", "Data/Hora Início", "Data/Hora Fim", 
-        "H. Noturnas", "H. Extras", "T. Trabalho", "T. Direção", "Status"
+        "H. Noturnas", "H. Extras", "T. Trabalho", "T. Excedido", "Status"
     ];
     
     const linhas = [];
@@ -855,6 +1050,9 @@ document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () =
 
         const isEstouro = (d.total_trabalho_horas || 0) > 12;
         const statusTexto = isEstouro ? 'INFRAÇÃO' : 'OK';
+        
+        const totalHoras = d.total_trabalho_horas || 0;
+        const excedido = Math.max(0, totalHoras - 12);
 
         linhas.push([
             d.motorista || '-',
@@ -863,8 +1061,8 @@ document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () =
             `${dF} às ${hF}`,
             formatarHorasMinutos(d.horas_noturnas || 0),
             formatarHorasMinutos(d.horas_extras || 0),
-            formatarHorasMinutos(d.total_trabalho_horas || 0),
-            formatarHorasMinutos(d.direcao_horas || 0),
+            formatarHorasMinutos(totalHoras),
+            formatarHorasMinutos(excedido), // Exibe tempo excedido
             statusTexto
         ]);
     });
@@ -901,6 +1099,26 @@ document.getElementById('btnExportarPDFJornada')?.addEventListener('click', () =
         }
     });
 
-    const dataHoje = new Date().toISOString().slice(0,10);
-    doc.save(`SerranaLog_Jornadas_${filtroStatus}_${dataHoje}.pdf`);
+    // ATUALIZADO: Adiciona a Logo também no relatório principal para manter o padrão
+    const btnGerarGeral = document.getElementById('btnExportarPDFJornada');
+    const textOriginalBtn = btnGerarGeral.innerHTML;
+    btnGerarGeral.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Baixando...';
+    btnGerarGeral.disabled = true;
+
+    const img = new Image();
+    img.src = 'assets/logoverde.png';
+    
+    img.onload = () => {
+        const pageWidth = doc.internal.pageSize.getWidth();
+        doc.addImage(img, 'PNG', pageWidth - 45, 10, 32, 12);
+        doc.save(`SerranaLog_Jornadas_${filtroStatus}_${new Date().toISOString().slice(0,10)}.pdf`);
+        btnGerarGeral.innerHTML = textOriginalBtn;
+        btnGerarGeral.disabled = false;
+    };
+    
+    img.onerror = () => {
+        doc.save(`SerranaLog_Jornadas_${filtroStatus}_${new Date().toISOString().slice(0,10)}.pdf`);
+        btnGerarGeral.innerHTML = textOriginalBtn;
+        btnGerarGeral.disabled = false;
+    };
 });
