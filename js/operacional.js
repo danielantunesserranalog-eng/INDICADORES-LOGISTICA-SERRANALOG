@@ -171,6 +171,14 @@ function atualizarPainelOperacional() {
         if (activeQuickFilterOp === 'D-2') return diff === 2;
         if (activeQuickFilterOp === 'D-7') return diff >= 0 && diff <= 7;
         if (activeQuickFilterOp === 'D-30') return diff >= 0 && diff <= 30;
+        if (activeQuickFilterOp === 'SEM') {
+            const inicioSemana = new Date(hj);
+            inicioSemana.setDate(hj.getDate() - hj.getDay());
+            return (parsed >= inicioSemana && parsed <= hj);
+        }
+        if (activeQuickFilterOp === 'MES') {
+            return (parsed.getMonth() === hj.getMonth() && parsed.getFullYear() === hj.getFullYear());
+        }
         return false;
     });
 
@@ -195,6 +203,14 @@ function atualizarPainelOperacional() {
         if (activeQuickFilterOp === 'D-2') return diff === 2;
         if (activeQuickFilterOp === 'D-7') return diff >= 0 && diff <= 7;
         if (activeQuickFilterOp === 'D-30') return diff >= 0 && diff <= 30;
+        if (activeQuickFilterOp === 'SEM') {
+            const inicioSemana = new Date(hj);
+            inicioSemana.setDate(hj.getDate() - hj.getDay());
+            return (parsed >= inicioSemana && parsed <= hj);
+        }
+        if (activeQuickFilterOp === 'MES') {
+            return (parsed.getMonth() === hj.getMonth() && parsed.getFullYear() === hj.getFullYear());
+        }
         return false;
     });
 
@@ -208,6 +224,8 @@ function atualizarPainelOperacional() {
         diasConsiderados = dts.size || 1;
     } else if (activeQuickFilterOp === 'D-7') diasConsiderados = 7;
     else if (activeQuickFilterOp === 'D-30') diasConsiderados = 30;
+    else if (activeQuickFilterOp === 'SEM') diasConsiderados = new Date().getDay() + 1; 
+    else if (activeQuickFilterOp === 'MES') diasConsiderados = new Date().getDate(); 
 
     const placasUnicasSerrana = new Set(filteredSerrana.map(d => d.placa).filter(p => p && p !== '-' && p.trim() !== '')).size || 0;
     const placasUnicasGlobal = new Set(filteredGlobal.map(d => d.placa).filter(p => p && p !== '-' && p.trim() !== '')).size || 0;

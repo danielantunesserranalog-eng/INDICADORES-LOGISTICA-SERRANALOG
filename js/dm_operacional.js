@@ -98,16 +98,33 @@ window.renderizarGraficoDMOperacional = async function(filtroPeriodo = '30') {
     const divGrafico = document.getElementById('graficoDmOperacional');
     if (!divGrafico || divGrafico.offsetWidth === 0) return;
 
+    // Detecta o filtro ativo na interface
+    let activeQF = document.querySelector('#quickFiltersGroup .btn-qf.active')?.getAttribute('data-qf') || 'ALL';
+    if (filtroPeriodo === 'mes_atual' || filtroPeriodo === 'MES') activeQF = 'MES';
+    if (filtroPeriodo === 'SEM') activeQF = 'SEM';
+
     const hoje = new Date();
     let dataStrCorte = '';
 
-    if (filtroPeriodo === 'mes_atual') {
+    if (activeQF === 'MES') {
         const y = hoje.getFullYear();
         const m = String(hoje.getMonth() + 1).padStart(2, '0');
         dataStrCorte = `${y}-${m}-01`;
+    } else if (activeQF === 'SEM') {
+        const dataDomingo = new Date(hoje);
+        dataDomingo.setDate(hoje.getDate() - hoje.getDay()); // Volta para o domingo da semana atual
+        const y = dataDomingo.getFullYear();
+        const m = String(dataDomingo.getMonth() + 1).padStart(2, '0');
+        const d = String(dataDomingo.getDate()).padStart(2, '0');
+        dataStrCorte = `${y}-${m}-${d}`;
     } else {
-        const dias = parseInt(filtroPeriodo) || 30;
-        const dataPassada = new Date(hoje.getTime() - (dias * 24 * 60 * 60 * 1000));
+        let dias = 30;
+        if (activeQF === 'D-7') dias = 7;
+        else if (activeQF === 'D-2') dias = 2;
+        else if (activeQF === 'D-1') dias = 1;
+        
+        const dataPassada = new Date(hoje);
+        dataPassada.setDate(hoje.getDate() - dias);
         const y = dataPassada.getFullYear();
         const m = String(dataPassada.getMonth() + 1).padStart(2, '0');
         const d = String(dataPassada.getDate()).padStart(2, '0');
@@ -186,7 +203,6 @@ window.renderizarGraficoDMOperacional = async function(filtroPeriodo = '30') {
                 smooth: true,
                 symbol: 'circle',
                 symbolSize: 8,
-                // ---> AQUI ESTÁ A CORREÇÃO VISUAL PARA MOSTRAR A FRAÇÃO
                 label: { 
                     show: true, 
                     position: 'top', 
@@ -262,19 +278,29 @@ window.renderizarGraficoEvolucaoDM = async function(filtroValue = '30') {
         const msPorDia = 24 * 60 * 60 * 1000;
         const totalMsDisponivelPorDia = frotasManutencao.length * msPorDia;
         
+        // Detecta o filtro ativo na interface
+        let activeQF = document.querySelector('#quickFiltersGroup .btn-qf.active')?.getAttribute('data-qf') || 'ALL';
+        if (filtroValue === 'mes_atual' || filtroValue === 'MES') activeQF = 'MES';
+        if (filtroValue === 'SEM') activeQF = 'SEM';
+
         let diasARenderizar = 30;
 
-        if (filtroValue === 'mes_atual') {
-            const primeiroDiaMes = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0);
-            const diffMs = agora.getTime() - primeiroDiaMes.getTime();
-            diasARenderizar = Math.ceil(diffMs / msPorDia); 
-            if(diasARenderizar < 1) diasARenderizar = 1;
+        if (activeQF === 'MES') {
+            diasARenderizar = agora.getDate(); // Dia 1 até o dia atual
+        } else if (activeQF === 'SEM') {
+            diasARenderizar = agora.getDay() + 1; // Domingo até o dia atual
         } else {
-            diasARenderizar = parseInt(filtroValue) || 30;
+            if (activeQF === 'D-7') diasARenderizar = 7;
+            else if (activeQF === 'D-2') diasARenderizar = 2;
+            else if (activeQF === 'D-1') diasARenderizar = 1;
+            else diasARenderizar = 30;
         }
 
+        // Monta o gráfico dia a dia, subtraindo os dias reais
         for (let i = diasARenderizar - 1; i >= 0; i--) {
-            const dataDia = new Date(agora.getTime() - (i * msPorDia));
+            const dataDia = new Date(agora);
+            dataDia.setDate(agora.getDate() - i);
+            
             const inicioDia = new Date(dataDia.getFullYear(), dataDia.getMonth(), dataDia.getDate(), 0, 0, 0);
             const fimDia = new Date(dataDia.getFullYear(), dataDia.getMonth(), dataDia.getDate(), 23, 59, 59, 999);
             

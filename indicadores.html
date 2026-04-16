@@ -52,6 +52,8 @@
                         <button data-qf="D-2" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all">D-2</button>
                         <button data-qf="D-7" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all">D-7</button>
                         <button data-qf="D-30" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all">D-30</button>
+                        <button data-qf="SEM" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all">SEM.</button>
+                        <button data-qf="MES" class="btn-qf border border-transparent text-[10px] font-bold text-slate-400 hover:text-sky-300 hover:bg-slate-700/50 px-2 py-1.5 rounded transition-all">MÊS</button>
                         <div class="w-px h-4 bg-slate-700 mx-1"></div>
                         <button data-qf="ALL" class="btn-qf active bg-sky-900/50 text-sky-400 border border-sky-800/50 text-[10px] font-bold px-2 py-1.5 rounded transition-all shadow-[0_0_10px_rgba(14,165,233,0.2)]"><i class="fas fa-times"></i></button>
                     </div>
@@ -243,6 +245,8 @@
         <button data-op-qf="D-2" class="btn-op-qf"></button>
         <button data-op-qf="D-7" class="btn-op-qf"></button>
         <button data-op-qf="D-30" class="btn-op-qf"></button>
+        <button data-op-qf="SEM" class="btn-op-qf"></button>
+        <button data-op-qf="MES" class="btn-op-qf"></button>
         <button data-op-qf="ALL" class="btn-op-qf"></button>
         <span id="opStatusFetch"></span>
         <canvas id="evolucaoManutencaoChart"></canvas>
@@ -251,6 +255,8 @@
         <button data-qf="D-2" class="btn-qf-jor"></button>
         <button data-qf="D-7" class="btn-qf-jor"></button>
         <button data-qf="D-30" class="btn-qf-jor"></button>
+        <button data-qf="SEM" class="btn-qf-jor"></button>
+        <button data-qf="MES" class="btn-qf-jor"></button>
         <button data-qf="ALL" class="btn-qf-jor"></button>
         <span id="jorFilterStatus"></span>
         <select id="exportStatusFilter"></select>
@@ -303,8 +309,8 @@
                         let dmValue = '30';
                         if(val === 'D-1') dmValue = '1';
                         if(val === 'D-2') dmValue = '2';
-                        if(val === 'D-7') dmValue = '7';
-                        if(val === 'D-30' || val === 'ALL') dmValue = '30';
+                        if(val === 'D-7' || val === 'SEM') dmValue = '7';
+                        if(val === 'D-30' || val === 'ALL' || val === 'MES') dmValue = '30';
                         const selectDM = document.getElementById('filtroPeriodoDM');
                         if (selectDM) selectDM.value = dmValue;
                         if (window.renderizarGraficoDMOperacional) window.renderizarGraficoDMOperacional(dmValue);

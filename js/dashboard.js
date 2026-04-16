@@ -188,10 +188,19 @@ function loadDashboardData() {
             if (parsed) {
                 parsed.setHours(0,0,0,0); const hj = new Date(); hj.setHours(0,0,0,0);
                 const diff = Math.round((hj - parsed)/86400000);
+                
                 if (activeQuickFilter === 'D-1') mData = (diff === 1);
                 else if (activeQuickFilter === 'D-2') mData = (diff === 2);
                 else if (activeQuickFilter === 'D-7') mData = (diff >= 0 && diff <= 7);
                 else if (activeQuickFilter === 'D-30') mData = (diff >= 0 && diff <= 30);
+                else if (activeQuickFilter === 'SEM') {
+                    const inicioSemana = new Date(hj);
+                    inicioSemana.setDate(hj.getDate() - hj.getDay());
+                    mData = (parsed >= inicioSemana && parsed <= hj);
+                }
+                else if (activeQuickFilter === 'MES') {
+                    mData = (parsed.getMonth() === hj.getMonth() && parsed.getFullYear() === hj.getFullYear());
+                }
             } else mData = false;
         } else mData = activeD === 'ALL' || d.dataDaBaseExcel === activeD;
         return mTransp && mData;
