@@ -251,6 +251,10 @@ function parseSheetToData(sheet) {
     const dtInicioDescarFabKey = findKey(['dt início descar fáb', 'dt inicio descar fab', 'data fim']);
     const hrInicioDescarFabKey = findKey(['hr início descar fáb', 'hr inicio descar fab', 'hora fim']);
     
+    // ADICIONADO: Chaves para Fim de Descarga
+    const dtFimDescarFabKey = findKey(['dt fim descar fáb', 'dt fim descar fab', 'data fim descar fab']);
+    const hrFimDescarFabKey = findKey(['hr fim descar fáb', 'hr fim descar fab', 'hora fim descar fab']);
+    
     const dtSaidaBaseKey = findKey(['data de saída', 'data saída', 'data saída fábrica']);
     const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saída', 'hora saida']);
     
@@ -272,13 +276,22 @@ function parseSheetToData(sheet) {
         const rawDtSaida = getValue(dtSaidaBaseKey);
         const rawHrSaida = getValue(hrSaidaFabKey);
         
+        // Busca os dados do Fim da Descarga
+        const rawDtFimDescar = getValue(dtFimDescarFabKey);
+        const rawHrFimDescar = getValue(hrFimDescarFabKey);
+        
         let strDataBase = 'Desconhecida';
         let timestampSaida = 0;
 
-        if (rawDtSaida) {
-            const parsed = parseDateTime(rawDtSaida, rawHrSaida);
+        // Prioriza a Dt Fim Descar Fáb. Se a coluna estiver vazia, usa a Data de Saída como backup.
+        const dtReferencia = rawDtFimDescar || rawDtSaida;
+        const hrReferencia = rawHrFimDescar || rawHrSaida;
+
+        if (dtReferencia) {
+            const parsed = parseDateTime(dtReferencia, hrReferencia);
             if (parsed) {
                 strDataBase = parsed.toLocaleDateString('pt-PT');
+                // O timestamp será usado para calcular os ciclos entre o fim de uma viagem e outra
                 timestampSaida = parsed.getTime();
             }
         }
