@@ -165,32 +165,41 @@ function formatarHorasMinutos(horasDecimais) {
 }
 
 function parseDateTime(dateVal, timeVal) {
-    if (!dateVal) return null;
     let baseDate = null;
-    if (typeof dateVal === 'number') {
-        const dateInfo = XLSX.SSF.parse_date_code(dateVal);
-        if (dateInfo) baseDate = new Date(dateInfo.y, dateInfo.m - 1, dateInfo.d);
-    } else if (typeof dateVal === 'string') {
-        const str = dateVal.trim();
-        if (str.includes('/')) {
-            const parts = str.split(' ')[0].split('/');
-            if (parts.length >= 3) {
-                let year = parseInt(parts[2], 10);
-                if (year < 100) year += 2000;
-                baseDate = new Date(year, parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
-            }
-        } else if (str.includes('-')) {
-            const parts = str.split(' ')[0].split('-');
-            if (parts.length >= 3) {
-                let year = parseInt(parts[0], 10) > 1000 ? parseInt(parts[0], 10) : parseInt(parts[2], 10);
-                let month = parseInt(parts[1], 10) - 1;
-                let day = parseInt(parts[0], 10) > 1000 ? parseInt(parts[2], 10) : parseInt(parts[0], 10);
-                if (year < 100) year += 2000;
-                baseDate = new Date(year, month, day);
-            }
-        } else { baseDate = new Date(str); }
+    if (dateVal) {
+        if (typeof dateVal === 'number') {
+            const dateInfo = XLSX.SSF.parse_date_code(dateVal);
+            if (dateInfo) baseDate = new Date(dateInfo.y, dateInfo.m - 1, dateInfo.d);
+        } else if (typeof dateVal === 'string') {
+            const str = dateVal.trim();
+            if (str.includes('/')) {
+                const parts = str.split(' ')[0].split('/');
+                if (parts.length >= 3) {
+                    let year = parseInt(parts[2], 10);
+                    if (year < 100) year += 2000;
+                    baseDate = new Date(year, parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+                }
+            } else if (str.includes('-')) {
+                const parts = str.split(' ')[0].split('-');
+                if (parts.length >= 3) {
+                    let year = parseInt(parts[0], 10) > 1000 ? parseInt(parts[0], 10) : parseInt(parts[2], 10);
+                    let month = parseInt(parts[1], 10) - 1;
+                    let day = parseInt(parts[0], 10) > 1000 ? parseInt(parts[2], 10) : parseInt(parts[0], 10);
+                    if (year < 100) year += 2000;
+                    baseDate = new Date(year, month, day);
+                }
+            } else { baseDate = new Date(str); }
+        }
     }
-    if (!baseDate || isNaN(baseDate.getTime())) return null;
+    
+    // CORREÇÃO: Se não existir data, cria uma data base arbitrária apenas para as horas funcionarem
+    if (!baseDate || isNaN(baseDate.getTime())) {
+        if (timeVal !== undefined && timeVal !== null && String(timeVal).trim() !== "") {
+            baseDate = new Date(2000, 0, 1);
+        } else {
+            return null;
+        }
+    }
 
     let hours = 0, minutes = 0, seconds = 0;
     if (typeof timeVal === 'number') {
@@ -266,11 +275,19 @@ function parseSheetToData(sheet) {
     const distAsfaltoKey = findKey(['distancia por asfalto', 'distância por asfalto', 'distancia asfalto']);
     const distTerraKey = findKey(['distancia por terra', 'distância por terra', 'distancia terra']);
     
+    // Mapeamento da Chegada (Início da Fila Campo)
     const dtChegadaCampoKey = findKey(['data chegada campo']);
-    const dtInicioCarregCpoKey = findKey(['dt início carreg cpo', 'dt inicio carreg cpo']);
     const hrChegadaCampoKey = findKey(['hora chegada campo', 'hr chegada campo']);
+    
+    // Mapeamento da Saída (Fim da Fila Campo)
+    const dtSaidaCampoKey = findKey(['data saída campo', 'dt saida campo', 'data saida campo']);
+    const hrSaidaCampoKey = findKey(['hora saída campo', 'hr saida campo', 'hora saida campo']);
+
+    // Mapeamento do Início do Carregamento
+    const dtInicioCarregCpoKey = findKey(['dt início carreg cpo', 'dt inicio carreg cpo']);
     const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo']);
 
+    // Mapeamento do Final do Carregamento
     const dtFinalCarregCpoKey = findKey(['dt final carreg cpo', 'data final carreg cpo', 'data fim carreg cpo']);
     const hrFinalCarregCpoKey = findKey(['hr final carreg cpo', 'hora final carreg cpo', 'hr fim carreg cpo', 'hora fim carreg cpo']);
 
@@ -346,8 +363,12 @@ function parseSheetToData(sheet) {
             distanciaTerra: parsePtBrNumber(getValue(distTerraKey)),
             cicloHoras: ciclo,
             
-            filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), false),
+            // LÓGICA ATUALIZADA - Fila Campo = (Hora Saída Campo - Hora Chegada Campo)
+            filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtSaidaCampoKey) || getValue(dtChegadaCampoKey), getValue(hrSaidaCampoKey), false),
+            
+            // LÓGICA ATUALIZADA - Tempo Carregamento = (Hr Final Carreg Cpo - Hr Início Carreg Cpo)
             tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
+            
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
             
             carregadorFlorestal: getValue(carregadorKey) ? String(getValue(carregadorKey)).trim() : null,
