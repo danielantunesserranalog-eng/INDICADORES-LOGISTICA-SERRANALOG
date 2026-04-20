@@ -1,4 +1,6 @@
 // SerranaLog Analytics - Central Engine
+console.log("🟢 APP.JS ATUALIZADO - VERSÃO 3 (Cálculo Fila Campo Corrigido)");
+
 Chart.register(ChartDataLabels);
 Chart.defaults.color = '#94a3b8';
 Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
@@ -192,7 +194,6 @@ function parseDateTime(dateVal, timeVal) {
         }
     }
     
-    // CORREÇÃO: Se não existir data, cria uma data base arbitrária apenas para as horas funcionarem
     if (!baseDate || isNaN(baseDate.getTime())) {
         if (timeVal !== undefined && timeVal !== null && String(timeVal).trim() !== "") {
             baseDate = new Date(2000, 0, 1);
@@ -219,6 +220,11 @@ function parseDateTime(dateVal, timeVal) {
 }
 
 function calcHoursDiff(dtStart, hrStart, dtEnd, hrEnd, isCiclo = false) {
+    // CORREÇÕES MAIS RÍGIDAS: Aborta se for nulo, em branco, hífen ou número zero da planilha
+    if (hrStart === null || hrStart === undefined || String(hrStart).trim() === "" || hrStart === "-") return null;
+    if (hrEnd === null || hrEnd === undefined || String(hrEnd).trim() === "" || hrEnd === "-") return null;
+    if (hrStart === 0 && hrEnd === 0) return null;
+
     let start = parseDateTime(dtStart, hrStart);
     let end = parseDateTime(dtEnd || dtStart, hrEnd); 
     
@@ -233,7 +239,7 @@ function calcHoursDiff(dtStart, hrStart, dtEnd, hrEnd, isCiclo = false) {
             diffHours = (end - start) / (1000 * 3600);
         }
 
-        if (diffHours >= 0 && diffHours <= 240) return diffHours;
+        if (diffHours > 0 && diffHours <= 240) return diffHours;
     }
     return null;
 }
@@ -257,10 +263,16 @@ function parseSheetToData(sheet) {
     const keys = Object.keys(rawData[0]);
     const normKeys = keys.map(k => ({ orig: k, norm: normalizeStr(k) }));
 
+    // BUSCA DE COLUNAS APRIMORADA: Tenta achar o nome exato primeiro, para não pegar colunas erradas
     function findKey(possibilities) {
         for (let p of possibilities) {
             const normP = normalizeStr(p);
-            let found = normKeys.find(k => k.norm === normP || k.norm.includes(normP));
+            let found = normKeys.find(k => k.norm === normP);
+            if (found) return found.orig;
+        }
+        for (let p of possibilities) {
+            const normP = normalizeStr(p);
+            let found = normKeys.find(k => k.norm.includes(normP));
             if (found) return found.orig;
         }
         return null;
@@ -269,33 +281,28 @@ function parseSheetToData(sheet) {
     const movimentoKey = findKey(['movimento', 'id_movimento']);
     const transpKey = findKey(['transportadora', 'nome da transportadora']);
     const placaKey = findKey(['placa do cavalo', 'placa cavalo', 'placa']);
-    const pesoLiqKey = findKey(['Peso na Entrada', 'Peso na Entrada']);
-    const volumeKey = findKey(['volume real', 'volume_real']);
+    const pesoLiqKey = findKey(['peso na entrada', 'peso entrada', 'peso liquido']);
+    const volumeKey = findKey(['volume real', 'volume_real', 'volume']);
     
     const distAsfaltoKey = findKey(['distancia por asfalto', 'distância por asfalto', 'distancia asfalto']);
     const distTerraKey = findKey(['distancia por terra', 'distância por terra', 'distancia terra']);
     
-    // Mapeamento da Chegada (Início da Fila Campo)
-    const dtChegadaCampoKey = findKey(['data chegada campo']);
-    const hrChegadaCampoKey = findKey(['hora chegada campo', 'hr chegada campo']);
-    
-    // Mapeamento da Saída (Fim da Fila Campo)
+    // Mapeamento EXATO da Fila Campo
+    const dtChegadaCampoKey = findKey(['data chegada campo', 'dt chegada campo']);
+    const hrChegadaCampoKey = findKey(['hora chegada campo', 'hr chegada campo', 'chegada campo']);
     const dtSaidaCampoKey = findKey(['data saída campo', 'dt saida campo', 'data saida campo']);
-    const hrSaidaCampoKey = findKey(['hora saída campo', 'hr saida campo', 'hora saida campo']);
+    const hrSaidaCampoKey = findKey(['hora saída campo', 'hr saida campo', 'hora saida campo', 'saida campo']);
 
-    // Mapeamento do Início do Carregamento
-    const dtInicioCarregCpoKey = findKey(['dt início carreg cpo', 'dt inicio carreg cpo']);
-    const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo']);
-
-    // Mapeamento do Final do Carregamento
+    // Mapeamento EXATO do Carregamento
+    const dtInicioCarregCpoKey = findKey(['dt início carreg cpo', 'dt inicio carreg cpo', 'data inicio carreg']);
+    const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo', 'hora inicio carreg']);
     const dtFinalCarregCpoKey = findKey(['dt final carreg cpo', 'data final carreg cpo', 'data fim carreg cpo']);
-    const hrFinalCarregCpoKey = findKey(['hr final carreg cpo', 'hora final carreg cpo', 'hr fim carreg cpo', 'hora fim carreg cpo']);
+    const hrFinalCarregCpoKey = findKey(['hr final carreg cpo', 'hora final carreg cpo', 'hr fim carreg cpo', 'hora fim carreg']);
 
     const dtEntradaKey = findKey(['data de entrada', 'data entrada', 'data chegada']);
     const hrEntradaKey = findKey(['hora de entrada', 'hora entrada', 'hr entrada']);
     const dtInicioDescarFabKey = findKey(['dt início descar fáb', 'dt inicio descar fab', 'data fim']);
     const hrInicioDescarFabKey = findKey(['hr início descar fáb', 'hr inicio descar fab', 'hora fim']);
-    
     const dtFimDescarFabKey = findKey(['dt fim descar fáb', 'dt fim descar fab', 'data fim descar fab']);
     const hrFimDescarFabKey = findKey(['hr fim descar fáb', 'hr fim descar fab', 'hora fim descar fab']);
     
@@ -303,9 +310,13 @@ function parseSheetToData(sheet) {
     const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saída', 'hora saida']);
     
     const cicloProntoKey = findKey(['ciclo', 'tempo de ciclo', 'ciclo horas', 'horas ciclo', 'tempo ciclo']);
-
     const carregadorKey = findKey(['carregador florestal', 'carregador_florestal', 'carregador']);
     const turnoKey = findKey(['turno']);
+
+    console.log("=== COLUNAS ENCONTRADAS PARA TEMPO EM CAMPO ===");
+    console.log("Hora Chegada Campo:", hrChegadaCampoKey || "NÃO ENCONTRADA");
+    console.log("Hora Saída Campo:", hrSaidaCampoKey || "NÃO ENCONTRADA");
+    console.log("===============================================");
 
     const today = new Date().toLocaleDateString('pt-PT');
 
@@ -318,13 +329,11 @@ function parseSheetToData(sheet) {
 
         const rawDtSaida = getValue(dtSaidaBaseKey);
         const rawHrSaida = getValue(hrSaidaFabKey);
-        
         const rawDtFimDescar = getValue(dtFimDescarFabKey);
         const rawHrFimDescar = getValue(hrFimDescarFabKey);
         
         let strDataBase = 'Desconhecida';
         let timestampSaida = 0;
-
         const dtReferencia = rawDtFimDescar || rawDtSaida;
         const hrReferencia = rawHrFimDescar || rawHrSaida;
 
@@ -363,12 +372,8 @@ function parseSheetToData(sheet) {
             distanciaTerra: parsePtBrNumber(getValue(distTerraKey)),
             cicloHoras: ciclo,
             
-            // LÓGICA ATUALIZADA - Fila Campo = (Hora Saída Campo - Hora Chegada Campo)
             filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtSaidaCampoKey) || getValue(dtChegadaCampoKey), getValue(hrSaidaCampoKey), false),
-            
-            // LÓGICA ATUALIZADA - Tempo Carregamento = (Hr Final Carreg Cpo - Hr Início Carreg Cpo)
             tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
-            
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
             
             carregadorFlorestal: getValue(carregadorKey) ? String(getValue(carregadorKey)).trim() : null,
@@ -405,7 +410,6 @@ function parseSheetToData(sheet) {
     });
 
     mappedData.forEach(d => delete d._timestamp);
-
     return mappedData.filter(item => item.pesoLiquido > 0 || item.volumeReal > 0);
 }
 
@@ -436,7 +440,6 @@ async function processAndSaveFile(file) {
                                 `${datasEncontradas[0]} a ${datasEncontradas[datasEncontradas.length - 1]}`;
         }
 
-        // ATUALIZADO: Buscar ids de movimento paginando (Evita duplicações que o limite geraria)
         let existingIds = [];
         let idFrom = 0;
         let fetchIds = true;
@@ -452,7 +455,6 @@ async function processAndSaveFile(file) {
         }
         
         const existingSet = new Set(existingIds.map(e => e.movimento));
-        
         let viagensNovas = 0;
         newRows.forEach(item => { if(!existingSet.has(item.movimento)) viagensNovas++; });
 
@@ -631,7 +633,6 @@ const centerTextPlugin = {
     }
 };
 
-// ATUALIZADO: Puxando via Helper Paginado
 async function loadDashboardData() {
     if(fullHistoricoData.length === 0) {
         const data = await fetchAllHistoricoViagens();
@@ -823,7 +824,6 @@ async function carregarHistoricoImportacoes() {
     }
 }
 
-// ATUALIZADO: Puxando via Helper Paginado
 async function loadHistoricoCompleto() {
     const data = await fetchAllHistoricoViagens();
     if(data && data.length > 0) { 
