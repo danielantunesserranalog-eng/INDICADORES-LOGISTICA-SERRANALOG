@@ -3,7 +3,6 @@
 // ==========================================
 
 // 1. CRIAR CONEXÃO EXCLUSIVA COM O BANCO DE MANUTENÇÃO (CCOL)
-// A checagem "if (!window.supabaseManutencao)" impede o erro de dupla declaração
 if (typeof window.supabaseManutencao === 'undefined') {
     window.supabaseManutencao = window.supabase.createClient(
         'https://ihgiyxzxdldqmrkziijl.supabase.co',
@@ -17,32 +16,46 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initPainelIndicadores() {
-    // Mostra indicadores de carregamento temporários nos cards superiores
     const elAvgDM = document.getElementById('avgDM');
     if (elAvgDM) elAvgDM.innerHTML = '<i class="fas fa-spinner fa-spin text-slate-500"></i>';
 
     try {
-        // 2. Busca as Ordens de Serviço DIRETAMENTE DO BANCO DO CCOL
-        const { data: ordens, error: errOrdens } = await window.supabaseManutencao
-            .from('ordens_servico')
-            .select('*');
-            
-        if (errOrdens) throw errOrdens;
+        // ATUALIZADO: Busca TODAS as Ordens de Serviço paginando (Imune ao limite de 1000)
+        let ordensPaginadas = [];
+        let from = 0;
+        let step = 1000;
+        let fetchMore = true;
 
-        // 3. Busca a frota DIRETAMENTE DO BANCO DO CCOL
+        while (fetchMore) {
+            const { data, error } = await window.supabaseManutencao
+                .from('ordens_servico')
+                .select('*')
+                .range(from, from + step - 1);
+            
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                ordensPaginadas = ordensPaginadas.concat(data);
+                from += step;
+            }
+            
+            if (!data || data.length < step) {
+                fetchMore = false;
+            }
+        }
+
+        // Busca a frota DIRETAMENTE DO BANCO DO CCOL
         const { data: frotas, error: errFrotas } = await window.supabaseManutencao
             .from('frotas_manutencao')
             .select('cavalo');
             
         if (errFrotas) throw errFrotas;
 
-        // 4. Joga os dados para as variáveis globais
         window.frotasManutencao = frotas || [];
-        window.ordensServico = ordens || [];
+        window.ordensServico = ordensPaginadas || [];
 
         console.log(`Sucesso: ${window.frotasManutencao.length} cavalos e ${window.ordensServico.length} OS carregadas do Banco CCOL.`);
 
-        // 5. Agora que os dados existem, disparamos a renderização dos gráficos!
         if (typeof window.renderizarGraficoEvolucaoDM === 'function') {
             window.renderizarGraficoEvolucaoDM();
         }
@@ -179,7 +192,6 @@ window.renderizarGraficoEvolucaoDM = function(dataFiltro) {
 
     if (typeof echarts === 'undefined') return;
 
-    // RENDER GRÁFICO 1: LINHA (EVOLUÇÃO DM)
     const chartDomLinha = document.getElementById('graficoEvolucaoDM');
     if (chartDomLinha) {
         let myChartLinha = echarts.getInstanceByDom(chartDomLinha) || echarts.init(chartDomLinha);
@@ -219,7 +231,6 @@ window.renderizarGraficoEvolucaoDM = function(dataFiltro) {
         window.addEventListener('resize', () => myChartLinha.resize());
     }
 
-    // RENDER GRÁFICO 2: BARRAS (STATUS DA FROTA)
     const chartDomBarras = document.getElementById('graficoStatusFrotaHorario');
     if (chartDomBarras) {
         let myChartBarras = echarts.getInstanceByDom(chartDomBarras) || echarts.init(chartDomBarras);

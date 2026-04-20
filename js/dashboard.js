@@ -129,10 +129,36 @@ const centerTextPlugin = {
     }
 };
 
+// ATUALIZADO: Buscar todos os dados paginando para evitar limite de 1000
 async function loadDashboardDataInit() {
-    const { data } = await supabaseClient.from('historico_viagens').select('*');
-    if(data) {
-        fullHistoricoData = data;
+    let allData = [];
+    let from = 0;
+    const step = 1000;
+    let fetchMore = true;
+
+    while (fetchMore) {
+        const { data, error } = await supabaseClient
+            .from('historico_viagens')
+            .select('*')
+            .range(from, from + step - 1);
+        
+        if (error) {
+            console.error(error);
+            break;
+        }
+        
+        if (data && data.length > 0) {
+            allData = allData.concat(data);
+            from += step;
+        }
+        
+        if (!data || data.length < step) {
+            fetchMore = false;
+        }
+    }
+
+    if(allData.length > 0) {
+        fullHistoricoData = allData;
         loadDashboardData();
     }
 }
@@ -248,12 +274,10 @@ function loadDashboardData() {
     const validFilaFabrica = filteredData.filter(d => d.filaFabricaHoras !== null && d.filaFabricaHoras > 0);
     const mediaFilaFabrica = validFilaFabrica.length > 0 ? validFilaFabrica.reduce((s, d) => s + d.filaFabricaHoras, 0) / validFilaFabrica.length : 0;
 
-    // --- PRODUTIVIDADE GLOBAL EM m³/h ---
     const produtividadeGlobalM3 = somaCiclosTotais > 0 ? (totalVolumeReal / somaCiclosTotais) : 0;
 
     if(document.getElementById('totalViagens')) document.getElementById('totalViagens').innerText = totalViagens.toLocaleString('pt-PT');
     
-    // --- LÓGICA DO INDICADOR PBTC ---
     let pbtcCor = "text-white";
     let pbtcIcone = "";
     
@@ -272,14 +296,12 @@ function loadDashboardData() {
 
     if(document.getElementById('totalPesoLiq')) document.getElementById('totalPesoLiq').innerHTML = `<span class="${pbtcCor}">${mediaPBTC.toLocaleString('pt-PT', {maximumFractionDigits: 1})} t</span>${pbtcIcone}`;
     
-    // --- RESTANTE DOS INDICADORES COM CHECAGEM ---
     if(document.getElementById('mediaVolumeViagem')) document.getElementById('mediaVolumeViagem').innerText = mediaVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
     if(document.getElementById('totalVolumeReal')) document.getElementById('totalVolumeReal').innerText = totalVolumeReal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
     if(document.getElementById('mediaDistancia')) document.getElementById('mediaDistancia').innerText = mediaDistTotal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " km";
     if(document.getElementById('mediaAsfalto')) document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
     if(document.getElementById('mediaTerra')) document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
     
-    // AS LINHAS QUE CAUSAVAM O ERRO FORAM PROTEGIDAS
     if(document.getElementById('cicloMedio')) document.getElementById('cicloMedio').innerText = formatarHorasMinutos(mediaCiclo);
     if(document.getElementById('filaCampo')) document.getElementById('filaCampo').innerText = formatarHorasMinutos(mediaFilaCampo);
     if(document.getElementById('tempoCarregamento')) document.getElementById('tempoCarregamento').innerText = formatarHorasMinutos(mediaTempoCarregamento);
@@ -291,7 +313,6 @@ function loadDashboardData() {
     const taxaOciosidade = somaCiclosTotais > 0 ? (somaFilas / somaCiclosTotais) * 100 : 0;
     if(document.getElementById('ociosidadeGlobal')) document.getElementById('ociosidadeGlobal').innerText = taxaOciosidade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + '%';
 
-    // --- CÁLCULO DE CAVALO DESTAQUE EM m³/h ---
     const mapaPlacas = new Map();
     validCycles.forEach(d => {
         const placaFormatada = (d.placa && d.placa.trim() !== '-' && d.placa.trim() !== '') ? d.placa.trim().toUpperCase() : 'DESCONHECIDA';
@@ -314,7 +335,6 @@ function loadDashboardData() {
     if(document.getElementById('bestPlacaValue')) document.getElementById('bestPlacaValue').innerText = melhorPlacaProdutividade > 0 ? melhorPlacaProdutividade.toLocaleString('pt-PT', {maximumFractionDigits: 1}) : "0.0";
     if(document.getElementById('bestPlacaName')) document.getElementById('bestPlacaName').innerText = `Placa: ${melhorPlacaNome}`;
 
-    // --- RENDERIZAR COMPARATIVO SERRANALOG VS TERCEIROS ---
     const tbodyComp = document.getElementById('comparativoBody');
     if (tbodyComp) {
         const dataSerrana = filteredData.filter(d => String(d.transportadora||'').toUpperCase().includes('SERRANALOG'));
@@ -364,7 +384,6 @@ function loadDashboardData() {
         `;
     }
 
-    // --- GRÁFICOS INFERIORES ---
     const transpCount = new Map();
     const transpCicloSum = new Map();
     const transpCicloCount = new Map();

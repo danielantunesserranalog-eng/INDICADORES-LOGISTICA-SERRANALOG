@@ -28,6 +28,36 @@ let activeQuickFilter = 'ALL';
 
 let fullHistoricoData = []; 
 
+// ATUALIZADO: Helper Centralizado para buscar histórico paginado
+async function fetchAllHistoricoViagens() {
+    let allData = [];
+    let from = 0;
+    const step = 1000;
+    let fetchMore = true;
+
+    while (fetchMore) {
+        const { data, error } = await supabaseClient
+            .from('historico_viagens')
+            .select('*')
+            .range(from, from + step - 1);
+        
+        if (error) {
+            console.error("Erro ao buscar histórico:", error);
+            break;
+        }
+        
+        if (data && data.length > 0) {
+            allData = allData.concat(data);
+            from += step;
+        }
+        
+        if (!data || data.length < step) {
+            fetchMore = false;
+        }
+    }
+    return allData;
+}
+
 // NAVEGAÇÃO
 function switchView(view) {
     viewDashboard.classList.add('hidden');
@@ -204,7 +234,6 @@ function normalizeStr(str) {
     return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
-// FORMATADOR DE TEMPO PARA JORNADAS (Recebe "HH:MM")
 function parseTimeToHours(timeStr) {
     if(!timeStr || timeStr === '-' || String(timeStr).trim() === '') return 0;
     const parts = String(timeStr).split(':');
@@ -242,7 +271,6 @@ function parseSheetToData(sheet) {
     const hrChegadaCampoKey = findKey(['hora chegada campo', 'hr chegada campo']);
     const hrInicioCarregCpoKey = findKey(['hr início carreg cpo', 'hr inicio carreg cpo']);
 
-    // TEMPO DE CARREGAMENTO
     const dtFinalCarregCpoKey = findKey(['dt final carreg cpo', 'data final carreg cpo', 'data fim carreg cpo']);
     const hrFinalCarregCpoKey = findKey(['hr final carreg cpo', 'hora final carreg cpo', 'hr fim carreg cpo', 'hora fim carreg cpo']);
 
@@ -251,7 +279,6 @@ function parseSheetToData(sheet) {
     const dtInicioDescarFabKey = findKey(['dt início descar fáb', 'dt inicio descar fab', 'data fim']);
     const hrInicioDescarFabKey = findKey(['hr início descar fáb', 'hr inicio descar fab', 'hora fim']);
     
-    // ADICIONADO: Chaves para Fim de Descarga
     const dtFimDescarFabKey = findKey(['dt fim descar fáb', 'dt fim descar fab', 'data fim descar fab']);
     const hrFimDescarFabKey = findKey(['hr fim descar fáb', 'hr fim descar fab', 'hora fim descar fab']);
     
@@ -260,7 +287,6 @@ function parseSheetToData(sheet) {
     
     const cicloProntoKey = findKey(['ciclo', 'tempo de ciclo', 'ciclo horas', 'horas ciclo', 'tempo ciclo']);
 
-    // ADICIONADOS: CHAVES FALTANTES PARA GRUA E TURNO
     const carregadorKey = findKey(['carregador florestal', 'carregador_florestal', 'carregador']);
     const turnoKey = findKey(['turno']);
 
@@ -276,14 +302,12 @@ function parseSheetToData(sheet) {
         const rawDtSaida = getValue(dtSaidaBaseKey);
         const rawHrSaida = getValue(hrSaidaFabKey);
         
-        // Busca os dados do Fim da Descarga
         const rawDtFimDescar = getValue(dtFimDescarFabKey);
         const rawHrFimDescar = getValue(hrFimDescarFabKey);
         
         let strDataBase = 'Desconhecida';
         let timestampSaida = 0;
 
-        // Prioriza a Dt Fim Descar Fáb. Se a coluna estiver vazia, usa a Data de Saída como backup.
         const dtReferencia = rawDtFimDescar || rawDtSaida;
         const hrReferencia = rawHrFimDescar || rawHrSaida;
 
@@ -291,7 +315,6 @@ function parseSheetToData(sheet) {
             const parsed = parseDateTime(dtReferencia, hrReferencia);
             if (parsed) {
                 strDataBase = parsed.toLocaleDateString('pt-PT');
-                // O timestamp será usado para calcular os ciclos entre o fim de uma viagem e outra
                 timestampSaida = parsed.getTime();
             }
         }
@@ -327,7 +350,6 @@ function parseSheetToData(sheet) {
             tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
             
-            // ADICIONADOS: SALVANDO GRUA, TURNO E HORA SAÍDA PARA O CÁLCULO
             carregadorFlorestal: getValue(carregadorKey) ? String(getValue(carregadorKey)).trim() : null,
             turno: getValue(turnoKey) ? String(getValue(turnoKey)).trim() : null,
             horaSaidaFabrica: rawHrSaida ? String(rawHrSaida).trim() : null,
@@ -393,9 +415,22 @@ async function processAndSaveFile(file) {
                                 `${datasEncontradas[0]} a ${datasEncontradas[datasEncontradas.length - 1]}`;
         }
 
-        const { data: existingIds, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento');
-        if (selErr) throw selErr;
-        const existingSet = new Set(existingIds ? existingIds.map(e => e.movimento) : []);
+        // ATUALIZADO: Buscar ids de movimento paginando (Evita duplicações que o limite geraria)
+        let existingIds = [];
+        let idFrom = 0;
+        let fetchIds = true;
+        while(fetchIds) {
+            const { data: ids, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento').range(idFrom, idFrom + 999);
+            if (selErr) throw selErr;
+            if(ids && ids.length > 0) {
+                existingIds = existingIds.concat(ids);
+                idFrom += 1000;
+            } else {
+                fetchIds = false;
+            }
+        }
+        
+        const existingSet = new Set(existingIds.map(e => e.movimento));
         
         let viagensNovas = 0;
         newRows.forEach(item => { if(!existingSet.has(item.movimento)) viagensNovas++; });
@@ -575,10 +610,11 @@ const centerTextPlugin = {
     }
 };
 
+// ATUALIZADO: Puxando via Helper Paginado
 async function loadDashboardData() {
     if(fullHistoricoData.length === 0) {
-        const { data } = await supabaseClient.from('historico_viagens').select('*');
-        if(data) fullHistoricoData = data;
+        const data = await fetchAllHistoricoViagens();
+        if(data && data.length > 0) fullHistoricoData = data;
     }
     const storedData = fullHistoricoData;
     if(!storedData.length) return;
@@ -766,9 +802,13 @@ async function carregarHistoricoImportacoes() {
     }
 }
 
+// ATUALIZADO: Puxando via Helper Paginado
 async function loadHistoricoCompleto() {
-    const { data } = await supabaseClient.from('historico_viagens').select('*');
-    if(data) { fullHistoricoData = data; renderHistoricoTable(); }
+    const data = await fetchAllHistoricoViagens();
+    if(data && data.length > 0) { 
+        fullHistoricoData = data; 
+        renderHistoricoTable(); 
+    }
 }
 
 function renderHistoricoTable() {
