@@ -14,6 +14,20 @@ let debounceTimerJor;
 const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 
+// LISTA DE NOMES A SEREM IGNORADOS (NÃO SÃO MOTORISTAS)
+const MOTORISTAS_EXCLUIDOS = [
+    "KEVEN MELGACO DE JESUS",
+    "GIVANILDO DA CONCEIÇÃO URSULINO",
+    "DANILO TEIXEIRA SILVA",
+    "LEANDRO LAFAIETE ALMEIDA",
+    "LUIS CARLOS MENDES MUNIZ",
+    "VALDIR ALVES",
+    "JOSEMILDO SOARES DE SOUZA",
+    "JULIO CESAR ALMEIDA NUNES",
+    "DEYVISON DOS SANTOS CRUZ",
+    "KLEITON MELGAÇO DA SILVA"
+];
+
 document.addEventListener('DOMContentLoaded', () => {
     carregarDropdownMotoristas();
     loadHistoricoJornadasCompleto(true);
@@ -50,7 +64,12 @@ async function carregarDropdownMotoristas() {
             const select = document.getElementById('filterMotoristaDropdown');
             if (!select) return;
 
-            const motoristasUnicos = [...new Set(data.map(d => d.motorista))].filter(Boolean).sort();
+            // Filtra os que não são motoristas antes de preencher o dropdown
+            const motoristasUnicos = [...new Set(data.map(d => d.motorista))]
+                .filter(Boolean)
+                .filter(m => !MOTORISTAS_EXCLUIDOS.includes(m.toUpperCase()))
+                .sort();
+                
             select.innerHTML = '<option value="ALL">TODOS OS MOTORISTAS</option>';
             motoristasUnicos.forEach(m => {
                 select.insertAdjacentHTML('beforeend', `<option value="${m}">${m}</option>`);
@@ -97,8 +116,27 @@ async function loadHistoricoJornadasCompleto(reset = false) {
         
         if (data) { 
             if (data.length < itensPorPaginaJor) fimDosDadosJor = true;
-            // Inverte os dados com reverse()
-            fullHistoricoJornadas = [...fullHistoricoJornadas, ...data.reverse()];
+            
+            // REMOVE DUPLICATAS E NOMES IGNORADOS AO CARREGAR
+            const dadosLimpos = [];
+            data.reverse().forEach(item => {
+                const nome = (item.motorista || "").toUpperCase();
+                
+                // Ignora se for nome da lista de exclusão
+                if (MOTORISTAS_EXCLUIDOS.includes(nome)) return;
+                
+                // Checa se já existe para não exibir linha duplicada
+                const chave = `${item.motorista || ''}-${item.inicio || ''}-${item.fim || ''}`;
+                
+                const isDuplicate = fullHistoricoJornadas.some(d => `${d.motorista || ''}-${d.inicio || ''}-${d.fim || ''}` === chave) || 
+                                    dadosLimpos.some(d => `${d.motorista || ''}-${d.inicio || ''}-${d.fim || ''}` === chave);
+                
+                if (!isDuplicate) {
+                    dadosLimpos.push(item);
+                }
+            });
+
+            fullHistoricoJornadas = [...fullHistoricoJornadas, ...dadosLimpos];
             paginaAtualJor++;
             renderHistoricoJornadasTable(); 
         }

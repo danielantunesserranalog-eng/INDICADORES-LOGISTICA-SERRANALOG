@@ -21,6 +21,20 @@ let chartEvolucaoOcorrencias = null;
 const regexDate = /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?|\d{4}-\d{1,2}-\d{1,2})/;
 const regexTime = /(\d{1,2}:\d{2}(:\d{2})?)/;
 
+// LISTA DE NOMES A SEREM IGNORADOS (NÃO SÃO MOTORISTAS)
+const MOTORISTAS_EXCLUIDOS = [
+    "KEVEN MELGACO DE JESUS",
+    "GIVANILDO DA CONCEIÇÃO URSULINO",
+    "DANILO TEIXEIRA SILVA",
+    "LEANDRO LAFAIETE ALMEIDA",
+    "LUIS CARLOS MENDES MUNIZ",
+    "VALDIR ALVES",
+    "JOSEMILDO SOARES DE SOUZA",
+    "JULIO CESAR ALMEIDA NUNES",
+    "DEYVISON DOS SANTOS CRUZ",
+    "KLEITON MELGAÇO DA SILVA"
+];
+
 // Função para auxiliar na ordenação por Data/Hora decrescente
 function obterDataHoraParaOrdenacao(inicioStr) {
     if (!inicioStr) return 0;
@@ -229,7 +243,27 @@ async function carregarPainelJornadas() {
             .limit(10000);
 
         if (error) throw error;
-        if (dadosBrutos) fullJornadasData = dadosBrutos.filter(d => d.total_trabalho_horas >= 8);
+        if (dadosBrutos) {
+            // REMOVE DUPLICATAS E IGNORA NOMES QUE NÃO SÃO MOTORISTAS
+            const dadosLimpos = [];
+            const seen = new Set();
+            
+            dadosBrutos.forEach(d => {
+                const nome = (d.motorista || "").toUpperCase();
+                
+                // Ignora se estiver na lista de exclusão
+                if (MOTORISTAS_EXCLUIDOS.includes(nome)) return;
+                
+                // Cria chave única para identificar duplicatas
+                const chave = `${d.motorista || ''}-${d.inicio || ''}-${d.fim || ''}`;
+                if (!seen.has(chave)) {
+                    seen.add(chave);
+                    dadosLimpos.push(d);
+                }
+            });
+
+            fullJornadasData = dadosLimpos.filter(d => d.total_trabalho_horas >= 8);
+        }
         popularFiltroDatas();
         renderizarPainelJornadas();
     } catch (error) { console.error("Erro:", error); }
