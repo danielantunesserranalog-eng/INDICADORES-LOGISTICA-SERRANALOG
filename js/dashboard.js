@@ -128,10 +128,12 @@ function atualizarElementoTempo(idElemento, mediaReal, metaData) {
         icone = `<i class="fas fa-check-circle text-emerald-400 text-sm ml-2" title="Dentro da meta"></i>`;
     }
 
-    // Injeta o HTML formatado diretamente no elemento
+    // Injeta o HTML formatado diretamente no elemento com espaçamento maior e linha divisória
     el.innerHTML = `
         <span class="${corClasse}">${strReal}</span>${icone}
-        <div class="text-[10px] text-slate-400 font-bold uppercase mt-1">Padrão: <span class="text-slate-300">${strMeta}</span></div>
+        <div class="text-[12px] text-slate-400 font-bold uppercase mt-4 pt-2 border-t border-slate-700/50 tracking-wider">
+            Padrão: <span class="text-slate-200 text-[15px] font-black ml-1">${strMeta}</span>
+        </div>
     `;
 }
 
