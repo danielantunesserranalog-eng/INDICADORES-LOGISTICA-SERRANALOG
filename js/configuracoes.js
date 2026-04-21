@@ -22,6 +22,22 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarFrentesGruas(); 
 });
 
+// FUNÇÕES AUXILIARES PARA CONVERSÃO DE TEMPO (HH:mm <-> Decimal)
+function decimalParaTime(decimal) {
+    if (!decimal || isNaN(decimal)) return '';
+    const horas = Math.floor(decimal);
+    const minutos = Math.round((decimal - horas) * 60);
+    return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+}
+
+function timeParaDecimal(timeStr) {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    const h = parseInt(parts[0], 10) || 0;
+    const m = parseInt(parts[1], 10) || 0;
+    return h + (m / 60);
+}
+
 // ==========================================
 // CADASTRO DE FRENTES E GRUAS (ATUALIZADO COM EDIÇÃO E MULTIPLAS GRUAS)
 // ==========================================
@@ -184,13 +200,23 @@ async function carregarMetasGlobais() {
             const elVolProg = document.getElementById('cfg_vol_prog');
             const elCxProg = document.getElementById('cfg_cx_prog');
             const elPbtcProg = document.getElementById('cfg_pbtc');
+            
+            const elMetaCiclo = document.getElementById('cfg_meta_ciclo');
+            const elMetaFilaCpo = document.getElementById('cfg_meta_fila_campo');
+            const elMetaCarga = document.getElementById('cfg_meta_carga');
+            const elMetaFilaFab = document.getElementById('cfg_meta_fila_fabrica');
 
             if (elVProg) elVProg.value = data.v_prog || '';
             if (elVolProg) elVolProg.value = data.vol_prog || '';
             if (elCxProg) elCxProg.value = data.cx_prog || '';
             if (elPbtcProg) elPbtcProg.value = data.pbtc_prog || '';
+            
+            if (elMetaCiclo) elMetaCiclo.value = decimalParaTime(data.meta_ciclo);
+            if (elMetaFilaCpo) elMetaFilaCpo.value = decimalParaTime(data.meta_fila_campo);
+            if (elMetaCarga) elMetaCarga.value = decimalParaTime(data.meta_carga);
+            if (elMetaFilaFab) elMetaFilaFab.value = decimalParaTime(data.meta_fila_fabrica);
         }
-    } catch(e) {}
+    } catch(e) { console.error("Erro ao carregar metas globais", e); }
 }
 
 const btnSalvarMetasGlobais = document.getElementById('btnSalvarMetasGlobais');
@@ -202,7 +228,11 @@ if (btnSalvarMetasGlobais) {
             v_prog: parseFloat(document.getElementById('cfg_v_prog').value) || 0,
             vol_prog: parseFloat(document.getElementById('cfg_vol_prog').value) || 0,
             cx_prog: parseFloat(document.getElementById('cfg_cx_prog').value) || 0,
-            pbtc_prog: parseFloat(document.getElementById('cfg_pbtc').value) || 0
+            pbtc_prog: parseFloat(document.getElementById('cfg_pbtc').value) || 0,
+            meta_ciclo: timeParaDecimal(document.getElementById('cfg_meta_ciclo').value),
+            meta_fila_campo: timeParaDecimal(document.getElementById('cfg_meta_fila_campo').value),
+            meta_carga: timeParaDecimal(document.getElementById('cfg_meta_carga').value),
+            meta_fila_fabrica: timeParaDecimal(document.getElementById('cfg_meta_fila_fabrica').value)
         };
         try {
             await supabaseClient.from('metas_globais').upsert(payload);

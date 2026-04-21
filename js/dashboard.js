@@ -7,6 +7,7 @@ Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
 Chart.defaults.font.family = "'Inter', sans-serif";
 
 let fullHistoricoData = [];
+let metasGlobaisObj = null; // Variável global para guardar as metas
 let activeQuickFilter = 'ALL';
 let chartCiclo = null, chartTransp = null;
 
@@ -101,6 +102,39 @@ function formatarHorasMinutos(horasDecimais) {
     return `${horas}h ${minutos.toString().padStart(2, '0')}m`;
 }
 
+// FUNÇÃO PARA ATUALIZAR ELEMENTO DE TEMPO COM COR E META
+function atualizarElementoTempo(idElemento, mediaReal, metaData) {
+    const el = document.getElementById(idElemento);
+    if (!el) return;
+
+    const strReal = formatarHorasMinutos(mediaReal);
+    
+    // Se não tiver meta configurada, apenas exibe o valor normal
+    if (!metaData || metaData <= 0) {
+        el.innerText = strReal;
+        return;
+    }
+
+    const strMeta = formatarHorasMinutos(metaData);
+    let corClasse = "text-white";
+    let icone = "";
+
+    // Lógica de Metas: Maior que a meta = vermelho | Igual ou menor = verde
+    if (mediaReal > metaData) {
+        corClasse = "text-rose-500";
+        icone = `<i class="fas fa-exclamation-circle text-rose-500 text-sm ml-2" title="Acima da meta"></i>`;
+    } else {
+        corClasse = "text-emerald-400";
+        icone = `<i class="fas fa-check-circle text-emerald-400 text-sm ml-2" title="Dentro da meta"></i>`;
+    }
+
+    // Injeta o HTML formatado diretamente no elemento
+    el.innerHTML = `
+        <span class="${corClasse}">${strReal}</span>${icone}
+        <div class="text-[10px] text-slate-400 font-bold uppercase mt-1">Padrão: <span class="text-slate-300">${strMeta}</span></div>
+    `;
+}
+
 const centerTextPlugin = {
     id: 'centerText',
     beforeDraw: function(chart) {
@@ -131,6 +165,17 @@ const centerTextPlugin = {
 
 // ATUALIZADO: Buscar todos os dados paginando para evitar limite de 1000
 async function loadDashboardDataInit() {
+    
+    // Busca as metas globais e salva na variável global
+    try {
+        const { data: metasData } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
+        if (metasData) {
+            metasGlobaisObj = metasData;
+        }
+    } catch(e) {
+        console.error("Erro ao puxar metas globais no dashboard:", e);
+    }
+
     let allData = [];
     let from = 0;
     const step = 1000;
@@ -302,10 +347,11 @@ function loadDashboardData() {
     if(document.getElementById('mediaAsfalto')) document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
     if(document.getElementById('mediaTerra')) document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
     
-    if(document.getElementById('cicloMedio')) document.getElementById('cicloMedio').innerText = formatarHorasMinutos(mediaCiclo);
-    if(document.getElementById('filaCampo')) document.getElementById('filaCampo').innerText = formatarHorasMinutos(mediaFilaCampo);
-    if(document.getElementById('tempoCarregamento')) document.getElementById('tempoCarregamento').innerText = formatarHorasMinutos(mediaTempoCarregamento);
-    if(document.getElementById('filaFabrica')) document.getElementById('filaFabrica').innerText = formatarHorasMinutos(mediaFilaFabrica);
+    // ATUALIZANDO OS ELEMENTOS DE TEMPO COM A NOVA FUNÇÃO DE CORES E METAS
+    atualizarElementoTempo('cicloMedio', mediaCiclo, metasGlobaisObj ? metasGlobaisObj.meta_ciclo : 0);
+    atualizarElementoTempo('filaCampo', mediaFilaCampo, metasGlobaisObj ? metasGlobaisObj.meta_fila_campo : 0);
+    atualizarElementoTempo('tempoCarregamento', mediaTempoCarregamento, metasGlobaisObj ? metasGlobaisObj.meta_carga : 0);
+    atualizarElementoTempo('filaFabrica', mediaFilaFabrica, metasGlobaisObj ? metasGlobaisObj.meta_fila_fabrica : 0);
     
     if(document.getElementById('produtividadeGlobal')) document.getElementById('produtividadeGlobal').innerText = produtividadeGlobalM3.toLocaleString('pt-PT', {maximumFractionDigits: 2});
 

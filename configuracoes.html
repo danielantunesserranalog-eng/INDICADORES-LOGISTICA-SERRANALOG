@@ -10,36 +10,41 @@
             window.location.href = 'login.html';
         }
     </script>
-
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 </head>
 <body class="bg-slate-900 min-h-screen text-slate-200 selection:bg-sky-500/30 flex overflow-hidden">
-
     <aside id="sidebar-container" class="w-72 bg-slate-800/80 border-r border-slate-700/50 backdrop-blur-xl flex flex-col justify-between h-screen shadow-2xl relative z-20 flex-shrink-0"></aside>
-
     <main class="flex-1 h-screen overflow-y-auto relative">
         <div class="max-w-[96rem] mx-auto px-6 py-8">
             <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
                 <div><h1 class="text-2xl font-extrabold text-white">Configurações da Torre</h1><p class="text-sm text-slate-400 font-medium">Gerenciamento de Metas Globais e Base de Dados</p></div>
             </div>
-
             <section class="space-y-6">
                 <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden">
                     <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
                         <h3 class="font-bold text-white tracking-wide"><i class="fas fa-bullseye text-amber-500 mr-2"></i> Configurar Metas Globais</h3>
                         <button id="btnSalvarMetasGlobais" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-6 rounded-lg shadow transition-colors text-sm"><i class="fas fa-save"></i> Salvar Metas Base</button>
                     </div>
-                    <div class="p-6 grid grid-cols-1 md:grid-cols-4 gap-6 bg-slate-900/50">
-                        <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Viagens Diárias (Qtd)</label><input type="number" id="cfg_v_prog" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500"></div>
-                        <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Volume Diário (m³)</label><input type="number" id="cfg_vol_prog" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500"></div>
-                        <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Caixa de Carga Média (m³)</label><input type="number" id="cfg_cx_prog" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500"></div>
-                        <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">PBTC Médio (t)</label><input type="number" id="cfg_pbtc" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500"></div>
+                    <div class="p-6 flex flex-col gap-6 bg-slate-900/50">
+                        <h4 class="text-sky-400 font-bold text-xs uppercase border-b border-slate-700 pb-2">Metas de Produção</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Viagens Diárias (Qtd)</label><input type="number" id="cfg_v_prog" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500"></div>
+                            <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Volume Diário (m³)</label><input type="number" id="cfg_vol_prog" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500"></div>
+                            <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Caixa de Carga Média (m³)</label><input type="number" id="cfg_cx_prog" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500"></div>
+                            <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">PBTC Médio (t)</label><input type="number" id="cfg_pbtc" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500"></div>
+                        </div>
+                        <h4 class="text-sky-400 font-bold text-xs uppercase border-b border-slate-700 pb-2 mt-2">Metas de Tempo Operacional (Formato HH:mm)</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block"><i class="far fa-clock mr-1"></i> Padrão Ciclo Total</label><input type="time" id="cfg_meta_ciclo" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500 cursor-pointer"></div>
+                            <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block"><i class="far fa-clock mr-1"></i> Limite Fila no Campo</label><input type="time" id="cfg_meta_fila_campo" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500 cursor-pointer"></div>
+                            <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block"><i class="far fa-clock mr-1"></i> Padrão Carregamento</label><input type="time" id="cfg_meta_carga" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500 cursor-pointer"></div>
+                            <div><label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block"><i class="far fa-clock mr-1"></i> Limite Fila na Fábrica</label><input type="time" id="cfg_meta_fila_fabrica" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500 cursor-pointer"></div>
+                        </div>
                     </div>
                 </div>
-
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden flex flex-col">
                         <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700"><h3 class="font-bold text-white tracking-wide"><i class="fas fa-truck text-sky-400 mr-2"></i> Viagens (Produção)</h3></div>
@@ -54,7 +59,6 @@
                             <div id="errorMsg" class="mt-4 text-rose-200 text-[10px] hidden bg-rose-900/50 p-2 rounded border border-rose-800"></div>
                         </div>
                     </div>
-
                     <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden flex flex-col">
                         <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700"><h3 class="font-bold text-white tracking-wide"><i class="fas fa-user-clock text-amber-400 mr-2"></i> Jornadas (Ponto)</h3></div>
                         <div class="p-6 bg-slate-900/50 flex-1">
@@ -68,7 +72,6 @@
                             <div id="errorMsgJornadas" class="mt-4 text-rose-200 text-[10px] hidden bg-rose-900/50 p-2 rounded border border-rose-800"></div>
                         </div>
                     </div>
-
                     <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden flex flex-col">
                         <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700"><h3 class="font-bold text-white tracking-wide"><i class="fas fa-exclamation-triangle text-rose-400 mr-2"></i> Eventos (Telemetria)</h3></div>
                         <div class="p-6 bg-slate-900/50 flex-1">
@@ -83,7 +86,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden">
                     <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
                         <h3 class="font-bold text-white tracking-wide text-[13px] uppercase"><i class="fas fa-history text-emerald-400 mr-2"></i> Últimas Importações Realizadas</h3>
@@ -98,7 +100,6 @@
                         </table>
                     </div>
                 </div>
-
                 <div class="glass-card rounded-2xl border border-indigo-700/50 shadow-xl overflow-hidden mt-6 mb-6">
                     <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
                         <h3 class="font-bold text-white tracking-wide text-[13px] uppercase">
@@ -127,7 +128,6 @@
                         </table>
                     </div>
                 </div>
-
                 <div class="glass-card rounded-2xl border border-sky-700/50 shadow-xl overflow-hidden mt-6 mb-6">
                     <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
                         <h3 class="font-bold text-white tracking-wide text-[13px] uppercase">
@@ -155,7 +155,6 @@
                                 </button>
                             </div>
                         </div>
-
                         <div class="overflow-x-auto max-h-[250px] overflow-y-auto custom-scrollbar">
                             <table class="min-w-full text-xs text-left">
                                 <thead class="bg-slate-900/95 text-slate-400 uppercase text-[10px] border-b border-slate-700 sticky top-0 z-10">
@@ -172,7 +171,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="glass-card rounded-2xl border border-rose-900/30 shadow-xl bg-rose-950/20 p-6 flex flex-col md:flex-row justify-between items-center gap-4">
                     <div><h3 class="font-bold text-rose-400"><i class="fas fa-exclamation-triangle mr-2"></i> Zona de Risco</h3><p class="text-[10px] text-slate-400">Limpeza permanente de tabelas.</p></div>
                     <div class="flex flex-col sm:flex-row items-center gap-3">
@@ -188,7 +186,6 @@
             </section>
         </div>
     </main>
-
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabaseClient.js"></script>
     <script src="js/common.js"></script>
