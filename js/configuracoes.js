@@ -412,26 +412,31 @@ async function processAndSaveJornadasFile(file) {
                 horas_extras: horasExtrasTotal
             };
         }).filter(item => {
-            // TRAVA 1: Filtra nulos e cargas < 8h
             if (item === null || item.motorista === '' || item.total_trabalho_horas < 8) return false;
-            
-            // TRAVA 2: Ignora sumariamente os motoristas da lista de exclusão
             if (MOTORISTAS_EXCLUIDOS.includes(item.motorista.toUpperCase())) return false;
-            
             return true;
         });
 
         if(mappedData.length === 0) throw new Error("Nenhuma jornada válida foi encontrada (Motoristas ignorados ou horários < 8h).");
 
-        // TRAVA 3: Consulta o banco para verificação rígida de duplicidade (Motorista + Inicio + Fim)
-        const { data: existingJornadas, error: selErr } = await supabaseClient
-            .from('historico_jornadas')
-            .select('motorista, inicio, fim')
-            .limit(100000);
-            
-        if (selErr) throw selErr;
+        // BUSCA PAGINADA ABSOLUTA: Puxa TUDO do banco para não deixar NENHUMA duplicata escapar
+        let existingJornadas = [];
+        let startJor = 0;
+        const stepJor = 1000;
+        while (true) {
+            const { data, error: selErr } = await supabaseClient
+                .from('historico_jornadas')
+                .select('motorista, inicio, fim')
+                .range(startJor, startJor + stepJor - 1);
+                
+            if (selErr) throw selErr;
+            if (!data || data.length === 0) break;
+            existingJornadas.push(...data);
+            if (data.length < stepJor) break;
+            startJor += stepJor;
+        }
 
-        const chavesExistentes = new Set(existingJornadas ? existingJornadas.map(j => `${j.motorista}|${j.inicio}|${j.fim}`) : []);
+        const chavesExistentes = new Set(existingJornadas.map(j => `${j.motorista}|${j.inicio}|${j.fim}`));
 
         let duplicadasIgnoradas = 0;
         const jornadasNovas = mappedData.filter(item => {
@@ -445,7 +450,7 @@ async function processAndSaveJornadasFile(file) {
             }
         });
 
-        if (jornadasNovas.length === 0) throw new Error(`Todas as jornadas da planilha já existem no banco. (${duplicadasIgnoradas} duplicadas ignoradas).`);
+        if (jornadasNovas.length === 0) throw new Error(`Todas as jornadas da planilha já existem no banco. (${duplicadasIgnoradas} duplicadas ignoradas com sucesso).`);
 
         const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(jornadasNovas);
         if (insErr) throw insErr;
@@ -637,11 +642,24 @@ async function processAndSaveFile(file) {
 
         if (!newRows || newRows.length === 0) throw new Error("Planilha vazia ou sem dados válidos.");
 
-        const { data: existingIds, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento').limit(100000);
-        if (selErr) throw selErr;
+        // BUSCA PAGINADA ABSOLUTA DE VIAGENS PARA IGNORAR DUPLICATAS COM PRECISÃO
+        let existingIds = [];
+        let startVia = 0;
+        const stepVia = 1000;
+        while (true) {
+            const { data: dbData, error: selErr } = await supabaseClient
+                .from('historico_viagens')
+                .select('movimento')
+                .range(startVia, startVia + stepVia - 1);
+                
+            if (selErr) throw selErr;
+            if (!dbData || dbData.length === 0) break;
+            existingIds.push(...dbData);
+            if (dbData.length < stepVia) break;
+            startVia += stepVia;
+        }
         
-        const existingSet = new Set(existingIds ? existingIds.map(e => e.movimento) : []);
-        
+        const existingSet = new Set(existingIds.map(e => e.movimento));
         const { data: frentesData } = await supabaseClient.from('frentes_gruas').select('*');
 
         let duplicadasIgnoradas = 0;
@@ -656,7 +674,7 @@ async function processAndSaveFile(file) {
         });
 
         if (viagensNovasArray.length === 0) {
-            throw new Error(`Todas as ${newRows.length} viagens da planilha já existem no banco. Nenhuma nova viagem adicionada.`);
+            throw new Error(`Todas as ${newRows.length} viagens da planilha já existem no banco. (${duplicadasIgnoradas} ignoradas).`);
         }
 
         viagensNovasArray.forEach(viagem => {
