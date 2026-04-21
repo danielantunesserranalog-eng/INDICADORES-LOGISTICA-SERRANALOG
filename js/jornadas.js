@@ -236,14 +236,28 @@ function popularFiltroDatas() {
 
 async function carregarPainelJornadas() {
     try {
-        const { data: dadosBrutos, error } = await supabaseClient
-            .from('historico_jornadas')
-            .select('*')
-            .order('id', { ascending: false })
-            .limit(10000);
+        let dadosBrutos = [];
+        let start = 0;
+        const step = 1000;
+        
+        // Loop de paginação para buscar TODOS os registros, não apenas os primeiros 1000
+        while (true) {
+            const { data, error } = await supabaseClient
+                .from('historico_jornadas')
+                .select('*')
+                .order('id', { ascending: false })
+                .range(start, start + step - 1);
 
-        if (error) throw error;
-        if (dadosBrutos) {
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            
+            dadosBrutos.push(...data);
+            
+            if (data.length < step) break; // Chegou no fim do banco
+            start += step;
+        }
+
+        if (dadosBrutos.length > 0) {
             // REMOVE DUPLICATAS E IGNORA NOMES QUE NÃO SÃO MOTORISTAS
             const dadosLimpos = [];
             const seen = new Set();
