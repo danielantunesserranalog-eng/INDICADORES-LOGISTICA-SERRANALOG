@@ -2,6 +2,20 @@
 // js/configuracoes.js - IMPORTAÇÃO E METAS
 // ==========================================
 
+// LISTA DE NOMES A SEREM IGNORADOS NA IMPORTAÇÃO
+const MOTORISTAS_EXCLUIDOS = [
+    "KEVEN MELGACO DE JESUS",
+    "GIVANILDO DA CONCEIÇÃO URSULINO",
+    "DANILO TEIXEIRA SILVA",
+    "LEANDRO LAFAIETE ALMEIDA",
+    "LUIS CARLOS MENDES MUNIZ",
+    "VALDIR ALVES",
+    "JOSEMILDO SOARES DE SOUZA",
+    "JULIO CESAR ALMEIDA NUNES",
+    "DEYVISON DOS SANTOS CRUZ",
+    "KLEITON MELGAÇO DA SILVA"
+];
+
 document.addEventListener('DOMContentLoaded', () => {
     carregarMetasGlobais();
     carregarHistoricoImportacoes(); 
@@ -397,23 +411,41 @@ async function processAndSaveJornadasFile(file) {
                 horas_noturnas: horasNoturnas,
                 horas_extras: horasExtrasTotal
             };
-        }).filter(item => item !== null && item.motorista !== '' && item.total_trabalho_horas >= 8);
+        }).filter(item => {
+            // TRAVA 1: Filtra nulos e cargas < 8h
+            if (item === null || item.motorista === '' || item.total_trabalho_horas < 8) return false;
+            
+            // TRAVA 2: Ignora sumariamente os motoristas da lista de exclusão
+            if (MOTORISTAS_EXCLUIDOS.includes(item.motorista.toUpperCase())) return false;
+            
+            return true;
+        });
 
-        if(mappedData.length === 0) throw new Error("Nenhuma jornada válida (>= 8h) foi encontrada. Verifique os horários no CSV.");
+        if(mappedData.length === 0) throw new Error("Nenhuma jornada válida foi encontrada (Motoristas ignorados ou horários < 8h).");
 
-        const { data: existingJornadas, error: selErr } = await supabaseClient.from('historico_jornadas').select('motorista, inicio').limit(100000);
+        // TRAVA 3: Consulta o banco para verificação rígida de duplicidade (Motorista + Inicio + Fim)
+        const { data: existingJornadas, error: selErr } = await supabaseClient
+            .from('historico_jornadas')
+            .select('motorista, inicio, fim')
+            .limit(100000);
+            
         if (selErr) throw selErr;
 
-        const chavesExistentes = new Set(existingJornadas ? existingJornadas.map(j => `${j.motorista}|${j.inicio}`) : []);
+        const chavesExistentes = new Set(existingJornadas ? existingJornadas.map(j => `${j.motorista}|${j.inicio}|${j.fim}`) : []);
 
         let duplicadasIgnoradas = 0;
         const jornadasNovas = mappedData.filter(item => {
-            const chaveUnica = `${item.motorista}|${item.inicio}`;
-            if (chavesExistentes.has(chaveUnica)) { duplicadasIgnoradas++; return false; } 
-            else { chavesExistentes.add(chaveUnica); return true; }
+            const chaveUnica = `${item.motorista}|${item.inicio}|${item.fim}`;
+            if (chavesExistentes.has(chaveUnica)) { 
+                duplicadasIgnoradas++; 
+                return false; 
+            } else { 
+                chavesExistentes.add(chaveUnica); 
+                return true; 
+            }
         });
 
-        if (jornadasNovas.length === 0) throw new Error(`Todas as ${mappedData.length} jornadas da planilha já existem no banco de dados.`);
+        if (jornadasNovas.length === 0) throw new Error(`Todas as jornadas da planilha já existem no banco. (${duplicadasIgnoradas} duplicadas ignoradas).`);
 
         const { error: insErr } = await supabaseClient.from('historico_jornadas').insert(jornadasNovas);
         if (insErr) throw insErr;
@@ -509,7 +541,6 @@ function parseSheetToData(sheet) {
     const hrSaidaFabKey = findKey(['hora saída fábrica', 'hora saída', 'hora saida']);
     const cicloProntoKey = findKey(['ciclo', 'tempo de ciclo', 'ciclo horas', 'horas ciclo', 'tempo ciclo']);
     
-    // NOVA CHAVE: CARREGADOR FLORESTAL (GRUA)
     const gruaKey = findKey(['carregador florestal', 'carregador']); 
 
     const today = new Date().toLocaleDateString('pt-PT');
@@ -564,7 +595,7 @@ function parseSheetToData(sheet) {
             filaCampoHoras: calcHoursDiff(getValue(dtChegadaCampoKey), getValue(hrChegadaCampoKey), getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), false),
             tempoCarregamentoHoras: calcHoursDiff(getValue(dtInicioCarregCpoKey), getValue(hrInicioCarregCpoKey), getValue(dtFinalCarregCpoKey) || getValue(dtInicioCarregCpoKey), getValue(hrFinalCarregCpoKey), false),
             filaFabricaHoras: calcHoursDiff(getValue(dtEntradaKey), getValue(hrEntradaKey), getValue(dtInicioDescarFabKey), getValue(hrInicioDescarFabKey), false),
-            grua: String(getValue(gruaKey) || "-").trim(), // CAPTURA A GRUA AQUI
+            grua: String(getValue(gruaKey) || "-").trim(), 
             _timestamp: timestampSaida
         };
     });
@@ -606,13 +637,11 @@ async function processAndSaveFile(file) {
 
         if (!newRows || newRows.length === 0) throw new Error("Planilha vazia ou sem dados válidos.");
 
-        // 1. Puxar IDs existentes
         const { data: existingIds, error: selErr } = await supabaseClient.from('historico_viagens').select('movimento').limit(100000);
         if (selErr) throw selErr;
         
         const existingSet = new Set(existingIds ? existingIds.map(e => e.movimento) : []);
         
-        // 2. Puxar o Cadastro de Frentes e Gruas para fazer o Cruzamento
         const { data: frentesData } = await supabaseClient.from('frentes_gruas').select('*');
 
         let duplicadasIgnoradas = 0;
@@ -630,9 +659,8 @@ async function processAndSaveFile(file) {
             throw new Error(`Todas as ${newRows.length} viagens da planilha já existem no banco. Nenhuma nova viagem adicionada.`);
         }
 
-        // 3. CRUZAMENTO DE DADOS (Frente X Grua)
         viagensNovasArray.forEach(viagem => {
-            viagem.frente = "Outras Frentes"; // Valor padrão caso não ache a grua
+            viagem.frente = "Outras Frentes"; 
             
             if (viagem.grua && viagem.grua !== "-") {
                 const gruaViagemLimpa = viagem.grua.toLowerCase().trim();
@@ -643,7 +671,7 @@ async function processAndSaveFile(file) {
                         
                         if (arrayGruasCadastradas.includes(gruaViagemLimpa)) {
                             viagem.frente = f.frente;
-                            break; // Se achou, para de procurar e vai pra próxima viagem
+                            break; 
                         }
                     }
                 }
