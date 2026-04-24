@@ -14,7 +14,6 @@ let fullHistoricoDataOp = [];
 let fullHistoricoManutencao = []; 
 let metasGlobais = {};
 let activeQuickFilterOp = 'ALL';
-
 let chartEvolucao = null;
 let chartProjecao = null; 
 let chartManutencao = null; 
@@ -63,6 +62,7 @@ function verificarStatusAtualizacao(datasArray) {
     const indicador = document.getElementById('indicadorAtualizacao');
     const icone = document.getElementById('iconeAtualizacao');
     const texto = document.getElementById('textoAtualizacao');
+
     if(!indicador) return;
 
     indicador.classList.remove('hidden');
@@ -84,7 +84,6 @@ function verificarStatusAtualizacao(datasArray) {
             let ano = parseInt(p[2]); if(ano < 100) ano += 2000;
             dt = new Date(ano, parseInt(p[1])-1, parseInt(p[0]));
         }
-
         if (dt && dt > maxDate) {
             maxDate = dt;
             const dia = String(dt.getDate()).padStart(2, '0');
@@ -116,29 +115,64 @@ async function loadOperacionalData() {
         const { data: metas } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
         if(metas) metasGlobais = metas;
 
-        const { data: historico } = await supabaseClient
-            .from('historico_viagens')
-            .select('*')
-            .limit(15000);
+        // CORREÇÃO MESTRA 1: Buscando os dados com loop de paginação para quebrar o limite de 1000 do Supabase
+        let historico = [];
+        let from = 0;
+        const step = 1000;
+        let fetchMore = true;
 
-        if(historico) {
+        while (fetchMore) {
+            const { data, error } = await supabaseClient
+                .from('historico_viagens')
+                .select('*')
+                .range(from, from + step - 1);
+            
+            if (error) {
+                console.error(error);
+                break;
+            }
+            if (data && data.length > 0) {
+                historico = historico.concat(data);
+                from += step;
+            }
+            if (!data || data.length < step) {
+                fetchMore = false;
+            }
+        }
+        
+        if(historico && historico.length > 0) {
             fullHistoricoDataOp = historico.reverse();
         }
 
-        // Buscar Manutenções do banco secundário
+        // Buscar Manutenções do banco secundário também paginado
         try {
-            const { data: manutencoes } = await supabaseManutencao
-                .from('ordens_servico')
-                .select('*')
-                .limit(5000);
-            if(manutencoes) {
+            let manutencoes = [];
+            let fromManut = 0;
+            let fetchMoreManut = true;
+            
+            while (fetchMoreManut) {
+                const { data: mData, error: errManut } = await supabaseManutencao
+                    .from('ordens_servico')
+                    .select('*')
+                    .range(fromManut, fromManut + step - 1);
+                
+                if(errManut) break;
+                if(mData && mData.length > 0) {
+                    manutencoes = manutencoes.concat(mData);
+                    fromManut += step;
+                }
+                if(!mData || mData.length < step) {
+                    fetchMoreManut = false;
+                }
+            }
+            if(manutencoes.length > 0) {
                 fullHistoricoManutencao = manutencoes;
             }
         } catch(errManutencao) {
             console.error("Erro ao carregar manutenções do banco:", errManutencao);
         }
 
-        if(historico) {
+        if(fullHistoricoDataOp.length > 0) {
             const allDates = [...new Set(fullHistoricoDataOp.map(d => d.dataDaBaseExcel))].filter(d => d && d !== 'Desconhecida');
             verificarStatusAtualizacao(allDates);
             atualizarPainelOperacional();
@@ -154,18 +188,19 @@ function atualizarPainelOperacional() {
     const filteredGlobal = fullHistoricoDataOp.filter(d => {
         if(activeQuickFilterOp === 'ALL') return true;
         
-        const p = d.dataDaBaseExcel.split('/');
-        if(p.length !== 3) return false;
-        
-        let ano = parseInt(p[2]); if(ano < 100) ano += 2000;
-        const parsed = new Date(ano, p[1]-1, p[0]);
-        parsed.setHours(0,0,0,0); const hj = new Date(); hj.setHours(0,0,0,0);
-        
+        // Usa o parser global que já funciona perfeitamente para todas as datas
+        const parsed = parseDateTime(d.dataDaBaseExcel, null);
+        if(!parsed) return false;
+
+        parsed.setHours(0,0,0,0); 
+        const hj = new Date(); hj.setHours(0,0,0,0);
+
         if (activeQuickFilterOp === 'DATE' && dataRef) {
             const dr = new Date(dataRef + "T00:00:00");
+            dr.setHours(0,0,0,0);
             return parsed.getTime() === dr.getTime();
         }
-        
+
         const diff = Math.round((hj - parsed)/86400000);
         if (activeQuickFilterOp === 'D-1') return diff === 1;
         if (activeQuickFilterOp === 'D-2') return diff === 2;
@@ -182,10 +217,9 @@ function atualizarPainelOperacional() {
         return false;
     });
 
-    // Filtro de Manutenções
+    // Filtro de Manutenção
     const filteredManutencao = fullHistoricoManutencao.filter(d => {
         if(activeQuickFilterOp === 'ALL') return true;
-
         const dateStr = d.data_abertura || d.created_at;
         if(!dateStr) return false;
 
@@ -242,14 +276,16 @@ function atualizarPainelOperacional() {
     const lblMultiplicador1 = document.getElementById('diasMultiplicador1');
     const lblMultiplicador2 = document.getElementById('diasMultiplicador2');
     
-    if(lblMultiplicador1) lblMultiplicador1.innerText = `${diasConsiderados}d | F:${placasUnicasSerrana} (Serrana)`;
+    // CORREÇÃO 2: Exibir métricas e metas baseadas no panorama Global para igualar à Visão Geral
+    if(lblMultiplicador1) lblMultiplicador1.innerText = `${diasConsiderados}d | F:${placasUnicasGlobal} (Global)`;
     if(lblMultiplicador2) lblMultiplicador2.innerText = `${diasConsiderados}d`;
 
-    const totalV_Serrana = filteredSerrana.length;
-    const metaV = (metasGlobais.v_prog || 0) * (placasUnicasSerrana === 0 ? 0 : placasUnicasSerrana) * diasConsiderados;
+    const totalV_Global = filteredGlobal.length;
+    const metaV = (metasGlobais.v_prog || 0) * (placasUnicasGlobal === 0 ? 0 : placasUnicasGlobal) * diasConsiderados;
+    
     document.getElementById('disp_v_prog').innerText = metaV;
-    document.getElementById('disp_v_real').innerText = totalV_Serrana;
-    atualizarBarra('bar_v_perc', 'disp_v_perc', totalV_Serrana, metaV);
+    document.getElementById('disp_v_real').innerText = totalV_Global;
+    atualizarBarra('bar_v_perc', 'disp_v_perc', totalV_Global, metaV);
 
     const totalVol_Global = filteredGlobal.reduce((s,x)=>s+(parseFloat(String(x.volumeReal).replace(',','.'))||0), 0);
     const metaVol = (metasGlobais.vol_prog || 0) * diasConsiderados; 
@@ -257,8 +293,6 @@ function atualizarPainelOperacional() {
     document.getElementById('disp_vol_real').innerText = totalVol_Global.toLocaleString('pt-PT', {maximumFractionDigits:1});
     atualizarBarra('bar_vol_perc', 'disp_vol_perc', totalVol_Global, metaVol);
 
-    const totalV_Global = filteredGlobal.length;
-    
     const mediaCx = totalV_Global > 0 ? (totalVol_Global / totalV_Global) : 0;
     const metaCx = metasGlobais.cx_prog || 0;
     document.getElementById('disp_cx_prog').innerText = metaCx;
@@ -290,7 +324,9 @@ function atualizarPainelOperacional() {
     atualizarBarra('bar_pbtc_perc', 'disp_pbtc_perc', mediaPbtc, metaPbtc);
 
     // Gráficos
-    renderEvolucaoChart(filteredGlobal);
+    // CORREÇÃO 3: Desenhar a Evolução Diária com TODOS os dados e não apenas o dia filtrado
+    renderEvolucaoChart(fullHistoricoDataOp);
+    
     renderProjecaoChart(filteredGlobal); 
     renderManutencaoChart(filteredManutencao); 
 
@@ -326,6 +362,7 @@ function renderEvolucaoChart(data) {
     data.forEach(d => {
         const dt = d.dataDaBaseExcel;
         if (!dt || dt === 'Desconhecida') return;
+
         if (!dailyMap.has(dt)) dailyMap.set(dt, 0);
         const vol = parseFloat(String(d.volumeReal).replace(',', '.')) || 0;
         dailyMap.set(dt, dailyMap.get(dt) + vol);
@@ -388,6 +425,7 @@ function renderProjecaoChart(data) {
     data.forEach(d => {
         const dt = d.dataDaBaseExcel;
         if (!dt || dt === 'Desconhecida') return;
+
         if (!dailyMap.has(dt)) dailyMap.set(dt, 0);
         const vol = parseFloat(String(d.volumeReal).replace(',', '.')) || 0;
         dailyMap.set(dt, dailyMap.get(dt) + vol);
@@ -469,7 +507,6 @@ function renderManutencaoChart(data) {
     if(!ctxMan) return;
 
     const dailyMap = new Map();
-
     data.forEach(d => {
         const dateStr = d.data_abertura || d.created_at;
         if (!dateStr) return;
@@ -564,7 +601,6 @@ function renderLeaderboards(data) {
     }
 }
 
-// NOVA FUNÇÃO: RENDERIZA TABELAS DE MANUTENÇÃO (Top Caminhões e Tipo Serviço)
 function renderManutencaoTables(data) {
     const placaMap = new Map();
     const tipoMap = new Map();
@@ -581,17 +617,16 @@ function renderManutencaoTables(data) {
     const topPlacas = Array.from(placaMap.entries())
         .map(([placa, qtd]) => ({ placa, qtd }))
         .sort((a, b) => b.qtd - a.qtd)
-        .slice(0, 5); // TOP 5
+        .slice(0, 5);
 
     const topTipos = Array.from(tipoMap.entries())
         .map(([tipo, qtd]) => ({ tipo, qtd }))
-        .sort((a, b) => b.qtd - a.qtd); // Lista os tipos mais recorrentes
+        .sort((a, b) => b.qtd - a.qtd);
 
     const bCaminhoes = document.getElementById('leaderboardCaminhoesQuebram');
     if (bCaminhoes) {
         bCaminhoes.innerHTML = '';
         topPlacas.forEach((x, i) => {
-            // Alterado para text-white e text-base/text-lg
             const tr = `<tr>
                 <td class="px-4 py-3 text-center"><div class="w-6 h-6 rounded-full ${i<3?'bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.5)]':'bg-slate-800 text-slate-400'} flex items-center justify-center text-xs font-bold">${i+1}</div></td>
                 <td class="px-4 py-3 font-bold text-white text-base">${x.placa}</td>
@@ -599,6 +634,7 @@ function renderManutencaoTables(data) {
             </tr>`;
             bCaminhoes.insertAdjacentHTML('beforeend', tr);
         });
+
         if (topPlacas.length === 0) {
             bCaminhoes.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-slate-500">Nenhuma ocorrência no período</td></tr>';
         }
@@ -609,7 +645,6 @@ function renderManutencaoTables(data) {
         bTipos.innerHTML = '';
         topTipos.forEach((x) => {
             const perc = totalOS > 0 ? (x.qtd / totalOS) * 100 : 0;
-            // Alterado para text-white e text-base/text-lg
             const tr = `<tr>
                 <td class="px-4 py-3 font-bold text-white text-base max-w-[150px] truncate" title="${x.tipo}">${x.tipo}</td>
                 <td class="px-4 py-3 text-right font-mono text-white text-lg font-bold">${x.qtd}</td>
@@ -617,12 +652,12 @@ function renderManutencaoTables(data) {
             </tr>`;
             bTipos.insertAdjacentHTML('beforeend', tr);
         });
+
         if (topTipos.length === 0) {
             bTipos.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-slate-500">Nenhuma ocorrência no período</td></tr>';
         }
     }
 }
-
 
 function renderDashboardsGerenciais(data) {
     const tMap = new Map();
