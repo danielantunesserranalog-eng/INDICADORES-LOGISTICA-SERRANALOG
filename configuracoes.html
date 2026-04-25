@@ -22,7 +22,7 @@
             <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
                 <div><h1 class="text-2xl font-extrabold text-white">Configurações da Torre</h1><p class="text-sm text-slate-400 font-medium">Gerenciamento de Metas Globais e Base de Dados</p></div>
             </div>
-            <section class="space-y-6">
+            <section class="space-y-6 animate-fade-in">
                 <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden">
                     <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
                         <h3 class="font-bold text-white tracking-wide"><i class="fas fa-bullseye text-amber-500 mr-2"></i> Configurar Metas Globais</h3>
@@ -45,6 +45,48 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="glass-card rounded-2xl border border-sky-700/50 shadow-xl overflow-hidden mt-6 mb-6">
+                    <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+                        <h3 class="font-bold text-white tracking-wide text-[13px] uppercase">
+                            <i class="fas fa-tractor text-sky-400 mr-2"></i> Mapeamento Dinâmico de Gruas
+                        </h3>
+                    </div>
+                    <div class="p-6 bg-slate-900/50">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            
+                            <div class="bg-slate-800/60 border border-emerald-700/50 rounded-xl p-5 flex flex-col h-full shadow-inner">
+                                <h4 class="text-emerald-400 font-extrabold uppercase text-xs mb-4 text-center border-b border-emerald-700/50 pb-3 tracking-widest"><i class="fas fa-star mr-1"></i> FRENTE SERRANA</h4>
+                                <div id="lista_serrana" class="flex flex-wrap gap-2 mb-6 flex-1 content-start">
+                                </div>
+                                <div class="flex mt-auto shadow-lg rounded-lg">
+                                    <input type="text" id="input_serrana" placeholder="Ex: GSR0009" class="w-full bg-slate-950 border border-slate-600 rounded-l-lg px-4 py-2.5 text-white outline-none focus:border-emerald-500 text-xs font-mono uppercase" onkeypress="if(event.key==='Enter') adicionarGrua('SERRANA', 'input_serrana')">
+                                    <button onclick="adicionarGrua('SERRANA', 'input_serrana')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-r-lg font-bold transition-colors"><i class="fas fa-plus"></i></button>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-slate-800/60 border border-amber-700/50 rounded-xl p-5 flex flex-col h-full shadow-inner">
+                                <h4 class="text-amber-400 font-extrabold uppercase text-xs mb-4 text-center border-b border-amber-700/50 pb-3 tracking-widest"><i class="fas fa-tree mr-1"></i> FRENTE REFLORESTAR</h4>
+                                <div id="lista_reflorestar" class="flex flex-wrap gap-2 mb-6 flex-1 content-start"></div>
+                                <div class="flex mt-auto shadow-lg rounded-lg">
+                                    <input type="text" id="input_reflorestar" placeholder="Ex: GRB0030" class="w-full bg-slate-950 border border-slate-600 rounded-l-lg px-4 py-2.5 text-white outline-none focus:border-amber-500 text-xs font-mono uppercase" onkeypress="if(event.key==='Enter') adicionarGrua('REFLORESTAR', 'input_reflorestar')">
+                                    <button onclick="adicionarGrua('REFLORESTAR', 'input_reflorestar')" class="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2.5 rounded-r-lg font-bold transition-colors"><i class="fas fa-plus"></i></button>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-800/60 border border-indigo-700/50 rounded-xl p-5 flex flex-col h-full shadow-inner">
+                                <h4 class="text-indigo-400 font-extrabold uppercase text-xs mb-4 text-center border-b border-indigo-700/50 pb-3 tracking-widest"><i class="fas fa-leaf mr-1"></i> FRENTE JSL</h4>
+                                <div id="lista_jsl" class="flex flex-wrap gap-2 mb-6 flex-1 content-start"></div>
+                                <div class="flex mt-auto shadow-lg rounded-lg">
+                                    <input type="text" id="input_jsl" placeholder="Ex: GSL0018" class="w-full bg-slate-950 border border-slate-600 rounded-l-lg px-4 py-2.5 text-white outline-none focus:border-indigo-500 text-xs font-mono uppercase" onkeypress="if(event.key==='Enter') adicionarGrua('JSL', 'input_jsl')">
+                                    <button onclick="adicionarGrua('JSL', 'input_jsl')" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-r-lg font-bold transition-colors"><i class="fas fa-plus"></i></button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden flex flex-col">
                         <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700"><h3 class="font-bold text-white tracking-wide"><i class="fas fa-truck text-sky-400 mr-2"></i> Viagens (Produção)</h3></div>
@@ -86,12 +128,13 @@
                         </div>
                     </div>
                 </div>
+
                 <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden">
                     <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
                         <h3 class="font-bold text-white tracking-wide text-[13px] uppercase"><i class="fas fa-history text-emerald-400 mr-2"></i> Últimas Importações Realizadas</h3>
                         <button id="btnAtualizarHistorico" class="text-slate-400 hover:text-white transition-colors"><i class="fas fa-sync-alt"></i></button>
                     </div>
-                    <div class="overflow-x-auto max-h-[250px] overflow-y-auto">
+                    <div class="overflow-x-auto max-h-[250px] overflow-y-auto custom-scrollbar">
                         <table class="min-w-full text-xs text-left">
                             <thead class="bg-slate-900/95 text-slate-400 uppercase text-[10px] border-b border-slate-700 sticky top-0">
                                 <tr><th class="px-6 py-3">Data/Hora</th><th class="px-6 py-3">Período/Módulo</th><th class="px-6 py-3 text-center">Registros</th></tr>
@@ -100,77 +143,7 @@
                         </table>
                     </div>
                 </div>
-                <div class="glass-card rounded-2xl border border-indigo-700/50 shadow-xl overflow-hidden mt-6 mb-6">
-                    <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
-                        <h3 class="font-bold text-white tracking-wide text-[13px] uppercase">
-                            <i class="fas fa-users-cog text-indigo-400 mr-2"></i> Integração de Login (Banco Centralizado)
-                        </h3>
-                        <button id="btnPuxarUsuarios" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-6 rounded-lg shadow transition-colors text-xs">
-                            <i class="fas fa-cloud-download-alt mr-1"></i> Sincronizar / Visualizar Usuários
-                        </button>
-                    </div>
-                    <div class="bg-slate-900/50 p-4 border-b border-slate-700/50 text-[11px] text-slate-400">
-                        <i class="fas fa-info-circle text-sky-400 mr-1"></i> A autenticação da plataforma está vinculada ao banco de dados externo mestre. Qualquer alteração de senha deve ser feita na plataforma de origem.
-                    </div>
-                    <div class="overflow-x-auto max-h-[300px] overflow-y-auto custom-scrollbar">
-                        <table class="min-w-full text-xs text-left">
-                            <thead class="bg-slate-900/95 text-slate-400 uppercase text-[10px] border-b border-slate-700 sticky top-0">
-                                <tr>
-                                    <th class="px-6 py-3">ID</th>
-                                    <th class="px-6 py-3">Username</th>
-                                    <th class="px-6 py-3">Cargo / Função</th>
-                                    <th class="px-6 py-3 text-center">Primeiro Acesso</th>
-                                </tr>
-                            </thead>
-                            <tbody id="usuariosExternosBody" class="divide-y divide-slate-800/80 text-slate-300">
-                                <tr><td colspan="4" class="text-center py-6 text-slate-500"><i class="fas fa-database text-slate-600 text-2xl block mb-2"></i>Clique em "Sincronizar" para carregar usuários do banco mestre.</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="glass-card rounded-2xl border border-sky-700/50 shadow-xl overflow-hidden mt-6 mb-6">
-                    <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
-                        <h3 class="font-bold text-white tracking-wide text-[13px] uppercase">
-                            <i class="fas fa-tractor text-sky-400 mr-2"></i> Cadastro de Frentes e Gruas
-                        </h3>
-                    </div>
-                    <div class="p-6 bg-slate-900/50">
-                        <input type="hidden" id="editFrenteGruaId" value="">
-                        
-                        <div class="flex flex-col md:flex-row gap-4 mb-6">
-                            <div class="flex-1">
-                                <label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Frente de Carregamento</label>
-                                <input type="text" id="inputFrente" placeholder="Ex: Frente 01 - Fazenda São Jorge" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500">
-                            </div>
-                            <div class="flex-1">
-                                <label class="text-[11px] text-slate-400 uppercase font-bold mb-1 block">Gruas (Separe por vírgulas para adicionar várias)</label>
-                                <input type="text" id="inputGrua" placeholder="Ex: Grua 05, Grua Volvo, Grua 12" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-sky-500">
-                            </div>
-                            <div class="flex items-end gap-2">
-                                <button id="btnCancelarEdicaoFrente" class="hidden w-full md:w-auto bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded-lg shadow transition-colors text-sm h-[42px]">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                                <button id="btnSalvarFrenteGrua" class="w-full md:w-auto bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 px-6 rounded-lg shadow transition-colors text-sm h-[42px] min-w-[140px]">
-                                    <i class="fas fa-plus mr-1" id="iconSalvarFrente"></i> <span id="textoSalvarFrente">Adicionar</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="overflow-x-auto max-h-[250px] overflow-y-auto custom-scrollbar">
-                            <table class="min-w-full text-xs text-left">
-                                <thead class="bg-slate-900/95 text-slate-400 uppercase text-[10px] border-b border-slate-700 sticky top-0 z-10">
-                                    <tr>
-                                        <th class="px-6 py-3">Frente de Carregamento</th>
-                                        <th class="px-6 py-3">Grua(s) Vinculada(s)</th>
-                                        <th class="px-6 py-3 text-center w-24">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tabelaFrentesGruasBody" class="divide-y divide-slate-800/80 text-slate-300">
-                                    <tr><td colspan="3" class="text-center py-4 text-slate-500">Carregando...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+
                 <div class="glass-card rounded-2xl border border-rose-900/30 shadow-xl bg-rose-950/20 p-6 flex flex-col md:flex-row justify-between items-center gap-4">
                     <div><h3 class="font-bold text-rose-400"><i class="fas fa-exclamation-triangle mr-2"></i> Zona de Risco</h3><p class="text-[10px] text-slate-400">Limpeza permanente de tabelas.</p></div>
                     <div class="flex flex-col sm:flex-row items-center gap-3">

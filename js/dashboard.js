@@ -7,7 +7,8 @@ Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
 Chart.defaults.font.family = "'Inter', sans-serif";
 
 let fullHistoricoData = [];
-let metasGlobaisObj = null; // Variável global para guardar as metas
+let metasGlobaisObj = null; 
+let configGruasObj = []; // Variável para armazenar a configuração do banco
 let activeQuickFilter = 'ALL';
 let chartCiclo = null, chartTransp = null;
 
@@ -27,10 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
         btnExportarComparativo.addEventListener('click', () => {
             const container = document.getElementById('comparativoContainer');
             
-            // Usando html2canvas para tirar um "print" do container em alta qualidade
             html2canvas(container, {
-                scale: 3, // Resolução 3x (Alta qualidade)
-                backgroundColor: '#0f172a', // Mantém o fundo escuro do Tailwind
+                scale: 3, 
+                backgroundColor: '#0f172a', 
                 useCORS: true
             }).then(canvas => {
                 const link = document.createElement('a');
@@ -127,14 +127,12 @@ function formatarHorasMinutos(horasDecimais) {
     return `${horas}h ${minutos.toString().padStart(2, '0')}m`;
 }
 
-// FUNÇÃO PARA ATUALIZAR ELEMENTO DE TEMPO COM COR E META
 function atualizarElementoTempo(idElemento, mediaReal, metaData) {
     const el = document.getElementById(idElemento);
     if (!el) return;
 
     const strReal = formatarHorasMinutos(mediaReal);
     
-    // Se não tiver meta configurada, apenas exibe o valor normal
     if (!metaData || metaData <= 0) {
         el.innerText = strReal;
         return;
@@ -144,7 +142,6 @@ function atualizarElementoTempo(idElemento, mediaReal, metaData) {
     let corClasse = "text-white";
     let icone = "";
 
-    // Lógica de Metas: Maior que a meta = vermelho | Igual ou menor = verde
     if (mediaReal > metaData) {
         corClasse = "text-rose-500";
         icone = `<i class="fas fa-exclamation-circle text-rose-500 text-sm ml-2" title="Acima da meta"></i>`;
@@ -153,7 +150,6 @@ function atualizarElementoTempo(idElemento, mediaReal, metaData) {
         icone = `<i class="fas fa-check-circle text-emerald-400 text-sm ml-2" title="Dentro da meta"></i>`;
     }
 
-    // Injeta o HTML formatado diretamente no elemento com espaçamento maior e linha divisória
     el.innerHTML = `
         <span class="${corClasse}">${strReal}</span>${icone}
         <div class="text-[12px] text-slate-400 font-bold uppercase mt-4 pt-2 border-t border-slate-700/50 tracking-wider">
@@ -190,10 +186,9 @@ const centerTextPlugin = {
     }
 };
 
-// ATUALIZADO: Buscar todos os dados paginando para evitar limite de 1000
 async function loadDashboardDataInit() {
     
-    // Busca as metas globais e salva na variável global
+    // Busca as metas globais
     try {
         const { data: metasData } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
         if (metasData) {
@@ -201,6 +196,16 @@ async function loadDashboardDataInit() {
         }
     } catch(e) {
         console.error("Erro ao puxar metas globais no dashboard:", e);
+    }
+
+    // Busca o mapeamento de Frentes e Gruas
+    try {
+        const { data: gruasData } = await supabaseClient.from('frentes_gruas').select('*');
+        if (gruasData) {
+            configGruasObj = gruasData;
+        }
+    } catch(e) {
+        console.error("Erro ao puxar gruas cadastradas:", e);
     }
 
     let allData = [];
@@ -254,7 +259,6 @@ function calcStats(dataArr) {
     const validFilaFab = dataArr.filter(d => d.filaFabricaHoras > 0);
     const medFilaFab = validFilaFab.length > 0 ? validFilaFab.reduce((s,d) => s + d.filaFabricaHoras, 0) / validFilaFab.length : 0;
 
-    // Distâncias
     const medAsfalto = viagens > 0 ? dataArr.reduce((s, d) => s + (d.distanciaAsfalto || 0), 0) / viagens : 0;
     const medTerra = viagens > 0 ? dataArr.reduce((s, d) => s + (d.distanciaTerra || 0), 0) / viagens : 0;
 
@@ -320,7 +324,7 @@ function loadDashboardData() {
         if(chartCiclo) chartCiclo.destroy();
         if(chartTransp) chartTransp.destroy();
         const tbodyComp = document.getElementById('comparativoBody');
-        if (tbodyComp) tbodyComp.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-slate-500">Sem dados para comparar</td></tr>';
+        if (tbodyComp) tbodyComp.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-slate-500">Sem dados para comparar</td></tr>';
         return;
     }
 
@@ -375,12 +379,10 @@ function loadDashboardData() {
     if(document.getElementById('mediaVolumeViagem')) document.getElementById('mediaVolumeViagem').innerText = mediaVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
     if(document.getElementById('totalVolumeReal')) document.getElementById('totalVolumeReal').innerText = totalVolumeReal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
     
-    // FORMATANDO AS DISTÂNCIAS DOS CARDS DO TOPO COM 2 CASAS DECIMAIS
     if(document.getElementById('mediaDistancia')) document.getElementById('mediaDistancia').innerText = mediaDistTotal.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " km";
     if(document.getElementById('mediaAsfalto')) document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     if(document.getElementById('mediaTerra')) document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     
-    // ATUALIZANDO OS ELEMENTOS DE TEMPO COM A NOVA FUNÇÃO DE CORES E METAS
     atualizarElementoTempo('cicloMedio', mediaCiclo, metasGlobaisObj ? metasGlobaisObj.meta_ciclo : 0);
     atualizarElementoTempo('filaCampo', mediaFilaCampo, metasGlobaisObj ? metasGlobaisObj.meta_fila_campo : 0);
     atualizarElementoTempo('tempoCarregamento', mediaTempoCarregamento, metasGlobaisObj ? metasGlobaisObj.meta_carga : 0);
@@ -418,17 +420,46 @@ function loadDashboardData() {
     if (tbodyComp) {
         
         // ==========================================
-        // LÓGICA DE SEPARAÇÃO DOS CENÁRIOS (6 Colunas)
+        // LÓGICA DE SEPARAÇÃO DINÂMICA DE CENÁRIOS 
         // ==========================================
-        const serranaLoaders = ['GSR0001', 'GSR0002', 'GSR0003', 'GSR0007', 'GSR0008', 'GRB0015', 'GRB0022'];
-        const reflorestarLoaders = ['GRB0017', 'GRB0020', 'GRB0029'];
-        const jslLoaders = ['GSL0012', 'GSL0016'];
+        let serranaLoaders = [];
+        let reflorestarLoaders = [];
+        let jslLoaders = [];
+        
+        // Puxa as regras dinâmicas carregadas do BD
+        if (configGruasObj && configGruasObj.length > 0) {
+            configGruasObj.forEach(item => {
+                const codes = (item.grua || '').split(',').map(c => c.trim().toUpperCase()).filter(c => c !== '');
+                const fName = (item.frente || '').toUpperCase();
+                
+                if (fName.includes('SERRANA')) {
+                    serranaLoaders.push(...codes);
+                } else if (fName.includes('REFLORESTAR')) {
+                    reflorestarLoaders.push(...codes);
+                } else if (fName.includes('JSL')) {
+                    jslLoaders.push(...codes);
+                }
+            });
+        } else {
+            // Backup caso falhe ou a tabela esteja vazia
+            serranaLoaders = ['GSR0001', 'GSR0002', 'GSR0003', 'GSR0007', 'GSR0008', 'GRB0015', 'GRB0022'];
+            reflorestarLoaders = ['GRB0017', 'GRB0020', 'GRB0029'];
+            jslLoaders = ['GSL0012', 'GSL0016'];
+        }
+
+        const allMappedLoaders = [...serranaLoaders, ...reflorestarLoaders, ...jslLoaders];
         
         function checkLoader(d, loaderArray) {
+            // Verifica na propriedade 'grua'
+            const val = String(d.grua || '').trim().toUpperCase();
+            if (val && val !== '-') {
+                return loaderArray.includes(val);
+            }
+            // Varredura extra em todos os campos string (salvaguarda)
             for (let key in d) {
                 if (d[key] && typeof d[key] === 'string') {
-                    const val = d[key].trim().toUpperCase();
-                    if (loaderArray.includes(val)) return true;
+                    const v = d[key].trim().toUpperCase();
+                    if (loaderArray.includes(v)) return true;
                 }
             }
             return false;
@@ -439,22 +470,20 @@ function loadDashboardData() {
             return name.includes('SERRANALOG');
         }
 
-        // C1: Serrana 100% (Serrana Carrega e Transporta)
+        // Separação em tempo real!
         const dataC1 = filteredData.filter(d => checkLoader(d, serranaLoaders) && isSerranaTransp(d));
-        
-        // C2: TRANSPORTE ASN (Serrana Carrega / Outros Transportam)
         const dataC2 = filteredData.filter(d => checkLoader(d, serranaLoaders) && !isSerranaTransp(d));
-        
-        // C3: Frente Reflorestar (Reflorestar Carrega / Serrana Transporta)
         const dataC3 = filteredData.filter(d => checkLoader(d, reflorestarLoaders) && isSerranaTransp(d));
-
-        // C4: Frente JSL (JSL Carrega / Serrana Transporta)
         const dataC4 = filteredData.filter(d => checkLoader(d, jslLoaders) && isSerranaTransp(d));
+        
+        // O que não foi mapeado cai aqui (Nova Grua que entrou, nome errado, etc)
+        const dataNI = filteredData.filter(d => !checkLoader(d, allMappedLoaders));
         
         const stC1 = calcStats(dataC1);
         const stC2 = calcStats(dataC2);
         const stC3 = calcStats(dataC3);
         const stC4 = calcStats(dataC4);
+        const stNI = calcStats(dataNI);
         const stGlobal = calcStats(filteredData);
 
         tbodyComp.innerHTML = `
@@ -464,6 +493,7 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${dataC2.length}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${dataC3.length}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${dataC4.length}</td>
+                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${dataNI.length}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${filteredData.length}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
@@ -472,6 +502,7 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC2.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC3.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC4.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${stNI.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stGlobal.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
@@ -480,6 +511,7 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC2.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC3.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC4.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${stNI.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stGlobal.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
@@ -488,6 +520,7 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medCiclo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medCiclo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medCiclo)}</td>
+                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${formatarHorasMinutos(stNI.medCiclo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medCiclo)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-700/50">
@@ -496,6 +529,7 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medFilaCpo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medFilaCpo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${formatarHorasMinutos(stNI.medFilaCpo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medFilaCpo)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
@@ -504,6 +538,7 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medCarreg)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medCarreg)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medCarreg)}</td>
+                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${formatarHorasMinutos(stNI.medCarreg)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medCarreg)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
@@ -512,6 +547,7 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medFilaFab)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medFilaFab)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medFilaFab)}</td>
+                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${formatarHorasMinutos(stNI.medFilaFab)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medFilaFab)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-700">
@@ -531,6 +567,10 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[13px] font-bold text-right">
                     <span class="text-sky-300" title="Asfalto">Asf: ${stC4.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
                     <span class="text-amber-400" title="Terra">Ter: ${stC4.medTerra.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                </td>
+                <td class="px-6 py-4 font-mono text-red-300 text-[13px] font-bold text-right">
+                    <span title="Asfalto">Asf: ${stNI.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
+                    <span title="Terra">Ter: ${stNI.medTerra.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span>
                 </td>
                 <td class="px-6 py-4 font-mono text-white text-[13px] font-bold text-right">
                     <span class="text-sky-300" title="Asfalto">Asf: ${stGlobal.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
