@@ -20,9 +20,14 @@
     <main class="flex-1 h-screen overflow-y-auto relative">
         <div class="max-w-[96rem] mx-auto px-6 py-8">
             <div class="flex justify-between items-center mb-8 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 backdrop-blur-sm">
-                <div><h1 class="text-2xl font-extrabold text-white">Configurações da Torre</h1><p class="text-sm text-slate-400 font-medium">Gerenciamento de Metas Globais e Base de Dados</p></div>
+                <div>
+                    <h1 class="text-2xl font-extrabold text-white">Configurações da Torre</h1>
+                    <p class="text-sm text-slate-400 font-medium">Gerenciamento de Metas Globais e Base de Dados</p>
+                </div>
             </div>
+            
             <section class="space-y-6 animate-fade-in">
+                
                 <div class="glass-card rounded-2xl border border-slate-700/50 shadow-xl overflow-hidden">
                     <div class="bg-slate-800/80 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
                         <h3 class="font-bold text-white tracking-wide"><i class="fas fa-bullseye text-amber-500 mr-2"></i> Configurar Metas Globais</h3>
@@ -145,7 +150,10 @@
                 </div>
 
                 <div class="glass-card rounded-2xl border border-rose-900/30 shadow-xl bg-rose-950/20 p-6 flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div><h3 class="font-bold text-rose-400"><i class="fas fa-exclamation-triangle mr-2"></i> Zona de Risco</h3><p class="text-[10px] text-slate-400">Limpeza permanente de tabelas.</p></div>
+                    <div>
+                        <h3 class="font-bold text-rose-400"><i class="fas fa-exclamation-triangle mr-2"></i> Zona de Risco</h3>
+                        <p class="text-[10px] text-slate-400">Limpeza permanente de tabelas.</p>
+                    </div>
                     <div class="flex flex-col sm:flex-row items-center gap-3">
                         <select id="tipoExclusao" class="bg-rose-950/80 border border-rose-800 text-rose-200 text-xs font-bold rounded px-4 py-2 outline-none">
                             <option value="tudo">Apagar TUDO</option>
@@ -159,10 +167,17 @@
             </section>
         </div>
     </main>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabaseClient.js"></script>
     <script src="js/common.js"></script>
     <script src="js/menu.js"></script>
-    <script src="js/configuracoes.js"></script>
+    
+    <script src="js/configuracoes/utils.js"></script>
+    <script src="js/configuracoes/gruas.js"></script>
+    <script src="js/configuracoes/metas.js"></script>
+    <script src="js/configuracoes/banco_historico.js"></script>
+    <script src="js/configuracoes/importacao.js"></script>
+    <script src="js/configuracoes/main.js"></script>
 </body>
 </html>
