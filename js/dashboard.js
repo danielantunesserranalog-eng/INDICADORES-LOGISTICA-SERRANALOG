@@ -18,6 +18,31 @@ const btnQFs = document.querySelectorAll('.btn-qf');
 document.addEventListener('DOMContentLoaded', () => {
     setupDashboardFilters();
     loadDashboardDataInit();
+
+    // ===============================================
+    // LÓGICA PARA EXPORTAR COMPARATIVO EM PNG
+    // ===============================================
+    const btnExportarComparativo = document.getElementById('btnExportarComparativo');
+    if(btnExportarComparativo) {
+        btnExportarComparativo.addEventListener('click', () => {
+            const container = document.getElementById('comparativoContainer');
+            
+            // Usando html2canvas para tirar um "print" do container em alta qualidade
+            html2canvas(container, {
+                scale: 3, // Resolução 3x (Alta qualidade)
+                backgroundColor: '#0f172a', // Mantém o fundo escuro do Tailwind
+                useCORS: true
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'Comparativo_Cenarios_Serrana.png';
+                link.href = canvas.toDataURL('image/png', 1.0);
+                link.click();
+            }).catch(err => {
+                console.error("Erro ao gerar a imagem PNG:", err);
+                alert("Houve um erro ao tentar salvar a imagem. Tente novamente.");
+            });
+        });
+    }
 });
 
 function setupDashboardFilters() {
@@ -229,7 +254,11 @@ function calcStats(dataArr) {
     const validFilaFab = dataArr.filter(d => d.filaFabricaHoras > 0);
     const medFilaFab = validFilaFab.length > 0 ? validFilaFab.reduce((s,d) => s + d.filaFabricaHoras, 0) / validFilaFab.length : 0;
 
-    return { volTotal: vol, medVol, medCiclo, prod, medFilaCpo, medCarreg, medFilaFab };
+    // Distâncias
+    const medAsfalto = viagens > 0 ? dataArr.reduce((s, d) => s + (d.distanciaAsfalto || 0), 0) / viagens : 0;
+    const medTerra = viagens > 0 ? dataArr.reduce((s, d) => s + (d.distanciaTerra || 0), 0) / viagens : 0;
+
+    return { volTotal: vol, medVol, medCiclo, prod, medFilaCpo, medCarreg, medFilaFab, medAsfalto, medTerra };
 }
 
 function loadDashboardData() {
@@ -291,7 +320,7 @@ function loadDashboardData() {
         if(chartCiclo) chartCiclo.destroy();
         if(chartTransp) chartTransp.destroy();
         const tbodyComp = document.getElementById('comparativoBody');
-        if (tbodyComp) tbodyComp.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-slate-500">Sem dados para comparar</td></tr>';
+        if (tbodyComp) tbodyComp.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-slate-500">Sem dados para comparar</td></tr>';
         return;
     }
 
@@ -345,9 +374,11 @@ function loadDashboardData() {
     
     if(document.getElementById('mediaVolumeViagem')) document.getElementById('mediaVolumeViagem').innerText = mediaVolume.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
     if(document.getElementById('totalVolumeReal')) document.getElementById('totalVolumeReal').innerText = totalVolumeReal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " m³";
-    if(document.getElementById('mediaDistancia')) document.getElementById('mediaDistancia').innerText = mediaDistTotal.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + " km";
-    if(document.getElementById('mediaAsfalto')) document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {maximumFractionDigits: 1});
-    if(document.getElementById('mediaTerra')) document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {maximumFractionDigits: 1});
+    
+    // FORMATANDO AS DISTÂNCIAS DOS CARDS DO TOPO COM 2 CASAS DECIMAIS
+    if(document.getElementById('mediaDistancia')) document.getElementById('mediaDistancia').innerText = mediaDistTotal.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " km";
+    if(document.getElementById('mediaAsfalto')) document.getElementById('mediaAsfalto').innerText = mediaAsfalto.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    if(document.getElementById('mediaTerra')) document.getElementById('mediaTerra').innerText = mediaTerra.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     
     // ATUALIZANDO OS ELEMENTOS DE TEMPO COM A NOVA FUNÇÃO DE CORES E METAS
     atualizarElementoTempo('cicloMedio', mediaCiclo, metasGlobaisObj ? metasGlobaisObj.meta_ciclo : 0);
@@ -385,49 +416,126 @@ function loadDashboardData() {
 
     const tbodyComp = document.getElementById('comparativoBody');
     if (tbodyComp) {
-        const dataSerrana = filteredData.filter(d => String(d.transportadora||'').toUpperCase().includes('SERRANALOG'));
-        const dataOutras = filteredData.filter(d => !String(d.transportadora||'').toUpperCase().includes('SERRANALOG'));
         
-        const stSerrana = calcStats(dataSerrana);
-        const stOutras = calcStats(dataOutras);
+        // ==========================================
+        // LÓGICA DE SEPARAÇÃO DOS CENÁRIOS (6 Colunas)
+        // ==========================================
+        const serranaLoaders = ['GSR0001', 'GSR0002', 'GSR0003', 'GSR0007', 'GSR0008', 'GRB0015', 'GRB0022'];
+        const reflorestarLoaders = ['GRB0017', 'GRB0020', 'GRB0029'];
+        const jslLoaders = ['GSL0012', 'GSL0016'];
+        
+        function checkLoader(d, loaderArray) {
+            for (let key in d) {
+                if (d[key] && typeof d[key] === 'string') {
+                    const val = d[key].trim().toUpperCase();
+                    if (loaderArray.includes(val)) return true;
+                }
+            }
+            return false;
+        }
+        
+        function isSerranaTransp(d) {
+            const name = String(d.transportadora || '').toUpperCase();
+            return name.includes('SERRANALOG');
+        }
+
+        // C1: Serrana 100% (Serrana Carrega e Transporta)
+        const dataC1 = filteredData.filter(d => checkLoader(d, serranaLoaders) && isSerranaTransp(d));
+        
+        // C2: TRANSPORTE ASN (Serrana Carrega / Outros Transportam)
+        const dataC2 = filteredData.filter(d => checkLoader(d, serranaLoaders) && !isSerranaTransp(d));
+        
+        // C3: Frente Reflorestar (Reflorestar Carrega / Serrana Transporta)
+        const dataC3 = filteredData.filter(d => checkLoader(d, reflorestarLoaders) && isSerranaTransp(d));
+
+        // C4: Frente JSL (JSL Carrega / Serrana Transporta)
+        const dataC4 = filteredData.filter(d => checkLoader(d, jslLoaders) && isSerranaTransp(d));
+        
+        const stC1 = calcStats(dataC1);
+        const stC2 = calcStats(dataC2);
+        const stC3 = calcStats(dataC3);
+        const stC4 = calcStats(dataC4);
         const stGlobal = calcStats(filteredData);
 
         tbodyComp.innerHTML = `
             <tr class="hover:bg-slate-800/30 transition-colors">
-                <td class="px-6 py-4 font-bold text-white"><i class="fas fa-box-open text-indigo-400 w-5"></i> Volume Médio / Viagem</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stSerrana.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stOutras.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stGlobal.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-bold text-white text-sm"><i class="fas fa-route text-slate-400 w-5"></i> Viagens Realizadas</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${dataC1.length}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${dataC2.length}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${dataC3.length}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${dataC4.length}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${filteredData.length}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
-                <td class="px-6 py-4 font-bold text-white"><i class="fas fa-cubes text-cyan-400 w-5"></i> Volume Total</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stSerrana.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stOutras.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${stGlobal.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-bold text-white text-sm"><i class="fas fa-box-open text-indigo-400 w-5"></i> Caixa de Carga Média</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC1.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC2.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC3.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC4.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stGlobal.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
-                <td class="px-6 py-4 font-bold text-white"><i class="fas fa-stopwatch text-blue-400 w-5"></i> Ciclo Médio Total</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stSerrana.medCiclo)}</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stOutras.medCiclo)}</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stGlobal.medCiclo)}</td>
+                <td class="px-6 py-4 font-bold text-white text-sm"><i class="fas fa-cubes text-cyan-400 w-5"></i> Volume Total</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC1.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC2.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC3.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC4.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stGlobal.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30 transition-colors">
+                <td class="px-6 py-4 font-bold text-white text-sm"><i class="fas fa-stopwatch text-blue-400 w-5"></i> Ciclo Médio Total</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC1.medCiclo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medCiclo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medCiclo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medCiclo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medCiclo)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-700/50">
-                <td class="px-6 py-4 font-bold text-slate-300 text-[11px] uppercase tracking-wider"><i class="fas fa-hourglass-half text-amber-500 w-5"></i> Espera Média no Campo</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stSerrana.medFilaCpo)}</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stOutras.medFilaCpo)}</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stGlobal.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-bold text-slate-300 text-xs uppercase tracking-wider"><i class="fas fa-hourglass-half text-amber-500 w-5"></i> Espera Média no Campo</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC1.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medFilaCpo)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medFilaCpo)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
-                <td class="px-6 py-4 font-bold text-slate-300 text-[11px] uppercase tracking-wider"><i class="fas fa-truck-loading text-emerald-500 w-5"></i> Tempo Médio Carregamento</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stSerrana.medCarreg)}</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stOutras.medCarreg)}</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stGlobal.medCarreg)}</td>
+                <td class="px-6 py-4 font-bold text-slate-300 text-xs uppercase tracking-wider"><i class="fas fa-truck-loading text-emerald-500 w-5"></i> Tempo Médio Carregamento</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC1.medCarreg)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medCarreg)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medCarreg)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medCarreg)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medCarreg)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
-                <td class="px-6 py-4 font-bold text-slate-300 text-[11px] uppercase tracking-wider"><i class="fas fa-industry text-rose-500 w-5"></i> Espera Média na Fábrica</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stSerrana.medFilaFab)}</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stOutras.medFilaFab)}</td>
-                <td class="px-6 py-4 font-mono text-white text-lg font-bold text-right">${formatarHorasMinutos(stGlobal.medFilaFab)}</td>
+                <td class="px-6 py-4 font-bold text-slate-300 text-xs uppercase tracking-wider"><i class="fas fa-industry text-rose-500 w-5"></i> Espera Média na Fábrica</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC1.medFilaFab)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medFilaFab)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medFilaFab)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medFilaFab)}</td>
+                <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medFilaFab)}</td>
+            </tr>
+            <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-700">
+                <td class="px-6 py-4 font-bold text-slate-300 text-xs uppercase tracking-wider"><i class="fas fa-road text-slate-400 w-5"></i> Dist. Média (Asfalto / Terra)</td>
+                <td class="px-6 py-4 font-mono text-white text-[13px] font-bold text-right">
+                    <span class="text-sky-300" title="Asfalto">Asf: ${stC1.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
+                    <span class="text-amber-400" title="Terra">Ter: ${stC1.medTerra.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                </td>
+                <td class="px-6 py-4 font-mono text-white text-[13px] font-bold text-right">
+                    <span class="text-sky-300" title="Asfalto">Asf: ${stC2.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
+                    <span class="text-amber-400" title="Terra">Ter: ${stC2.medTerra.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                </td>
+                <td class="px-6 py-4 font-mono text-white text-[13px] font-bold text-right">
+                    <span class="text-sky-300" title="Asfalto">Asf: ${stC3.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
+                    <span class="text-amber-400" title="Terra">Ter: ${stC3.medTerra.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                </td>
+                <td class="px-6 py-4 font-mono text-white text-[13px] font-bold text-right">
+                    <span class="text-sky-300" title="Asfalto">Asf: ${stC4.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
+                    <span class="text-amber-400" title="Terra">Ter: ${stC4.medTerra.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                </td>
+                <td class="px-6 py-4 font-mono text-white text-[13px] font-bold text-right">
+                    <span class="text-sky-300" title="Asfalto">Asf: ${stGlobal.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
+                    <span class="text-amber-400" title="Terra">Ter: ${stGlobal.medTerra.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                </td>
             </tr>
         `;
     }
