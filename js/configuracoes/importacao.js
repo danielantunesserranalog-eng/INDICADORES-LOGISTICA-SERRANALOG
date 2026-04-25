@@ -200,6 +200,24 @@ async function processAndSaveFile(file) {
 
         if (viagensNovasArray.length === 0) throw new Error(`Todas as viagens já existem. (${duplicadasIgnoradas} ignoradas).`);
 
+        // ===============================================
+        // INTELIGÊNCIA: VERIFICA SE EXISTE GRUA DESCONHECIDA
+        // ===============================================
+        const allMappedGruas = [];
+        if (typeof frentesData !== 'undefined') {
+            allMappedGruas.push(...(frentesData['SERRANA']?.gruas || []));
+            allMappedGruas.push(...(frentesData['REFLORESTAR']?.gruas || []));
+            allMappedGruas.push(...(frentesData['JSL']?.gruas || []));
+        }
+
+        const gruasDesconhecidas = new Set();
+        viagensNovasArray.forEach(v => {
+            const gruaRaw = String(v.grua || '').trim().toUpperCase();
+            if (gruaRaw && gruaRaw !== '-' && !allMappedGruas.includes(gruaRaw)) {
+                gruasDesconhecidas.add(gruaRaw);
+            }
+        });
+
         const datasEncontradas = [...new Set(viagensNovasArray.map(r => r.dataDaBaseExcel).filter(d => d && d !== 'Desconhecida'))];
         let strHistoricoDatas = 'Desconhecida';
         
@@ -219,7 +237,14 @@ async function processAndSaveFile(file) {
 
         await supabaseClient.from('historico_importacoes').insert([{ "dataBase": `Viagens: ${strHistoricoDatas}`, "qtdViagens": viagensNovasArray.length, "dataLancamento": new Date().toLocaleString('pt-PT') }]);
         
-        alert(`Sucesso! Salvas ${viagensNovasArray.length} NOVAS viagens.\nDatas: ${strHistoricoDatas}`);
+        let msgSucesso = `Sucesso! Salvas ${viagensNovasArray.length} NOVAS viagens.\nDatas: ${strHistoricoDatas}`;
+        
+        // Dispara o alerta caso existam máquinas novas
+        if (gruasDesconhecidas.size > 0) {
+            msgSucesso += `\n\n⚠️ ATENÇÃO: Foram identificadas gruas não cadastradas no sistema (${Array.from(gruasDesconhecidas).join(', ')}).\n\nPara que o Dashboard Visão Geral funcione perfeitamente, por favor, adicione-as ao mapeamento na tela de Configurações.`;
+        }
+
+        alert(msgSucesso);
         carregarHistoricoImportacoes(); 
         
     } catch (err) {
@@ -230,7 +255,6 @@ async function processAndSaveFile(file) {
 }
 
 function initImportacao() {
-    // Viagens
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     if(dropZone && fileInput){
@@ -241,7 +265,6 @@ function initImportacao() {
         fileInput.addEventListener('change', e => { if(e.target.files.length) processAndSaveFile(e.target.files[0]); });
     }
 
-    // Jornadas
     const dropZoneJornadas = document.getElementById('dropZoneJornadas');
     const fileInputJornadas = document.getElementById('fileInputJornadas');
     if(dropZoneJornadas && fileInputJornadas){

@@ -8,7 +8,7 @@ Chart.defaults.font.family = "'Inter', sans-serif";
 
 let fullHistoricoData = [];
 let metasGlobaisObj = null; 
-let configGruasObj = []; // Variável para armazenar a configuração do banco
+let configGruasObj = []; 
 let activeQuickFilter = 'ALL';
 let chartCiclo = null, chartTransp = null;
 
@@ -20,9 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDashboardFilters();
     loadDashboardDataInit();
 
-    // ===============================================
-    // LÓGICA PARA EXPORTAR COMPARATIVO EM PNG
-    // ===============================================
     const btnExportarComparativo = document.getElementById('btnExportarComparativo');
     if(btnExportarComparativo) {
         btnExportarComparativo.addEventListener('click', () => {
@@ -188,7 +185,6 @@ const centerTextPlugin = {
 
 async function loadDashboardDataInit() {
     
-    // Busca as metas globais
     try {
         const { data: metasData } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
         if (metasData) {
@@ -198,7 +194,6 @@ async function loadDashboardDataInit() {
         console.error("Erro ao puxar metas globais no dashboard:", e);
     }
 
-    // Busca o mapeamento de Frentes e Gruas na tabela CORRETA (config_gruas)
     try {
         const { data: gruasData } = await supabaseClient.from('config_gruas').select('*');
         if (gruasData) {
@@ -324,7 +319,7 @@ function loadDashboardData() {
         if(chartCiclo) chartCiclo.destroy();
         if(chartTransp) chartTransp.destroy();
         const tbodyComp = document.getElementById('comparativoBody');
-        if (tbodyComp) tbodyComp.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-slate-500">Sem dados para comparar</td></tr>';
+        if (tbodyComp) tbodyComp.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-slate-500">Sem dados para comparar</td></tr>';
         return;
     }
 
@@ -419,14 +414,10 @@ function loadDashboardData() {
     const tbodyComp = document.getElementById('comparativoBody');
     if (tbodyComp) {
         
-        // ==========================================
-        // LÓGICA DE SEPARAÇÃO DINÂMICA DE CENÁRIOS 
-        // ==========================================
         let serranaLoaders = [];
         let reflorestarLoaders = [];
         let jslLoaders = [];
         
-        // CORREÇÃO: Lendo da coluna 'codigos' da tabela config_gruas
         if (configGruasObj && configGruasObj.length > 0) {
             configGruasObj.forEach(item => {
                 const codes = (item.codigos || '').split(',').map(c => c.trim().toUpperCase()).filter(c => c !== '');
@@ -441,14 +432,11 @@ function loadDashboardData() {
                 }
             });
         } else {
-            // Backup caso falhe ou a tabela esteja vazia
             serranaLoaders = ['GSR0001', 'GSR0002', 'GSR0003', 'GSR0007', 'GSR0008', 'GRB0015', 'GRB0022'];
             reflorestarLoaders = ['GRB0017', 'GRB0020', 'GRB0029'];
             jslLoaders = ['GSL0012', 'GSL0016'];
         }
 
-        const allMappedLoaders = [...serranaLoaders, ...reflorestarLoaders, ...jslLoaders];
-        
         function checkLoader(d, loaderArray) {
             const val = String(d.grua || '').trim().toUpperCase();
             if (val && val !== '-') {
@@ -473,13 +461,10 @@ function loadDashboardData() {
         const dataC3 = filteredData.filter(d => checkLoader(d, reflorestarLoaders) && isSerranaTransp(d));
         const dataC4 = filteredData.filter(d => checkLoader(d, jslLoaders) && isSerranaTransp(d));
         
-        const dataNI = filteredData.filter(d => !checkLoader(d, allMappedLoaders));
-        
         const stC1 = calcStats(dataC1);
         const stC2 = calcStats(dataC2);
         const stC3 = calcStats(dataC3);
         const stC4 = calcStats(dataC4);
-        const stNI = calcStats(dataNI);
         const stGlobal = calcStats(filteredData);
 
         tbodyComp.innerHTML = `
@@ -489,7 +474,6 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${dataC2.length}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${dataC3.length}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${dataC4.length}</td>
-                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${dataNI.length}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${filteredData.length}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
@@ -498,7 +482,6 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC2.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC3.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC4.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
-                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${stNI.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stGlobal.medVol.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
@@ -507,7 +490,6 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC2.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC3.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stC4.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
-                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${stNI.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${stGlobal.volTotal.toLocaleString('pt-PT',{maximumFractionDigits:1})} m³</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
@@ -516,7 +498,6 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medCiclo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medCiclo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medCiclo)}</td>
-                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${formatarHorasMinutos(stNI.medCiclo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medCiclo)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-700/50">
@@ -525,7 +506,6 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medFilaCpo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medFilaCpo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medFilaCpo)}</td>
-                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${formatarHorasMinutos(stNI.medFilaCpo)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medFilaCpo)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
@@ -534,7 +514,6 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medCarreg)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medCarreg)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medCarreg)}</td>
-                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${formatarHorasMinutos(stNI.medCarreg)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medCarreg)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors">
@@ -543,7 +522,6 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC2.medFilaFab)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC3.medFilaFab)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stC4.medFilaFab)}</td>
-                <td class="px-6 py-4 font-mono text-red-400 text-[15px] font-bold text-right">${formatarHorasMinutos(stNI.medFilaFab)}</td>
                 <td class="px-6 py-4 font-mono text-white text-[15px] font-bold text-right">${formatarHorasMinutos(stGlobal.medFilaFab)}</td>
             </tr>
             <tr class="hover:bg-slate-800/30 transition-colors border-t border-slate-700">
@@ -563,10 +541,6 @@ function loadDashboardData() {
                 <td class="px-6 py-4 font-mono text-white text-[13px] font-bold text-right">
                     <span class="text-sky-300" title="Asfalto">Asf: ${stC4.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
                     <span class="text-amber-400" title="Terra">Ter: ${stC4.medTerra.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span>
-                </td>
-                <td class="px-6 py-4 font-mono text-red-300 text-[13px] font-bold text-right">
-                    <span title="Asfalto">Asf: ${stNI.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
-                    <span title="Terra">Ter: ${stNI.medTerra.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span>
                 </td>
                 <td class="px-6 py-4 font-mono text-white text-[13px] font-bold text-right">
                     <span class="text-sky-300" title="Asfalto">Asf: ${stGlobal.medAsfalto.toLocaleString('pt-PT',{minimumFractionDigits:2, maximumFractionDigits:2})}</span><br>
