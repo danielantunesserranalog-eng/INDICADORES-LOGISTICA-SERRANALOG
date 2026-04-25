@@ -49,7 +49,7 @@ async function carregarFrentesGruas() {
     };
 
     try {
-        const { data, error } = await supabaseClient.from('frentes_gruas').select('*');
+        const { data, error } = await supabaseClient.from('config_gruas').select('*');
         
         let encontrouNoBanco = false;
 
@@ -58,7 +58,6 @@ async function carregarFrentesGruas() {
                 const f = (item.frente || '').toUpperCase();
                 let targetFrente = null;
                 
-                // Mapeamento flexível (não importa se no banco está "Serrana", "Frente Serrana", etc)
                 if (f.includes('SERRANA')) targetFrente = 'SERRANA';
                 else if (f.includes('REFLORESTAR')) targetFrente = 'REFLORESTAR';
                 else if (f.includes('JSL')) targetFrente = 'JSL';
@@ -66,29 +65,26 @@ async function carregarFrentesGruas() {
                 if (targetFrente) {
                     encontrouNoBanco = true;
                     frentesData[targetFrente].id = item.id;
-                    // Proteção extra: Lê da coluna 'grua' ou 'codigos' caso a tabela tenha sido criada diferente
-                    const colGrua = item.grua || item.codigos || ''; 
+                    const colGrua = item.codigos || ''; 
                     frentesData[targetFrente].gruas = colGrua.split(',').map(g => g.trim().toUpperCase()).filter(g => g);
                 }
             });
         }
 
-        // AUTO-SEED: Se o banco estiver vazio ou a tabela incompleta, força a criação com os dados da imagem
+        // AUTO-SEED: Se o banco estiver vazio, força a criação
         if (!encontrouNoBanco) {
             frentesData['SERRANA'].gruas = ['GSR0001', 'GSR0002', 'GSR0003', 'GSR0007', 'GSR0008', 'GRB0015', 'GRB0022'];
             frentesData['REFLORESTAR'].gruas = ['GRB0017', 'GRB0020', 'GRB0029'];
             frentesData['JSL'].gruas = ['GSL0012', 'GSL0016'];
             
-            // Tenta salvar silenciosamente no banco para inicializar
             try {
-                await supabaseClient.from('frentes_gruas').insert([
-                    { frente: 'SERRANA', grua: frentesData['SERRANA'].gruas.join(', ') },
-                    { frente: 'REFLORESTAR', grua: frentesData['REFLORESTAR'].gruas.join(', ') },
-                    { frente: 'JSL', grua: frentesData['JSL'].gruas.join(', ') }
+                await supabaseClient.from('config_gruas').insert([
+                    { frente: 'SERRANA', codigos: frentesData['SERRANA'].gruas.join(', ') },
+                    { frente: 'REFLORESTAR', codigos: frentesData['REFLORESTAR'].gruas.join(', ') },
+                    { frente: 'JSL', codigos: frentesData['JSL'].gruas.join(', ') }
                 ]);
                 
-                // Recarrega para pegar os IDs gerados pelo banco
-                const { data: newData } = await supabaseClient.from('frentes_gruas').select('*');
+                const { data: newData } = await supabaseClient.from('config_gruas').select('*');
                 if (newData) {
                     newData.forEach(item => {
                         const f = (item.frente || '').toUpperCase();
@@ -98,14 +94,13 @@ async function carregarFrentesGruas() {
                     });
                 }
             } catch(silentErr) {
-                console.log("Banco não está pronto para insert automático. Exibindo via memória visual.", silentErr);
+                console.log("Banco não está pronto para insert automático.", silentErr);
             }
         }
         
         renderizarGruas();
     } catch (e) {
         console.error("Erro geral na API do Supabase:", e);
-        // Fallback garantido para a interface nunca ficar quebrada
         frentesData['SERRANA'].gruas = ['GSR0001', 'GSR0002', 'GSR0003', 'GSR0007', 'GSR0008', 'GRB0015', 'GRB0022'];
         frentesData['REFLORESTAR'].gruas = ['GRB0017', 'GRB0020', 'GRB0029'];
         frentesData['JSL'].gruas = ['GSL0012', 'GSL0016'];
@@ -150,9 +145,7 @@ window.adicionarGrua = async function(frente, inputId) {
     
     if (!valor) return;
     
-    // Suporta adicionar várias de uma vez colando com vírgula
     const novasGruas = valor.split(',').map(g => g.trim()).filter(g => g);
-    
     let gruasAtuais = [...frentesData[frente].gruas];
     let adicionou = false;
     
@@ -185,9 +178,9 @@ async function salvarNoBanco(frente, stringGruas) {
     const id = frentesData[frente].id;
     try {
         if (id) {
-            await supabaseClient.from('frentes_gruas').update({ grua: stringGruas }).eq('id', id);
+            await supabaseClient.from('config_gruas').update({ codigos: stringGruas }).eq('id', id);
         } else {
-            const { data } = await supabaseClient.from('frentes_gruas').insert([{ frente: frente, grua: stringGruas }]).select();
+            const { data } = await supabaseClient.from('config_gruas').insert([{ frente: frente, codigos: stringGruas }]).select();
             if (data && data.length > 0) {
                 frentesData[frente].id = data[0].id;
             }
@@ -378,7 +371,7 @@ if (btnLimparBanco) {
 }
 
 // ==========================================
-// IMPORTAÇÃO DE JORNADAS E VIAGENS MANTIDAS
+// IMPORTAÇÃO DE JORNADAS E VIAGENS
 // ==========================================
 async function processAndSaveJornadasFile(file) {
     const errorMsgDiv = document.getElementById('errorMsgJornadas');

@@ -198,9 +198,9 @@ async function loadDashboardDataInit() {
         console.error("Erro ao puxar metas globais no dashboard:", e);
     }
 
-    // Busca o mapeamento de Frentes e Gruas
+    // Busca o mapeamento de Frentes e Gruas na tabela CORRETA (config_gruas)
     try {
-        const { data: gruasData } = await supabaseClient.from('frentes_gruas').select('*');
+        const { data: gruasData } = await supabaseClient.from('config_gruas').select('*');
         if (gruasData) {
             configGruasObj = gruasData;
         }
@@ -426,10 +426,10 @@ function loadDashboardData() {
         let reflorestarLoaders = [];
         let jslLoaders = [];
         
-        // Puxa as regras dinâmicas carregadas do BD
+        // CORREÇÃO: Lendo da coluna 'codigos' da tabela config_gruas
         if (configGruasObj && configGruasObj.length > 0) {
             configGruasObj.forEach(item => {
-                const codes = (item.grua || '').split(',').map(c => c.trim().toUpperCase()).filter(c => c !== '');
+                const codes = (item.codigos || '').split(',').map(c => c.trim().toUpperCase()).filter(c => c !== '');
                 const fName = (item.frente || '').toUpperCase();
                 
                 if (fName.includes('SERRANA')) {
@@ -450,12 +450,10 @@ function loadDashboardData() {
         const allMappedLoaders = [...serranaLoaders, ...reflorestarLoaders, ...jslLoaders];
         
         function checkLoader(d, loaderArray) {
-            // Verifica na propriedade 'grua'
             const val = String(d.grua || '').trim().toUpperCase();
             if (val && val !== '-') {
                 return loaderArray.includes(val);
             }
-            // Varredura extra em todos os campos string (salvaguarda)
             for (let key in d) {
                 if (d[key] && typeof d[key] === 'string') {
                     const v = d[key].trim().toUpperCase();
@@ -470,13 +468,11 @@ function loadDashboardData() {
             return name.includes('SERRANALOG');
         }
 
-        // Separação em tempo real!
         const dataC1 = filteredData.filter(d => checkLoader(d, serranaLoaders) && isSerranaTransp(d));
         const dataC2 = filteredData.filter(d => checkLoader(d, serranaLoaders) && !isSerranaTransp(d));
         const dataC3 = filteredData.filter(d => checkLoader(d, reflorestarLoaders) && isSerranaTransp(d));
         const dataC4 = filteredData.filter(d => checkLoader(d, jslLoaders) && isSerranaTransp(d));
         
-        // O que não foi mapeado cai aqui (Nova Grua que entrou, nome errado, etc)
         const dataNI = filteredData.filter(d => !checkLoader(d, allMappedLoaders));
         
         const stC1 = calcStats(dataC1);
