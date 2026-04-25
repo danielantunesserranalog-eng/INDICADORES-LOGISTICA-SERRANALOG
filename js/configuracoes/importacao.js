@@ -16,19 +16,6 @@ async function processAndSaveJornadasFile(file) {
 
         if (!rawData || rawData.length === 0) throw new Error("Planilha vazia ou em formato incorreto.");
 
-        const safeParseTime = (val) => {
-            if (val === null || val === undefined || val === '-' || String(val).trim() === '') return 0;
-            if (typeof val === 'number') return val < 24 ? val * 24 : val;
-            const str = String(val).trim();
-            if (str.includes(':')) {
-                const parts = str.split(':');
-                return parseInt(parts[0] || 0, 10) + (parseInt(parts[1] || 0, 10) / 60);
-            }
-            return parseFloat(str.replace(',', '.')) || 0;
-        };
-
-        const regexDateCheck = /(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2})/;
-
         const mappedData = rawData.map(row => {
             const getVal = (possibleNames) => {
                 for (let k of Object.keys(row)) {
@@ -42,7 +29,7 @@ async function processAndSaveJornadasFile(file) {
             if (!motorista || String(motorista).trim() === '-' || String(motorista).trim() === '') return null;
             
             const valTrabalho = getVal(['total de trabalho', 'total trabalho', 'tempo de trabalho']);
-            const totalHoras = safeParseTime(valTrabalho);
+            const totalHoras = timeParaDecimal(valTrabalho);
             
             const colDataExtra = getVal(['data', 'data da jornada', 'data inicial', 'data do movimento']);
             let strInicio = String(getVal(['início', 'inicio']) || '').trim();
@@ -50,8 +37,8 @@ async function processAndSaveJornadasFile(file) {
 
             if (colDataExtra) {
                 const dataLimpa = String(colDataExtra).trim();
-                if (strInicio && !strInicio.match(regexDateCheck)) strInicio = `${dataLimpa} ${strInicio}`;
-                if (strFim && !strFim.match(regexDateCheck)) strFim = `${dataLimpa} ${strFim}`;
+                if (strInicio && !strInicio.match(/(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2})/)) strInicio = `${dataLimpa} ${strInicio}`;
+                if (strFim && !strFim.match(/(\d{1,2}\/\d{1,2}\/\d{2,4}|\d{4}-\d{1,2}-\d{1,2})/)) strFim = `${dataLimpa} ${strFim}`;
             }
 
             return {
@@ -61,12 +48,12 @@ async function processAndSaveJornadasFile(file) {
                 inicio: strInicio,
                 fim: strFim,
                 total_trabalho_horas: totalHoras,
-                refeicao_horas: safeParseTime(getVal(['refeição', 'refeicao'])),
-                repouso_horas: safeParseTime(getVal(['repouso'])),
-                direcao_horas: safeParseTime(getVal(['direção', 'direcao'])),
+                refeicao_horas: timeParaDecimal(getVal(['refeição', 'refeicao'])),
+                repouso_horas: timeParaDecimal(getVal(['repouso'])),
+                direcao_horas: timeParaDecimal(getVal(['direção', 'direcao'])),
                 estourou_jornada: totalHoras > 12,
-                horas_noturnas: safeParseTime(getVal(['noturnas', 'noturna', 'horas noturnas'])),
-                horas_extras: safeParseTime(getVal(['extra normal', 'extranormal'])) + safeParseTime(getVal(['extra excedente', 'extraexcedente']))
+                horas_noturnas: timeParaDecimal(getVal(['noturnas', 'noturna', 'horas noturnas'])),
+                horas_extras: timeParaDecimal(getVal(['extra normal', 'extranormal'])) + timeParaDecimal(getVal(['extra excedente', 'extraexcedente']))
             };
         }).filter(item => {
             if (item === null || item.motorista === '' || item.total_trabalho_horas < 8) return false;
@@ -180,6 +167,41 @@ async function processAndSaveFile(file) {
         const newRows = parseSheetToData(workbook.Sheets[workbook.SheetNames[0]]);
         if (!newRows || newRows.length === 0) throw new Error("Planilha vazia ou sem dados válidos.");
 
+        // Busca TODAS as gruas cadastradas no banco para fazer a limpeza da bagunça
+        const { data: gruasData } = await supabaseClient.from('config_gruas').select('*');
+        let allMappedLoaders = [];
+        if (gruasData) {
+            gruasData.forEach(item => {
+                const codes = (item.codigos || '').split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+                allMappedLoaders.push(...codes);
+            });
+        }
+
+        // ==============================================================
+        // INTELIGÊNCIA 1: Filtro rigoroso (Joga fora a bagunça do Excel)
+        // ==============================================================
+        const operacaoRows = newRows.filter(row => {
+            const transp = String(row.transportadora || '').toUpperCase();
+            const grua = String(row.grua || '').trim().toUpperCase();
+            
+            // É a nossa frota transportando?
+            const isSerranaTransp = transp.includes('SERRANALOG') || transp.includes('SERRANA LOG');
+            // O carregamento ocorreu em uma grua que a gente mapeou no painel?
+            const isMappedLoader = allMappedLoaders.includes(grua);
+            // Salva-vidas: É uma grua nova não mapeada ainda, mas que tem o nosso prefixo oficial?
+            const isOurPrefix = grua.startsWith('GSR') || grua.startsWith('GRB') || grua.startsWith('GSL');
+
+            // Só passa o que for nosso. O resto (bagunça) é deletado.
+            return isSerranaTransp || isMappedLoader || isOurPrefix;
+        });
+
+        if (operacaoRows.length === 0) {
+            throw new Error("A planilha não contém nenhuma viagem da nossa operação. A importação foi abortada.");
+        }
+
+        let linhasDescartadas = newRows.length - operacaoRows.length;
+
+        // Puxa as duplicatas do banco
         let existingIds = [];
         let startVia = 0; const stepVia = 1000;
         while (true) {
@@ -193,27 +215,26 @@ async function processAndSaveFile(file) {
         
         const existingSet = new Set(existingIds.map(e => e.movimento));
         let duplicadasIgnoradas = 0;
-        const viagensNovasArray = newRows.filter(item => {
+        
+        // Filtra os IDs usando a lista já limpa
+        const viagensNovasArray = operacaoRows.filter(item => {
             if (existingSet.has(item.movimento)) { duplicadasIgnoradas++; return false; } 
             else { existingSet.add(item.movimento); return true; }
         });
 
-        if (viagensNovasArray.length === 0) throw new Error(`Todas as viagens já existem. (${duplicadasIgnoradas} ignoradas).`);
-
-        // ===============================================
-        // INTELIGÊNCIA: VERIFICA SE EXISTE GRUA DESCONHECIDA
-        // ===============================================
-        const allMappedGruas = [];
-        if (typeof frentesData !== 'undefined') {
-            allMappedGruas.push(...(frentesData['SERRANA']?.gruas || []));
-            allMappedGruas.push(...(frentesData['REFLORESTAR']?.gruas || []));
-            allMappedGruas.push(...(frentesData['JSL']?.gruas || []));
+        if (viagensNovasArray.length === 0) {
+            let msg = `Todas as viagens já existem. (${duplicadasIgnoradas} duplicadas ignoradas).`;
+            if (linhasDescartadas > 0) msg += ` E ${linhasDescartadas} viagens inúteis foram descartadas.`;
+            throw new Error(msg);
         }
 
+        // ==============================================================
+        // INTELIGÊNCIA 2: Alerta de Gruas Desconhecidas Importadas
+        // ==============================================================
         const gruasDesconhecidas = new Set();
         viagensNovasArray.forEach(v => {
             const gruaRaw = String(v.grua || '').trim().toUpperCase();
-            if (gruaRaw && gruaRaw !== '-' && !allMappedGruas.includes(gruaRaw)) {
+            if (gruaRaw && gruaRaw !== '-' && !allMappedLoaders.includes(gruaRaw)) {
                 gruasDesconhecidas.add(gruaRaw);
             }
         });
@@ -237,11 +258,14 @@ async function processAndSaveFile(file) {
 
         await supabaseClient.from('historico_importacoes').insert([{ "dataBase": `Viagens: ${strHistoricoDatas}`, "qtdViagens": viagensNovasArray.length, "dataLancamento": new Date().toLocaleString('pt-PT') }]);
         
-        let msgSucesso = `Sucesso! Salvas ${viagensNovasArray.length} NOVAS viagens.\nDatas: ${strHistoricoDatas}`;
+        let msgSucesso = `Sucesso! Salvas ${viagensNovasArray.length} NOVAS viagens da nossa operação.\nDatas: ${strHistoricoDatas}`;
         
-        // Dispara o alerta caso existam máquinas novas
+        if (linhasDescartadas > 0) {
+            msgSucesso += `\n\n🗑️ MÁGICA: ${linhasDescartadas} viagens de terceiros (bagunça) foram descartadas e não sujaram o sistema!`;
+        }
+
         if (gruasDesconhecidas.size > 0) {
-            msgSucesso += `\n\n⚠️ ATENÇÃO: Foram identificadas gruas não cadastradas no sistema (${Array.from(gruasDesconhecidas).join(', ')}).\n\nPara que o Dashboard Visão Geral funcione perfeitamente, por favor, adicione-as ao mapeamento na tela de Configurações.`;
+            msgSucesso += `\n\n⚠️ ALERTA: Foram importadas viagens com códigos de GRUAS NOVAS ou NÃO CADASTRADAS: (${Array.from(gruasDesconhecidas).join(', ')}).\n\nLembre-se de ir nos cards de Frentes nesta mesma tela e adicioná-las para que os cálculos do Dashboard fiquem perfeitos.`;
         }
 
         alert(msgSucesso);
