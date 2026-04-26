@@ -57,7 +57,7 @@ async function processAndSaveJornadasFile(file) {
             };
         }).filter(item => {
             if (item === null || item.motorista === '' || item.total_trabalho_horas < 8) return false;
-            if (MOTORISTAS_EXCLUIDOS.includes(item.motorista.toUpperCase())) return false;
+            if (typeof MOTORISTAS_EXCLUIDOS !== 'undefined' && MOTORISTAS_EXCLUIDOS.includes(item.motorista.toUpperCase())) return false;
             return true;
         });
 
@@ -94,7 +94,7 @@ async function processAndSaveJornadasFile(file) {
         }]);
         
         alert(`Sucesso! Salvas ${jornadasNovas.length} NOVAS jornadas.`);
-        carregarHistoricoImportacoes(); 
+        if (typeof carregarHistoricoImportacoes === 'function') carregarHistoricoImportacoes(); 
         
     } catch (err) {
         if(errorMsgDiv) { errorMsgDiv.innerText = "Erro: " + err.message; errorMsgDiv.classList.remove('hidden'); } 
@@ -167,36 +167,52 @@ async function processAndSaveFile(file) {
         const newRows = parseSheetToData(workbook.Sheets[workbook.SheetNames[0]]);
         if (!newRows || newRows.length === 0) throw new Error("Planilha vazia ou sem dados válidos.");
 
-        // Busca TODAS as gruas cadastradas no banco para fazer a limpeza da bagunça
+        // Busca TODAS as gruas cadastradas no banco (usado apenas para o alerta de gruas desconhecidas)
         const { data: gruasData } = await supabaseClient.from('config_gruas').select('*');
         let allMappedLoaders = [];
         if (gruasData) {
             gruasData.forEach(item => {
-                const codes = (item.codigos || '').split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+                const codes = (item.codigos || '').split(',')
+                    .map(c => c.trim().toUpperCase())
+                    .filter(c => c && c !== '-' && c !== 'OUTRAS' && c !== 'OUTROS' && c !== '0');
                 allMappedLoaders.push(...codes);
             });
         }
 
         // ==============================================================
-        // INTELIGÊNCIA 1: Filtro rigoroso (Joga fora a bagunça do Excel)
+        // INTELIGÊNCIA 1: Filtro ABSOLUTO - Regras Escritas em Pedra
         // ==============================================================
         const operacaoRows = newRows.filter(row => {
-            const transp = String(row.transportadora || '').toUpperCase();
+            const transp = String(row.transportadora || '').trim().toUpperCase();
             const grua = String(row.grua || '').trim().toUpperCase();
             
-            // É a nossa frota transportando?
-            const isSerranaTransp = transp.includes('SERRANALOG') || transp.includes('SERRANA LOG');
-            // O carregamento ocorreu em uma grua que a gente mapeou no painel?
-            const isMappedLoader = allMappedLoaders.includes(grua);
-            // Salva-vidas: É uma grua nova não mapeada ainda, mas que tem o nosso prefixo oficial?
-            const isOurPrefix = grua.startsWith('GSR') || grua.startsWith('GRB') || grua.startsWith('GSL');
+            // 1. Identificar se a transportadora é a SERRANA
+            const isSerranaTransp = transp.includes('SERRANALOG') || 
+                                    transp.includes('SERRANA LOG') || 
+                                    transp.includes('SERRANA TRANSP') || 
+                                    transp === 'SERRANA';
 
-            // Só passa o que for nosso. O resto (bagunça) é deletado.
-            return isSerranaTransp || isMappedLoader || isOurPrefix;
+            // 2. Identificar se a Grua pertence EXCLUSIVAMENTE à SERRANA
+            // Gruas de terceiros (JSL, Reflorestar) cadastradas no banco NÃO ativam essa variável.
+            // Aqui definimos os prefixos reais das máquinas da Serrana.
+            const prefixosSerrana = ['GSR'];
+            const isGruaDaSerrana = prefixosSerrana.some(prefixo => grua.startsWith(prefixo));
+
+            // 3. Aplicação das Regras Estritas do Negócio
+            if (isSerranaTransp) {
+                // CENÁRIO 1: A Serrana transportou (Não importa a grua de quem é, ENTRA)
+                return true;
+            } else if (!isSerranaTransp && isGruaDaSerrana) {
+                // CENÁRIO 2: Outra transportadora levou, MAS a grua é exclusivamente nossa (GSR) (ENTRA)
+                return true;
+            } else {
+                // CENÁRIO 3: Outra transportadora levou E a grua NÃO é nossa (Ex: JSL na grua GSL0020) -> BLOQUEIA
+                return false;
+            }
         });
 
         if (operacaoRows.length === 0) {
-            throw new Error("A planilha não contém nenhuma viagem da nossa operação. A importação foi abortada.");
+            throw new Error("A planilha não contém nenhuma viagem da nossa operação baseada nas regras definidas. A importação foi abortada.");
         }
 
         let linhasDescartadas = newRows.length - operacaoRows.length;
@@ -224,7 +240,7 @@ async function processAndSaveFile(file) {
 
         if (viagensNovasArray.length === 0) {
             let msg = `Todas as viagens já existem. (${duplicadasIgnoradas} duplicadas ignoradas).`;
-            if (linhasDescartadas > 0) msg += ` E ${linhasDescartadas} viagens inúteis foram descartadas.`;
+            if (linhasDescartadas > 0) msg += ` E ${linhasDescartadas} viagens de outras operações foram bloqueadas com sucesso.`;
             throw new Error(msg);
         }
 
@@ -258,18 +274,18 @@ async function processAndSaveFile(file) {
 
         await supabaseClient.from('historico_importacoes').insert([{ "dataBase": `Viagens: ${strHistoricoDatas}`, "qtdViagens": viagensNovasArray.length, "dataLancamento": new Date().toLocaleString('pt-PT') }]);
         
-        let msgSucesso = `Sucesso! Salvas ${viagensNovasArray.length} NOVAS viagens da nossa operação.\nDatas: ${strHistoricoDatas}`;
+        let msgSucesso = `Sucesso! Salvas ${viagensNovasArray.length} NOVAS viagens.\nDatas: ${strHistoricoDatas}`;
         
         if (linhasDescartadas > 0) {
-            msgSucesso += `\n\n🗑️ MÁGICA: ${linhasDescartadas} viagens de terceiros (bagunça) foram descartadas e não sujaram o sistema!`;
+            msgSucesso += `\n\n🛡️ BLOQUEIO ATIVO: ${linhasDescartadas} viagens de outras operações (ex: JSL, Reflorestar sem a Serrana) foram descartadas e não entraram no sistema!`;
         }
 
         if (gruasDesconhecidas.size > 0) {
-            msgSucesso += `\n\n⚠️ ALERTA: Foram importadas viagens com códigos de GRUAS NOVAS ou NÃO CADASTRADAS: (${Array.from(gruasDesconhecidas).join(', ')}).\n\nLembre-se de ir nos cards de Frentes nesta mesma tela e adicioná-las para que os cálculos do Dashboard fiquem perfeitos.`;
+            msgSucesso += `\n\n⚠️ ALERTA: Foram importadas viagens com códigos de GRUAS NOVAS ou NÃO CADASTRADAS: (${Array.from(gruasDesconhecidas).join(', ')}).\n\nLembre-se de ir nos cards de Frentes nesta mesma tela e adicioná-las para que os cálculos fiquem perfeitos.`;
         }
 
         alert(msgSucesso);
-        carregarHistoricoImportacoes(); 
+        if (typeof carregarHistoricoImportacoes === 'function') carregarHistoricoImportacoes(); 
         
     } catch (err) {
         if(errorMsgDiv) { errorMsgDiv.innerText = "Erro: " + err.message; errorMsgDiv.classList.remove('hidden'); } else alert("Erro: " + err.message);
