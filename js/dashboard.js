@@ -14,6 +14,7 @@ let chartCiclo = null, chartTransp = null;
 
 const filterTransportadora = document.getElementById('filterTransportadora');
 const filterData = document.getElementById('filterData');
+const filterMes = document.getElementById('filterMes');
 const btnQFs = document.querySelectorAll('.btn-qf');
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -44,13 +45,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function setupDashboardFilters() {
     if(filterTransportadora) filterTransportadora.addEventListener('change', () => loadDashboardData());
-    if(filterData) filterData.addEventListener('change', () => { setQuickFilterUI('ALL'); loadDashboardData(); });
+    
+    if(filterData) filterData.addEventListener('change', () => { 
+        setQuickFilterUI('ALL'); 
+        if(filterMes) filterMes.value = 'ALL';
+        loadDashboardData(); 
+    });
+
+    if(filterMes) filterMes.addEventListener('change', () => { 
+        setQuickFilterUI('ALL'); 
+        if(filterData) filterData.value = 'ALL';
+        loadDashboardData(); 
+    });
 
     btnQFs.forEach(btn => {
         btn.addEventListener('click', (e) => {
             const qf = e.currentTarget.getAttribute('data-qf');
             setQuickFilterUI(qf);
             if (qf !== 'ALL' && filterData) filterData.value = 'ALL';
+            if (qf !== 'ALL' && filterMes) filterMes.value = 'ALL';
             loadDashboardData();
         });
     });
@@ -264,6 +277,7 @@ function loadDashboardData() {
     const storedData = fullHistoricoData;
     if(!storedData.length) return;
 
+    // Popula Transportadoras
     const allTransps = [...new Set(storedData.map(d => d.transportadora))].filter(Boolean).sort();
     const currT = filterTransportadora ? filterTransportadora.value : 'ALL';
     if (filterTransportadora) {
@@ -271,6 +285,7 @@ function loadDashboardData() {
         allTransps.forEach(t => filterTransportadora.insertAdjacentHTML('beforeend', `<option value="${t}" ${t===currT?'selected':''}>${t}</option>`));
     }
 
+    // Popula Dias
     const allDates = [...new Set(storedData.map(d => d.dataDaBaseExcel))].filter(d => d && d !== 'Desconhecida').sort((a,b)=>{const pA=a.split('/');const pB=b.split('/');return new Date(pA[2],pA[1]-1,pA[0])-new Date(pB[2],pB[1]-1,pB[0]);});
     const currD = filterData ? filterData.value : 'ALL';
     if (filterData) {
@@ -278,13 +293,51 @@ function loadDashboardData() {
         allDates.forEach(dt => filterData.insertAdjacentHTML('beforeend', `<option value="${dt}" ${dt===currD?'selected':''}>${dt}</option>`));
     }
 
+    // Popula Meses Automáticos
+    const currM = filterMes ? filterMes.value : 'ALL';
+    if (filterMes) {
+        const mesesSet = new Set();
+        storedData.forEach(d => {
+            if(d.dataDaBaseExcel && d.dataDaBaseExcel !== 'Desconhecida') {
+                const p = d.dataDaBaseExcel.split('/');
+                if(p.length >= 3) {
+                    let y = p[2]; if(y.length === 2) y = "20"+y;
+                    mesesSet.add(`${p[1]}/${y}`); 
+                }
+            }
+        });
+        const allMeses = Array.from(mesesSet).sort((a,b) => {
+             const pA = a.split('/'); const pB = b.split('/');
+             return new Date(pA[1], pA[0]-1, 1) - new Date(pB[1], pB[0]-1, 1);
+        });
+
+        const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+        filterMes.innerHTML = '<option value="ALL">TODOS OS MESES</option>';
+        allMeses.forEach(mStr => {
+            const p = mStr.split('/');
+            const mesIdx = parseInt(p[0]) - 1;
+            const nomeMes = monthNames[mesIdx] + '/' + p[1].substring(2);
+            filterMes.insertAdjacentHTML('beforeend', `<option value="${mStr}" ${mStr===currM?'selected':''}>${nomeMes}</option>`);
+        });
+    }
+
     const activeT = filterTransportadora ? filterTransportadora.value : 'ALL';
     const activeD = filterData ? filterData.value : 'ALL';
+    const activeM = filterMes ? filterMes.value : 'ALL';
     
+    // Lógica de Filtragem
     const filteredData = storedData.filter(d => {
         const mTransp = activeT === 'ALL' || d.transportadora === activeT;
         let mData = true;
-        if (activeQuickFilter !== 'ALL') {
+
+        if (activeM !== 'ALL') {
+            const p = d.dataDaBaseExcel.split('/');
+            if(p.length >= 3) {
+                 let y = p[2]; if(y.length === 2) y = "20"+y;
+                 mData = (`${p[1]}/${y}` === activeM);
+            } else { mData = false; }
+        } 
+        else if (activeQuickFilter !== 'ALL') {
             const parsed = parseDateTime(d.dataDaBaseExcel, null);
             if (parsed) {
                 parsed.setHours(0,0,0,0); const hj = new Date(); hj.setHours(0,0,0,0);
@@ -299,11 +352,11 @@ function loadDashboardData() {
                     inicioSemana.setDate(hj.getDate() - hj.getDay());
                     mData = (parsed >= inicioSemana && parsed <= hj);
                 }
-                else if (activeQuickFilter === 'MES') {
-                    mData = (parsed.getMonth() === hj.getMonth() && parsed.getFullYear() === hj.getFullYear());
-                }
             } else mData = false;
-        } else mData = activeD === 'ALL' || d.dataDaBaseExcel === activeD;
+        } else {
+            mData = activeD === 'ALL' || d.dataDaBaseExcel === activeD;
+        }
+        
         return mTransp && mData;
     });
 

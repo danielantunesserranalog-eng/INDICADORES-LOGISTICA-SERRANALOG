@@ -38,8 +38,16 @@
                 </div>
                 
                 <div id="dashboardFilters" class="flex items-center gap-4 bg-slate-900/80 p-2 rounded-xl border border-sky-800 shadow-lg shadow-sky-900/20 flex-wrap">
+                    
+                    <div class="flex items-center gap-2 border-r border-slate-700/50 pr-4">
+                        <label for="filterMes" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="fas fa-calendar-alt mr-1"></i> Mês:</label>
+                        <select id="filterMes" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-4 py-2 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner">
+                            <option value="ALL">TODOS OS MESES</option>
+                        </select>
+                    </div>
+
                     <div class="flex items-center gap-2">
-                        <label for="filterData" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="far fa-calendar-alt mr-1"></i> Data:</label>
+                        <label for="filterData" class="text-xs font-bold text-sky-400 uppercase tracking-widest pl-2"><i class="fas fa-calendar-day mr-1"></i> Dia:</label>
                         <select id="filterData" class="bg-slate-800 text-white text-sm font-bold rounded-lg border border-slate-600 px-4 py-2 focus:outline-none focus:border-sky-500 cursor-pointer shadow-inner">
                             <option value="ALL">TODO O PERÍODO</option>
                         </select>

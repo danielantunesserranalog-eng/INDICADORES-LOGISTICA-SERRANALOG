@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupOperacionalFilters() {
     const btnQFs = document.querySelectorAll('.btn-op-qf');
     const datePicker = document.getElementById('opDatePicker');
+    const filterMesOp = document.getElementById('filterMesOp');
     
     btnQFs.forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -40,6 +41,7 @@ function setupOperacionalFilters() {
                 }
             });
             if(datePicker) datePicker.value = '';
+            if(filterMesOp) filterMesOp.value = 'ALL';
             atualizarPainelOperacional();
         });
     });
@@ -52,8 +54,23 @@ function setupOperacionalFilters() {
                     b.classList.remove('active', 'border-emerald-500/50', 'text-emerald-400', 'bg-emerald-900/30');
                     b.classList.add('border-transparent', 'text-slate-400', 'hover:bg-slate-700/50');
                 });
+                if(filterMesOp) filterMesOp.value = 'ALL';
                 atualizarPainelOperacional();
             }
+        });
+    }
+
+    if(filterMesOp) {
+        filterMesOp.addEventListener('change', () => {
+            if(filterMesOp.value !== 'ALL') {
+                activeQuickFilterOp = 'ALL';
+                btnQFs.forEach(b => {
+                    b.classList.remove('active', 'border-emerald-500/50', 'text-emerald-400', 'bg-emerald-900/30');
+                    b.classList.add('border-transparent', 'text-slate-400', 'hover:bg-slate-700/50');
+                });
+                if(datePicker) datePicker.value = '';
+            }
+            atualizarPainelOperacional();
         });
     }
 }
@@ -115,7 +132,6 @@ async function loadOperacionalData() {
         const { data: metas } = await supabaseClient.from('metas_globais').select('*').eq('id', 1).single();
         if(metas) metasGlobais = metas;
 
-        // CORREÇÃO MESTRA 1: Buscando os dados com loop de paginação para quebrar o limite de 1000 do Supabase
         let historico = [];
         let from = 0;
         const step = 1000;
@@ -144,7 +160,6 @@ async function loadOperacionalData() {
             fullHistoricoDataOp = historico.reverse();
         }
 
-        // Buscar Manutenções do banco secundário também paginado
         try {
             let manutencoes = [];
             let fromManut = 0;
@@ -172,6 +187,37 @@ async function loadOperacionalData() {
             console.error("Erro ao carregar manutenções do banco:", errManutencao);
         }
 
+        // Popula o Filtro de Meses
+        const filterMesOp = document.getElementById('filterMesOp');
+        if(filterMesOp && fullHistoricoDataOp.length > 0) {
+            const currMesOp = filterMesOp.value;
+            const mesesSet = new Set();
+            
+            fullHistoricoDataOp.forEach(d => {
+                if(d.dataDaBaseExcel && d.dataDaBaseExcel !== 'Desconhecida') {
+                    const p = d.dataDaBaseExcel.split('/');
+                    if(p.length >= 3) {
+                        let y = p[2]; if(y.length === 2) y = "20"+y;
+                        mesesSet.add(`${p[1]}/${y}`);
+                    }
+                }
+            });
+
+            const allMeses = Array.from(mesesSet).sort((a,b) => {
+                 const pA = a.split('/'); const pB = b.split('/');
+                 return new Date(pA[1], pA[0]-1, 1) - new Date(pB[1], pB[0]-1, 1);
+            });
+
+            const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            filterMesOp.innerHTML = '<option value="ALL">Todos os Meses</option>';
+            allMeses.forEach(mStr => {
+                const p = mStr.split('/');
+                const mesIdx = parseInt(p[0]) - 1;
+                const nomeMes = monthNames[mesIdx] + '/' + p[1].substring(2);
+                filterMesOp.insertAdjacentHTML('beforeend', `<option value="${mStr}" ${mStr===currMesOp?'selected':''}>${nomeMes}</option>`);
+            });
+        }
+
         if(fullHistoricoDataOp.length > 0) {
             const allDates = [...new Set(fullHistoricoDataOp.map(d => d.dataDaBaseExcel))].filter(d => d && d !== 'Desconhecida');
             verificarStatusAtualizacao(allDates);
@@ -180,72 +226,136 @@ async function loadOperacionalData() {
     } catch(e) { console.error("Erro ao carregar dados operacionais:", e); }
 }
 
+function parseDateTime(dateVal, timeVal) {
+    if (!dateVal) return null;
+    let baseDate = null;
+    if (typeof dateVal === 'number') {
+        const dateInfo = XLSX.SSF.parse_date_code(dateVal);
+        if (dateInfo) baseDate = new Date(dateInfo.y, dateInfo.m - 1, dateInfo.d);
+    } else if (typeof dateVal === 'string') {
+        const str = dateVal.trim();
+        if (str.includes('/')) {
+            const parts = str.split(' ')[0].split('/');
+            if (parts.length >= 3) {
+                let year = parseInt(parts[2], 10);
+                if (year < 100) year += 2000;
+                baseDate = new Date(year, parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+            }
+        } else if (str.includes('-')) {
+            const parts = str.split(' ')[0].split('-');
+            if (parts.length >= 3) {
+                let year = parseInt(parts[0], 10) > 1000 ? parseInt(parts[0], 10) : parseInt(parts[2], 10);
+                let month = parseInt(parts[1], 10) - 1;
+                let day = parseInt(parts[0], 10) > 1000 ? parseInt(parts[2], 10) : parseInt(parts[0], 10);
+                if (year < 100) year += 2000;
+                baseDate = new Date(year, month, day);
+            }
+        } else { baseDate = new Date(str); }
+    }
+    if (!baseDate || isNaN(baseDate.getTime())) return null;
+
+    let hours = 0, minutes = 0, seconds = 0;
+    if (timeVal) {
+        if (typeof timeVal === 'number') {
+            let fraction = timeVal % 1; 
+            if (fraction < 0) fraction += 1;
+            let totalSeconds = Math.round(fraction * 24 * 3600);
+            hours = Math.floor(totalSeconds / 3600);
+            totalSeconds %= 3600;
+            minutes = Math.floor(totalSeconds / 60);
+        } else if (typeof timeVal === 'string' && timeVal.trim() !== "") {
+            const tParts = timeVal.trim().split(':');
+            hours = parseInt(tParts[0], 10) || 0;
+            minutes = parseInt(tParts[1], 10) || 0;
+        }
+    }
+    baseDate.setHours(hours, minutes, seconds, 0);
+    return baseDate;
+}
+
 function atualizarPainelOperacional() {
     const dataRef = document.getElementById('opDatePicker') ? document.getElementById('opDatePicker').value : null;
+    const filterMesOp = document.getElementById('filterMesOp');
+    const mesRef = filterMesOp ? filterMesOp.value : 'ALL';
     let diasConsiderados = 1;
 
     // Filtro de Viagens
     const filteredGlobal = fullHistoricoDataOp.filter(d => {
-        if(activeQuickFilterOp === 'ALL') return true;
-        
-        // Usa o parser global que já funciona perfeitamente para todas as datas
         const parsed = parseDateTime(d.dataDaBaseExcel, null);
         if(!parsed) return false;
 
-        parsed.setHours(0,0,0,0); 
-        const hj = new Date(); hj.setHours(0,0,0,0);
-
-        if (activeQuickFilterOp === 'DATE' && dataRef) {
-            const dr = new Date(dataRef + "T00:00:00");
-            dr.setHours(0,0,0,0);
-            return parsed.getTime() === dr.getTime();
+        if (mesRef !== 'ALL') {
+            const p = d.dataDaBaseExcel.split('/');
+            if(p.length >= 3) {
+                 let y = p[2]; if(y.length === 2) y = "20"+y;
+                 if(`${p[1]}/${y}` !== mesRef) return false;
+            } else return false;
+        } else {
+            if(activeQuickFilterOp === 'ALL' && !dataRef) return true;
         }
 
-        const diff = Math.round((hj - parsed)/86400000);
-        if (activeQuickFilterOp === 'D-1') return diff === 1;
-        if (activeQuickFilterOp === 'D-2') return diff === 2;
-        if (activeQuickFilterOp === 'D-7') return diff >= 0 && diff <= 7;
-        if (activeQuickFilterOp === 'D-30') return diff >= 0 && diff <= 30;
-        if (activeQuickFilterOp === 'SEM') {
-            const inicioSemana = new Date(hj);
-            inicioSemana.setDate(hj.getDate() - hj.getDay());
-            return (parsed >= inicioSemana && parsed <= hj);
+        if (mesRef === 'ALL') {
+            parsed.setHours(0,0,0,0); 
+            const hj = new Date(); hj.setHours(0,0,0,0);
+
+            if (activeQuickFilterOp === 'DATE' && dataRef) {
+                const dr = new Date(dataRef + "T00:00:00");
+                dr.setHours(0,0,0,0);
+                return parsed.getTime() === dr.getTime();
+            }
+
+            const diff = Math.round((hj - parsed)/86400000);
+            if (activeQuickFilterOp === 'D-1') return diff === 1;
+            if (activeQuickFilterOp === 'D-2') return diff === 2;
+            if (activeQuickFilterOp === 'D-7') return diff >= 0 && diff <= 7;
+            if (activeQuickFilterOp === 'D-30') return diff >= 0 && diff <= 30;
+            if (activeQuickFilterOp === 'SEM') {
+                const inicioSemana = new Date(hj);
+                inicioSemana.setDate(hj.getDate() - hj.getDay());
+                return (parsed >= inicioSemana && parsed <= hj);
+            }
         }
-        if (activeQuickFilterOp === 'MES') {
-            return (parsed.getMonth() === hj.getMonth() && parsed.getFullYear() === hj.getFullYear());
-        }
-        return false;
+        
+        return mesRef !== 'ALL';
     });
 
     // Filtro de Manutenção
     const filteredManutencao = fullHistoricoManutencao.filter(d => {
-        if(activeQuickFilterOp === 'ALL') return true;
         const dateStr = d.data_abertura || d.created_at;
         if(!dateStr) return false;
 
         const parsed = new Date(dateStr);
         parsed.setHours(0,0,0,0); 
-        const hj = new Date(); hj.setHours(0,0,0,0);
 
-        if (activeQuickFilterOp === 'DATE' && dataRef) {
-            const dr = new Date(dataRef + "T00:00:00");
-            return parsed.getTime() === dr.getTime();
+        if (mesRef !== 'ALL') {
+            const m = String(parsed.getMonth() + 1).padStart(2, '0');
+            const y = parsed.getFullYear();
+            if (`${m}/${y}` !== mesRef) return false;
+        } else {
+            if(activeQuickFilterOp === 'ALL' && !dataRef) return true;
         }
 
-        const diff = Math.round((hj - parsed)/86400000);
-        if (activeQuickFilterOp === 'D-1') return diff === 1;
-        if (activeQuickFilterOp === 'D-2') return diff === 2;
-        if (activeQuickFilterOp === 'D-7') return diff >= 0 && diff <= 7;
-        if (activeQuickFilterOp === 'D-30') return diff >= 0 && diff <= 30;
-        if (activeQuickFilterOp === 'SEM') {
-            const inicioSemana = new Date(hj);
-            inicioSemana.setDate(hj.getDate() - hj.getDay());
-            return (parsed >= inicioSemana && parsed <= hj);
+        if (mesRef === 'ALL') {
+            const hj = new Date(); hj.setHours(0,0,0,0);
+
+            if (activeQuickFilterOp === 'DATE' && dataRef) {
+                const dr = new Date(dataRef + "T00:00:00");
+                return parsed.getTime() === dr.getTime();
+            }
+
+            const diff = Math.round((hj - parsed)/86400000);
+            if (activeQuickFilterOp === 'D-1') return diff === 1;
+            if (activeQuickFilterOp === 'D-2') return diff === 2;
+            if (activeQuickFilterOp === 'D-7') return diff >= 0 && diff <= 7;
+            if (activeQuickFilterOp === 'D-30') return diff >= 0 && diff <= 30;
+            if (activeQuickFilterOp === 'SEM') {
+                const inicioSemana = new Date(hj);
+                inicioSemana.setDate(hj.getDate() - hj.getDay());
+                return (parsed >= inicioSemana && parsed <= hj);
+            }
         }
-        if (activeQuickFilterOp === 'MES') {
-            return (parsed.getMonth() === hj.getMonth() && parsed.getFullYear() === hj.getFullYear());
-        }
-        return false;
+        
+        return mesRef !== 'ALL';
     });
 
     const filteredSerrana = filteredGlobal.filter(d => {
@@ -253,13 +363,13 @@ function atualizarPainelOperacional() {
         return transp.includes('SERRANALOG');
     });
 
-    if(activeQuickFilterOp === 'ALL') {
+    if(activeQuickFilterOp === 'D-7') diasConsiderados = 7;
+    else if(activeQuickFilterOp === 'D-30') diasConsiderados = 30;
+    else if(activeQuickFilterOp === 'SEM') diasConsiderados = new Date().getDay() + 1; 
+    else {
         const dts = new Set(filteredGlobal.map(x=>x.dataDaBaseExcel));
         diasConsiderados = dts.size || 1;
-    } else if (activeQuickFilterOp === 'D-7') diasConsiderados = 7;
-    else if (activeQuickFilterOp === 'D-30') diasConsiderados = 30;
-    else if (activeQuickFilterOp === 'SEM') diasConsiderados = new Date().getDay() + 1; 
-    else if (activeQuickFilterOp === 'MES') diasConsiderados = new Date().getDate(); 
+    }
 
     const placasUnicasSerrana = new Set(filteredSerrana.map(d => d.placa).filter(p => p && p !== '-' && p.trim() !== '')).size || 0;
     const placasUnicasGlobal = new Set(filteredGlobal.map(d => d.placa).filter(p => p && p !== '-' && p.trim() !== '')).size || 0;
@@ -276,7 +386,6 @@ function atualizarPainelOperacional() {
     const lblMultiplicador1 = document.getElementById('diasMultiplicador1');
     const lblMultiplicador2 = document.getElementById('diasMultiplicador2');
     
-    // CORREÇÃO 2: Exibir métricas e metas baseadas no panorama Global para igualar à Visão Geral
     if(lblMultiplicador1) lblMultiplicador1.innerText = `${diasConsiderados}d | F:${placasUnicasGlobal} (Global)`;
     if(lblMultiplicador2) lblMultiplicador2.innerText = `${diasConsiderados}d`;
 
@@ -323,14 +432,11 @@ function atualizarPainelOperacional() {
     
     atualizarBarra('bar_pbtc_perc', 'disp_pbtc_perc', mediaPbtc, metaPbtc);
 
-    // Gráficos
-    // CORREÇÃO 3: Desenhar a Evolução Diária com TODOS os dados e não apenas o dia filtrado
-    renderEvolucaoChart(fullHistoricoDataOp);
+    renderEvolucaoChart(filteredGlobal.length > 0 ? filteredGlobal : fullHistoricoDataOp);
     
     renderProjecaoChart(filteredGlobal); 
     renderManutencaoChart(filteredManutencao); 
 
-    // Renderiza Tabelas
     renderLeaderboards(filteredSerrana);
     renderManutencaoTables(filteredManutencao); 
     renderDashboardsGerenciais(filteredGlobal);
